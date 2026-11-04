@@ -9,7 +9,7 @@ import ApplicationServices
 /// macOS garde son fonctionnement habituel.
 @MainActor
 final class VolumeKeyInterceptor {
-    enum Key { case up, down, mute }
+    enum Key { case up, down, mute, brightnessUp, brightnessDown }
 
     /// Renvoie `true` si la touche a été traitée (elle est alors retirée du flux).
     var onKey: ((Key, _ fineStep: Bool) -> Bool)?
@@ -108,6 +108,8 @@ final class VolumeKeyInterceptor {
         case 0: key = .up       // NX_KEYTYPE_SOUND_UP
         case 1: key = .down     // NX_KEYTYPE_SOUND_DOWN
         case 7: key = .mute     // NX_KEYTYPE_MUTE
+        case 2: key = .brightnessUp    // NX_KEYTYPE_BRIGHTNESS_UP
+        case 3: key = .brightnessDown  // NX_KEYTYPE_BRIGHTNESS_DOWN
         default: return Unmanaged.passUnretained(event)
         }
 

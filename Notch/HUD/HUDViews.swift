@@ -58,7 +58,15 @@ struct BatteryHUDView: View {
     }
 }
 
-/// Luminosité de l'écran (remplie à l'étape suivante).
+/// Luminosité de l'écran intégré.
 struct BrightnessHUDView: View {
-    var body: some View { EmptyView() }
+    @Environment(BrightnessController.self) private var brightness
+
+    var body: some View {
+        LevelHUD(
+            symbol: brightness.symbol,
+            level: Double(brightness.brightness),
+            label: "\(Int((brightness.brightness * 100).rounded()))"
+        )
+    }
 }

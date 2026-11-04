@@ -16,6 +16,8 @@ final class VolumeController {
 
     @ObservationIgnored private var device = AudioObjectID(kAudioObjectUnknown)
     @ObservationIgnored var hud: HUDCenter?
+    /// Les touches de luminosité passent par le même canal que celles du volume.
+    @ObservationIgnored var brightness: BrightnessController?
     /// Changement venant de notre propre réglage : pas d'indicateur par-dessus le curseur.
     @ObservationIgnored private var isSettingVolume = false
 
@@ -107,6 +109,11 @@ final class VolumeController {
     }
 
     private func handleKey(_ key: VolumeKeyInterceptor.Key, fine: Bool) -> Bool {
+        switch key {
+        case .brightnessUp: return brightness?.handleKey(up: true, fine: fine) ?? false
+        case .brightnessDown: return brightness?.handleKey(up: false, fine: fine) ?? false
+        default: break
+        }
         // Sortie non réglable (ex. HDMI) : on laisse macOS gérer et prévenir.
         guard isAdjustable else { return false }
         let step = fine ? Self.fineStep : Self.step
@@ -118,6 +125,8 @@ final class VolumeController {
             setVolume(max(((volume - step) / step).rounded() * step, 0))
         case .mute:
             toggleMute()
+        case .brightnessUp, .brightnessDown:
+            break
         }
         flashHUD()
         return true

@@ -110,7 +110,7 @@ struct NotchRootView: View {
                 set: { settings.hideSystemBanners = $0 }
             ))
             .disabled(!settings.mirrorSystemNotifications)
-            Toggle("Remplacer l'indicateur de volume", isOn: Binding(
+            Toggle("Remplacer les indicateurs volume / luminosité", isOn: Binding(
                 get: { settings.replaceSystemVolumeHUD },
                 set: {
                     settings.replaceSystemVolumeHUD = $0
@@ -118,7 +118,7 @@ struct NotchRootView: View {
                 }
             ))
             if settings.replaceSystemVolumeHUD, !volume.isReplacingSystemHUD {
-                Button("Autoriser l'accessibilité (touches de volume)…") { volume.requestAccessibility() }
+                Button("Autoriser l'accessibilité (touches volume / luminosité)…") { volume.requestAccessibility() }
             }
             Divider()
             Button("Quitter Notch") { NSApp.terminate(nil) }

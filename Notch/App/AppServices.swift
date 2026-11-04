@@ -7,6 +7,7 @@ struct AppServices {
     let alerts: AlertCenter
     let hud: HUDCenter
     let battery: BatteryMonitor
+    let brightness: BrightnessController
     let music: MusicController
     let volume: VolumeController
     let calendar: CalendarController
@@ -25,6 +26,8 @@ struct AppServices {
         hud = HUDCenter()
         battery = BatteryMonitor()
         battery.hud = hud
+        brightness = BrightnessController()
+        brightness.hud = hud
         music = MusicController()
         volume = VolumeController()
         calendar = CalendarController()
@@ -35,6 +38,7 @@ struct AppServices {
         claudeCode.alerts = alerts
         volume.alerts = alerts
         volume.hud = hud
+        volume.brightness = brightness
         calendar.alerts = alerts
         calendar.startMeetingReminders()
         volume.setReplacesSystemHUD(settings.replaceSystemVolumeHUD)
@@ -74,6 +78,7 @@ extension View {
             .environment(services.alerts)
             .environment(services.hud)
             .environment(services.battery)
+            .environment(services.brightness)
             .environment(services.music)
             .environment(services.volume)
             .environment(services.calendar)
