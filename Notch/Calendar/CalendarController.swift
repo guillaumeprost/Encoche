@@ -11,6 +11,33 @@ struct CalendarEvent: Identifiable, Equatable {
     let end: Date
     let isAllDay: Bool
     let color: Color
+    /// Lien de visio trouvé dans l'événement (Meet, Zoom, Teams…).
+    var meetingURL: URL?
+}
+
+/// Trouve un lien de visio dans un événement : son URL, son lieu ou ses notes.
+enum MeetingLink {
+    private static let hosts = [
+        "meet.google.com", "zoom.us", "teams.microsoft.com", "teams.live.com",
+        "webex.com", "whereby.com", "facetime.apple.com",
+    ]
+    private static let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+
+    static func find(in event: EKEvent) -> URL? {
+        if let url = event.url, isMeeting(url) { return url }
+        for text in [event.location, event.notes].compactMap({ $0 }) {
+            let range = NSRange(text.startIndex..., in: text)
+            for match in detector?.matches(in: text, range: range) ?? [] {
+                if let url = match.url, isMeeting(url) { return url }
+            }
+        }
+        return nil
+    }
+
+    private static func isMeeting(_ url: URL) -> Bool {
+        guard let host = url.host?.lowercased() else { return false }
+        return hosts.contains { host == $0 || host.hasSuffix("." + $0) }
+    }
 }
 
 /// Lit les événements des calendriers du Mac (iCloud, Google, Exchange… tout ce que
@@ -30,6 +57,10 @@ final class CalendarController {
     private(set) var busyDays: Set<Date> = []
 
     private let store = EKEventStore()
+    /// Pour les rappels de réunion dans l'encoche.
+    @ObservationIgnored var alerts: AlertCenter?
+    @ObservationIgnored private var remindedIDs: Set<String> = []
+    @ObservationIgnored private var reminderTimer: Timer?
     private let calendar = Calendar.current
 
     init() {
@@ -79,6 +110,56 @@ final class CalendarController {
 
     func selectToday() { select(Date()) }
 
+    // MARK: - Rappels de réunion
+
+    /// Vérifie toutes les 20 s s'il faut prévenir d'un événement qui commence dans la minute.
+    func startMeetingReminders() {
+        reminderTimer = Timer.scheduledTimer(withTimeInterval: 20, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.checkUpcomingMeetings() }
+        }
+        checkUpcomingMeetings()
+    }
+
+    private func checkUpcomingMeetings() {
+        guard access == .granted else { return }
+        let now = Date()
+        // Commence dans la minute (ou vient de commencer, si l'app était occupée).
+        let predicate = store.predicateForEvents(
+            withStart: now.addingTimeInterval(-60), end: now.addingTimeInterval(75), calendars: nil
+        )
+        for event in store.events(matching: predicate) where !event.isAllDay {
+            let start = event.startDate.timeIntervalSince(now)
+            guard start <= 70, start > -60 else { continue }
+            let key = "\(event.calendarItemIdentifier)-\(event.startDate.timeIntervalSince1970)"
+            guard !remindedIDs.contains(key) else { continue }
+            remindedIDs.insert(key)
+            postReminder(for: event, startsIn: start)
+        }
+    }
+
+    private func postReminder(for event: EKEvent, startsIn seconds: TimeInterval) {
+        let title = event.title?.isEmpty == false ? event.title! : "Événement"
+        let when = seconds > 5 ? "Commence dans 1 min" : "Commence maintenant"
+        let itemID = event.calendarItemIdentifier
+        let openEvent: NotchAlert.Action = .openURL(URL(string: "ical://ekevent/\(itemID)?method=show&options=more")!)
+
+        var alert = NotchAlert(
+            icon: .symbol("calendar", .red),
+            source: "Calendrier",
+            title: title,
+            body: [when, event.location].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "),
+            action: openEvent
+        )
+        if let url = MeetingLink.find(in: event) {
+            // Avec un lien de visio : la notification attend une réponse.
+            alert.buttons = [
+                .init(label: "Ignorer", role: .normal) {},
+                .init(label: "Rejoindre", role: .primary) { NSWorkspace.shared.open(url) },
+            ]
+        }
+        alerts?.post(alert)
+    }
+
     func open(_ event: CalendarEvent) {
         if let url = URL(string: "ical://ekevent/\(event.itemID)?method=show&options=more") {
             NSWorkspace.shared.open(url)
@@ -126,7 +207,8 @@ final class CalendarController {
                     start: event.startDate,
                     end: event.endDate,
                     isAllDay: event.isAllDay,
-                    color: Color(nsColor: event.calendar.color ?? .systemBlue)
+                    color: Color(nsColor: event.calendar.color ?? .systemBlue),
+                    meetingURL: MeetingLink.find(in: event)
                 )
             }
     }

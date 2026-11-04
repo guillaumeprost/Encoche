@@ -29,6 +29,8 @@ struct AppServices {
         claudeCode = ClaudeCodeMonitor()
         claudeCode.alerts = alerts
         volume.alerts = alerts
+        calendar.alerts = alerts
+        calendar.startMeetingReminders()
         volume.setReplacesSystemHUD(settings.replaceSystemVolumeHUD)
         ask = ClaudeAsk()
         launchAtLogin = LaunchAtLogin()

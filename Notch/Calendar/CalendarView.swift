@@ -148,6 +148,17 @@ private struct EventRow: View {
                     .foregroundStyle(isNow ? event.color : .primary.opacity(0.5))
             }
             Spacer(minLength: 0)
+            if let url = event.meetingURL, !isPast {
+                Button { NSWorkspace.shared.open(url) } label: {
+                    Image(systemName: "video.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 26, height: 20)
+                        .background(Capsule().fill(Color.green.opacity(isNow ? 1 : 0.7)))
+                }
+                .buttonStyle(.plain)
+                .help("Rejoindre la réunion")
+            }
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 6)
