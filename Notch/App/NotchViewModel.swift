@@ -1,0 +1,41 @@
+import AppKit
+import Observation
+
+@Observable
+@MainActor
+final class NotchViewModel {
+    var isOpen = false
+    /// Taille de l'encoche physique (ou d'une encoche simulée sur un écran sans encoche).
+    var notchSize = CGSize(width: 185, height: 32)
+    var hasPhysicalNotch = true
+
+    var useGlass: Bool = UserDefaults.standard.object(forKey: "useGlass") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(useGlass, forKey: "useGlass") }
+    }
+
+    static let expandedBodyWidth: CGFloat = 480
+    static let expandedContentHeight: CGFloat = 124
+
+    var topRadius: CGFloat { isOpen ? 12 : 6 }
+    var bottomRadius: CGFloat { isOpen ? 26 : 9 }
+
+    /// Largeur d'une case latérale de la « live activity » repliée.
+    var activitySlotWidth: CGFloat { notchSize.height + 8 }
+
+    /// Taille totale de la forme, évasements du haut compris.
+    func shapeSize(showsActivity: Bool) -> CGSize {
+        let bodyWidth: CGFloat
+        let height: CGFloat
+        if isOpen {
+            bodyWidth = Self.expandedBodyWidth
+            height = notchSize.height + Self.expandedContentHeight
+        } else if showsActivity {
+            bodyWidth = notchSize.width + 2 * activitySlotWidth
+            height = notchSize.height
+        } else {
+            bodyWidth = notchSize.width
+            height = notchSize.height
+        }
+        return CGSize(width: bodyWidth + 2 * topRadius, height: height)
+    }
+}

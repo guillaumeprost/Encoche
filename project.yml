@@ -1,0 +1,30 @@
+name: Notch
+options:
+  bundleIdPrefix: com.guillaumeprost
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
+targets:
+  Notch:
+    type: application
+    platform: macOS
+    sources: [Notch]
+    info:
+      path: Notch/Info.plist
+      properties:
+        CFBundleDisplayName: Notch
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        LSUIElement: true
+        NSAppleEventsUsageDescription: "Notch pilote Musique et Spotify pour afficher et contrôler le morceau en cours."
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.guillaumeprost.notch
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "-"
+        ENABLE_HARDENED_RUNTIME: NO
+        ENABLE_APP_SANDBOX: NO
