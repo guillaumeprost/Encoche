@@ -104,6 +104,11 @@ struct NotchRootView: View {
             if systemNotifications.access == .denied {
                 Button("Autoriser les notifications macOS…") { systemNotifications.openPrivacySettings() }
             }
+            Toggle("Masquer les bannières macOS", isOn: Binding(
+                get: { settings.hideSystemBanners },
+                set: { settings.hideSystemBanners = $0 }
+            ))
+            .disabled(!settings.mirrorSystemNotifications)
             Toggle("Remplacer l'indicateur de volume", isOn: Binding(
                 get: { settings.replaceSystemVolumeHUD },
                 set: {

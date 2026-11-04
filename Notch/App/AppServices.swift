@@ -15,6 +15,7 @@ struct AppServices {
     let ask: ClaudeAsk
     let launchAtLogin: LaunchAtLogin
     let systemNotifications: SystemNotificationWatcher
+    let bannerSuppressor: BannerSuppressor
 
     init() {
         settings = AppSettings()
@@ -32,6 +33,29 @@ struct AppServices {
         ask = ClaudeAsk()
         launchAtLogin = LaunchAtLogin()
         systemNotifications = SystemNotificationWatcher(alerts: alerts, settings: settings)
+
+        // Bannières de macOS fermées tant que Notch les relaie : seulement si le relais marche,
+        // pour ne jamais perdre une notification.
+        bannerSuppressor = BannerSuppressor()
+        let settings = settings, watcher = systemNotifications
+        bannerSuppressor.isEnabled = {
+            settings.hideSystemBanners && settings.mirrorSystemNotifications && watcher.access == .granted
+        }
+        bannerSuppressor.beforeClosing = { watcher.pollNow() }
+        let alertCenter = alerts
+        bannerSuppressor.onUnreadBanner = { appName, title, body in
+            guard !alertCenter.hasRecent(title: title) else { return }
+            let bundleID = NSWorkspace.shared.runningApplications
+                .first { $0.localizedName == appName }?.bundleIdentifier
+            alertCenter.post(NotchAlert(
+                icon: bundleID.map { .app(bundleID: $0) } ?? .symbol("bell.fill", .gray),
+                source: appName,
+                title: title,
+                body: body,
+                action: bundleID.map { .openApp(bundleID: $0) }
+            ))
+        }
+        bannerSuppressor.start()
     }
 }
 

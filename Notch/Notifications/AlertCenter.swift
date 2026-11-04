@@ -81,6 +81,11 @@ final class AlertCenter {
         }
     }
 
+    /// Une notification avec ce titre est-elle arrivée il y a moins de `seconds` secondes ?
+    func hasRecent(title: String, within seconds: TimeInterval = 10) -> Bool {
+        history.contains { $0.title == title && Date().timeIntervalSince($0.date) < seconds }
+    }
+
     func markAllRead() {
         unreadCount = 0
     }

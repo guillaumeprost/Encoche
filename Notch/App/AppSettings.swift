@@ -16,6 +16,11 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(mirrorSystemNotifications, forKey: "mirrorSystemNotifications") }
     }
 
+    /// Masquer les bannières de macOS : les notifications n'apparaissent que dans l'encoche.
+    var hideSystemBanners: Bool = UserDefaults.standard.object(forKey: "hideSystemBanners") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(hideSystemBanners, forKey: "hideSystemBanners") }
+    }
+
     /// Remplacer l'indicateur de volume de macOS par celui de l'encoche.
     var replaceSystemVolumeHUD: Bool = UserDefaults.standard.object(forKey: "replaceSystemVolumeHUD") as? Bool ?? true {
         didSet { UserDefaults.standard.set(replaceSystemVolumeHUD, forKey: "replaceSystemVolumeHUD") }

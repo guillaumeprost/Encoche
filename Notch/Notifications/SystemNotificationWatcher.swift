@@ -87,6 +87,12 @@ final class SystemNotificationWatcher {
         poll()
     }
 
+    /// Lit tout de suite les nouvelles notifications (avant qu'une bannière ne soit fermée).
+    func pollNow() {
+        guard db != nil, settings.mirrorSystemNotifications else { return }
+        poll()
+    }
+
     private func poll() {
         var statement: OpaquePointer?
         // Une seconde de marge : deux notifications peuvent partager la même date ;
