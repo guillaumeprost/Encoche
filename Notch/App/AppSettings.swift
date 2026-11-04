@@ -5,7 +5,9 @@ import Observation
 @Observable
 @MainActor
 final class AppSettings {
-    var useGlass: Bool = UserDefaults.standard.object(forKey: "useGlass") as? Bool ?? true {
+    /// Liquid Glass pour l'encoche ouverte. Désactivé par défaut : en noir, l'encoche se fond
+    /// dans celle du Mac.
+    var useGlass: Bool = UserDefaults.standard.object(forKey: "useGlass") as? Bool ?? false {
         didSet { UserDefaults.standard.set(useGlass, forKey: "useGlass") }
     }
 

@@ -93,7 +93,7 @@ struct NotchRootView: View {
         .clipShape(shape)
         .shadow(color: .black.opacity(vm.isOpen || vm.showsAlert ? 0.35 : 0), radius: 18, y: 8)
         .contextMenu {
-            Toggle("Liquid Glass", isOn: Binding(get: { settings.useGlass }, set: { settings.useGlass = $0 }))
+            Toggle("Liquid Glass (encoche ouverte)", isOn: Binding(get: { settings.useGlass }, set: { settings.useGlass = $0 }))
             if launchAtLogin.isInstalledCopy {
                 Toggle("Ouvrir au démarrage", isOn: Binding(get: { launchAtLogin.isEnabled }, set: { launchAtLogin.set($0) }))
             }
@@ -145,11 +145,13 @@ struct NotchRootView: View {
     }
 
     /// Ouverte ou notification, avec le Liquid Glass activé.
-    private var glassActive: Bool { (vm.isOpen || vm.showsAlert) && settings.useGlass }
+    /// Notifications et indicateurs restent toujours noirs, comme l'encoche matérielle (effet
+    /// Dynamic Island) ; seule l'encoche ouverte peut passer en verre, si l'option est activée.
+    private var glassActive: Bool { vm.isOpen && settings.useGlass }
 
-    /// Repliée : noir pur, pour se fondre dans l'encoche physique.
-    /// Ouverte ou notification : Liquid Glass natif, sans teinte imposée — il suit l'apparence
-    /// du Mac et ses réglages d'accessibilité (réduire la transparence, augmenter le contraste).
+    /// Noir pur par défaut, pour se fondre dans l'encoche physique, y compris ouverte et pour
+    /// les notifications. En option, l'encoche ouverte passe en Liquid Glass natif, qui suit
+    /// l'apparence du Mac et son réglage de transparence.
     @ViewBuilder
     private func background(_ shape: NotchShape) -> some View {
         ZStack(alignment: .top) {
