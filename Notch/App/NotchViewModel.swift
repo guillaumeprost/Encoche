@@ -16,8 +16,8 @@ final class NotchViewModel {
     var showsAlert = false
     /// La notification affichée porte des boutons (demande de permission).
     var alertHasButtons = false
-    /// L'indicateur de volume est affiché sous l'encoche repliée.
-    var showsVolumeHUD = false
+    /// Un indicateur (volume, luminosité, batterie) est affiché sous l'encoche repliée.
+    var showsHUD = false
 
     static let expandedBodyWidth: CGFloat = 640
     static let expandedContentHeight: CGFloat = 136
@@ -26,10 +26,10 @@ final class NotchViewModel {
     static let alertBodyWidth: CGFloat = 380
     static let alertContentHeight: CGFloat = 60
     static let alertButtonsHeight: CGFloat = 36
-    static let volumeHUDHeight: CGFloat = 26
+    static let hudHeight: CGFloat = 26
 
     var topRadius: CGFloat { isOpen || showsAlert ? 12 : 6 }
-    var bottomRadius: CGFloat { isOpen ? 26 : showsAlert ? 22 : showsVolumeHUD ? 16 : 9 }
+    var bottomRadius: CGFloat { isOpen ? 26 : showsAlert ? 22 : showsHUD ? 16 : 9 }
 
     /// Largeur d'une case latérale de la « live activity » repliée.
     var activitySlotWidth: CGFloat { notchSize.height + 8 }
@@ -44,9 +44,9 @@ final class NotchViewModel {
         } else if showsAlert {
             bodyWidth = max(alertHasButtons ? 440 : Self.alertBodyWidth, notchSize.width + 2 * activitySlotWidth)
             height = notchSize.height + Self.alertContentHeight + (alertHasButtons ? Self.alertButtonsHeight : 0)
-        } else if showsVolumeHUD {
+        } else if showsHUD {
             bodyWidth = notchSize.width + 2 * activitySlotWidth
-            height = notchSize.height + Self.volumeHUDHeight
+            height = notchSize.height + Self.hudHeight
         } else if showsActivity {
             bodyWidth = notchSize.width + 2 * activitySlotWidth
             height = notchSize.height

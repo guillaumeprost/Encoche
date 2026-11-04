@@ -4,6 +4,7 @@ struct NotchRootView: View {
     @Environment(NotchViewModel.self) private var vm
     @Environment(AppSettings.self) private var settings
     @Environment(MusicController.self) private var music
+    @Environment(HUDCenter.self) private var hud
     @Environment(VolumeController.self) private var volume
     @Environment(ClaudeCodeMonitor.self) private var claudeCode
     @Environment(LaunchAtLogin.self) private var launchAtLogin
@@ -65,12 +66,12 @@ struct NotchRootView: View {
                     insertion: .opacity.combined(with: .scale(scale: 0.9, anchor: .top)).animation(spring.delay(0.08)),
                     removal: .opacity.animation(.easeOut(duration: 0.12))
                 ))
-            } else if vm.showsVolumeHUD {
+            } else if vm.showsHUD, let kind = hud.current {
                 VStack(spacing: 0) {
                     Color.clear.frame(height: vm.notchSize.height)
-                    VolumeHUDView()
+                    HUDView(kind: kind)
                         .padding(.horizontal, 14 + vm.topRadius)
-                        .frame(height: NotchViewModel.volumeHUDHeight)
+                        .frame(height: NotchViewModel.hudHeight)
                         .padding(.bottom, 2)
                 }
                 .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
@@ -130,8 +131,8 @@ struct NotchRootView: View {
         .animation(spring, value: vm.isOpen)
         .animation(spring, value: settings.tab)
         .animation(spring, value: vm.showsAlert)
-        .animation(spring, value: vm.showsVolumeHUD)
-        .onChange(of: volume.showsHUD, initial: true) { vm.showsVolumeHUD = volume.showsHUD }
+        .animation(spring, value: vm.showsHUD)
+        .onChange(of: hud.current, initial: true) { vm.showsHUD = hud.current != nil }
         .onChange(of: alerts.current?.id, initial: true) {
             vm.showsAlert = alerts.current != nil
             vm.alertHasButtons = alerts.current?.isPersistent ?? false

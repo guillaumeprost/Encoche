@@ -5,6 +5,8 @@ import SwiftUI
 struct AppServices {
     let settings: AppSettings
     let alerts: AlertCenter
+    let hud: HUDCenter
+    let battery: BatteryMonitor
     let music: MusicController
     let volume: VolumeController
     let calendar: CalendarController
@@ -20,6 +22,9 @@ struct AppServices {
     init() {
         settings = AppSettings()
         alerts = AlertCenter()
+        hud = HUDCenter()
+        battery = BatteryMonitor()
+        battery.hud = hud
         music = MusicController()
         volume = VolumeController()
         calendar = CalendarController()
@@ -29,6 +34,7 @@ struct AppServices {
         claudeCode = ClaudeCodeMonitor()
         claudeCode.alerts = alerts
         volume.alerts = alerts
+        volume.hud = hud
         calendar.alerts = alerts
         calendar.startMeetingReminders()
         volume.setReplacesSystemHUD(settings.replaceSystemVolumeHUD)
@@ -66,6 +72,8 @@ extension View {
     func environment(_ services: AppServices) -> some View {
         environment(services.settings)
             .environment(services.alerts)
+            .environment(services.hud)
+            .environment(services.battery)
             .environment(services.music)
             .environment(services.volume)
             .environment(services.calendar)

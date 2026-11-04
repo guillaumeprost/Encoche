@@ -9,18 +9,13 @@ import Observation
 @Observable
 @MainActor
 final class VolumeController {
-    /// Durée d'affichage de l'indicateur après un changement.
-    private static let hudDuration: Duration = .milliseconds(1600)
-
     private(set) var volume: Float = 0
     private(set) var isMuted = false
     /// La sortie actuelle permet de régler le volume (pas toujours le cas, ex. écran en HDMI).
     private(set) var isAdjustable = false
-    /// L'indicateur façon iPhone est affiché.
-    private(set) var showsHUD = false
 
     @ObservationIgnored private var device = AudioObjectID(kAudioObjectUnknown)
-    @ObservationIgnored private var hudTask: Task<Void, Never>?
+    @ObservationIgnored var hud: HUDCenter?
     /// Changement venant de notre propre réglage : pas d'indicateur par-dessus le curseur.
     @ObservationIgnored private var isSettingVolume = false
 
@@ -206,12 +201,6 @@ final class VolumeController {
     }
 
     private func flashHUD() {
-        showsHUD = true
-        hudTask?.cancel()
-        hudTask = Task { [weak self] in
-            try? await Task.sleep(for: Self.hudDuration)
-            guard !Task.isCancelled else { return }
-            self?.showsHUD = false
-        }
+        hud?.show(.volume)
     }
 }
