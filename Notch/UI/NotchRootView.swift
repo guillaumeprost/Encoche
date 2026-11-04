@@ -63,6 +63,9 @@ struct NotchRootView: View {
             Divider()
             Button("Quitter Notch") { NSApp.terminate(nil) }
         }
+        // Plein écran : rangée au-dessus du bord, elle redescend avec la barre de menus.
+        .offset(y: vm.isRetracted ? -(size.height + 24) : 0)
+        .animation(.easeInOut(duration: 0.25), value: vm.isRetracted)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .animation(spring, value: vm.isOpen)
         .animation(spring, value: showsActivity)

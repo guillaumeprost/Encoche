@@ -1,11 +1,13 @@
 import AppKit
 
-/// Maintient une encoche par écran connecté, et suit les branchements/débranchements
-/// ou changements de résolution.
+/// Maintient une encoche par écran connecté, suit les branchements/débranchements
+/// ou changements de résolution, et masque l'encoche des écrans en plein écran.
 @MainActor
 final class NotchScreenManager {
     private let services: AppServices
     private var controllers: [CGDirectDisplayID: NotchWindowController] = [:]
+    private var fullScreenDisplays: Set<CGDirectDisplayID> = []
+    private var detector: FullScreenDetector?
 
     init(services: AppServices) {
         self.services = services
@@ -16,6 +18,11 @@ final class NotchScreenManager {
             object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.syncScreens() }
+        }
+
+        detector = FullScreenDetector { [weak self] displays in
+            self?.fullScreenDisplays = displays
+            self?.applyFullScreenState()
         }
     }
 
@@ -37,11 +44,14 @@ final class NotchScreenManager {
                 controllers[id] = NotchWindowController(screen: screen, services: services)
             }
         }
-    }
-}
 
-private extension NSScreen {
-    var displayID: CGDirectDisplayID? {
-        deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID
+        detector?.check()
+        applyFullScreenState()
+    }
+
+    private func applyFullScreenState() {
+        for (id, controller) in controllers {
+            controller.setFullScreen(fullScreenDisplays.contains(id))
+        }
     }
 }

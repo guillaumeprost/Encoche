@@ -17,7 +17,9 @@ final class NotchPanel: NSPanel {
         isMovable = false
         isReleasedWhenClosed = false
         ignoresMouseEvents = true
-        collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
+        // Présente sur tous les bureaux, mais pas sur ceux des apps en plein écran
+        // (pas de `.fullScreenAuxiliary`) : l'encoche s'efface devant une vidéo ou une app plein écran.
+        collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
     }
 
     override var canBecomeKey: Bool { true }

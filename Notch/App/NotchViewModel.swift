@@ -10,6 +10,8 @@ final class NotchViewModel {
     var hasPhysicalNotch = true
     /// Garde l'encoche ouverte même si la souris sort (saisie en cours dans un champ).
     var holdOpen = false
+    /// Rangée au-dessus de l'écran (app en plein écran, barre de menus masquée).
+    var isRetracted = false
 
     static let expandedBodyWidth: CGFloat = 640
     static let expandedContentHeight: CGFloat = 136

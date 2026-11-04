@@ -15,6 +15,9 @@ final class NotchWindowController {
     private var monitors: [Any] = []
     private var pendingToggle: Task<Void, Never>?
     private var screenFrame: NSRect = .zero
+    /// Une app est en plein écran sur cet écran : l'encoche se range avec la barre de menus.
+    private var isFullScreen = false
+    private var pendingRetract: Task<Void, Never>?
 
     init(screen: NSScreen, services: AppServices) {
         music = services.music
@@ -42,6 +45,19 @@ final class NotchWindowController {
                 self?.handleMouse()
             }
         }
+    }
+
+    /// En plein écran, l'encoche se range au-dessus de l'écran comme la barre de menus,
+    /// et redescend avec elle quand le curseur touche le haut de l'écran.
+    func setFullScreen(_ fullScreen: Bool) {
+        guard fullScreen != isFullScreen else { return }
+        isFullScreen = fullScreen
+        pendingToggle?.cancel()
+        pendingToggle = nil
+        pendingRetract?.cancel()
+        pendingRetract = nil
+        if fullScreen, viewModel.isOpen { setOpen(false) }
+        viewModel.isRetracted = fullScreen
     }
 
     /// Retire l'encoche (écran débranché).
@@ -108,6 +124,9 @@ final class NotchWindowController {
     }
 
     private func handleMouse() {
+        let mouse = NSEvent.mouseLocation
+        if isFullScreen, !handleFullScreenReveal(mouse) { return }
+
         let inside = hotRect().contains(NSEvent.mouseLocation) || (viewModel.isOpen && viewModel.holdOpen)
         if inside == viewModel.isOpen {
             pendingToggle?.cancel()
@@ -123,6 +142,37 @@ final class NotchWindowController {
             self.pendingToggle = nil
             self.setOpen(inside)
         }
+    }
+
+    /// Plein écran : sortie/rentrée de l'encoche avec la barre de menus.
+    /// Renvoie `true` si l'encoche est sortie et doit gérer le survol normalement.
+    private func handleFullScreenReveal(_ mouse: NSPoint) -> Bool {
+        let onThisScreen = mouse.x >= screenFrame.minX && mouse.x < screenFrame.maxX
+        // Hauteur de la barre de menus qui descend (au moins celle de l'encoche).
+        let menuBarZone = max(viewModel.notchSize.height, 24) + 6
+
+        if viewModel.isRetracted {
+            // Le curseur touche le haut de l'écran : la barre de menus descend, l'encoche aussi.
+            if onThisScreen, mouse.y >= screenFrame.maxY - 1 {
+                viewModel.isRetracted = false
+            }
+            return false
+        }
+
+        let nearTop = onThisScreen && mouse.y >= screenFrame.maxY - menuBarZone
+        if nearTop || viewModel.isOpen || hotRect().contains(mouse) {
+            pendingRetract?.cancel()
+            pendingRetract = nil
+        } else if pendingRetract == nil {
+            // Le curseur redescend : on remonte avec la barre de menus.
+            pendingRetract = Task { [weak self] in
+                try? await Task.sleep(for: .milliseconds(300))
+                guard !Task.isCancelled, let self else { return }
+                self.pendingRetract = nil
+                if self.isFullScreen, !self.viewModel.isOpen { self.viewModel.isRetracted = true }
+            }
+        }
+        return true
     }
 
     private func setOpen(_ open: Bool) {
