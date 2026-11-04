@@ -10,6 +10,8 @@ import ServiceManagement
 @MainActor
 final class LaunchAtLogin {
     private static let configuredKey = "launchAtLoginConfigured"
+    /// Choix de l'utilisateur, retenu pour réenregistrer l'app si elle change de nom ou de place.
+    private static let wantedKey = "launchAtLoginWanted"
 
     private(set) var isEnabled = SMAppService.mainApp.status == .enabled
 
@@ -19,13 +21,20 @@ final class LaunchAtLogin {
 
     init() {
         // Premier lancement depuis /Applications : activé par défaut.
-        if isInstalledCopy, !UserDefaults.standard.bool(forKey: Self.configuredKey) {
-            UserDefaults.standard.set(true, forKey: Self.configuredKey)
+        let defaults = UserDefaults.standard
+        guard isInstalledCopy else { return }
+        if !defaults.bool(forKey: Self.configuredKey) {
+            defaults.set(true, forKey: Self.configuredKey)
+            set(true)
+        } else if defaults.object(forKey: Self.wantedKey) as? Bool ?? true {
+            // Réenregistre la copie actuelle : l'ancienne inscription peut viser une app
+            // renommée ou déplacée (Notch.app → Encoche.app). Sans effet si déjà à jour.
             set(true)
         }
     }
 
     func set(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: Self.wantedKey)
         do {
             if enabled {
                 try SMAppService.mainApp.register()
@@ -33,7 +42,7 @@ final class LaunchAtLogin {
                 try SMAppService.mainApp.unregister()
             }
         } catch {
-            NSLog("[Notch] Launch at login change failed: \(error)")
+            NSLog("[Encoche] Launch at login change failed: \(error)")
         }
         isEnabled = SMAppService.mainApp.status == .enabled
     }

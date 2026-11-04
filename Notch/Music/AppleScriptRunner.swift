@@ -36,7 +36,7 @@ enum AppleScriptRunner {
         var error: NSDictionary?
         let result = script.executeAndReturnError(&error)
         if let error {
-            NSLog("[Notch] AppleScript error: \(error)")
+            NSLog("[Encoche] AppleScript error: \(error)")
             return nil
         }
         return result

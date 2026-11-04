@@ -151,7 +151,7 @@ final class ClaudeCodeMonitor {
         case .allowAlways:
             output = ["behavior": "allow", "updatedPermissions": permission.suggestions]
         case .deny:
-            output = ["behavior": "deny", "message": "Refusé depuis l'encoche Notch."]
+            output = ["behavior": "deny", "message": "Refusé depuis Encoche."]
         case .terminal:
             output = nil
         }

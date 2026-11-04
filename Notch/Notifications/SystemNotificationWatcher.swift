@@ -179,9 +179,9 @@ final class SystemNotificationWatcher {
         UserDefaults.standard.set(true, forKey: Self.onboardingKey)
         alerts.post(NotchAlert(
             icon: .symbol("bell.badge.fill", .red),
-            source: "Notch",
+            source: "Encoche",
             title: "Afficher tes notifications ici ?",
-            body: "Clique pour autoriser Notch dans « Accès complet au disque ».",
+            body: "Clique pour autoriser Encoche dans « Accès complet au disque ».",
             action: .run { [weak self] in self?.openPrivacySettings() }
         ))
     }

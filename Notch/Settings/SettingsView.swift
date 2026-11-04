@@ -16,7 +16,7 @@ final class SettingsWindowController {
         if window == nil {
             let hosting = NSHostingController(rootView: SettingsView().environment(services))
             let window = NSWindow(contentViewController: hosting)
-            window.title = "Réglages de Notch"
+            window.title = "Réglages d’Encoche"
             window.styleMask = [.titled, .closable, .miniaturizable]
             window.isReleasedWhenClosed = false
             window.setContentSize(NSSize(width: 520, height: 640))
@@ -46,7 +46,7 @@ struct SettingsView: View {
             Form {
                 Section("Général") {
                     if launchAtLogin.isInstalledCopy {
-                        Toggle("Ouvrir Notch au démarrage du Mac", isOn: Binding(
+                        Toggle("Ouvrir Encoche au démarrage du Mac", isOn: Binding(
                             get: { launchAtLogin.isEnabled }, set: { launchAtLogin.set($0) }
                         ))
                     } else {
@@ -70,7 +70,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Notifications")
                 } footer: {
-                    Text("Les bannières sont masquées seulement si Notch peut lire les notifications : rien ne se perd.")
+                    Text("Les bannières sont masquées seulement si Encoche peut lire les notifications : rien ne se perd.")
                 }
 
                 Section {
@@ -126,7 +126,7 @@ struct SettingsView: View {
 
                 Section("À propos") {
                     LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—")
-                    Button("Quitter Notch", role: .destructive) { NSApp.terminate(nil) }
+                    Button("Quitter Encoche", role: .destructive) { NSApp.terminate(nil) }
                 }
             }
             .formStyle(.grouped)

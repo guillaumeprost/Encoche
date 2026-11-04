@@ -17,15 +17,18 @@ targets:
     info:
       path: Notch/Info.plist
       properties:
-        CFBundleDisplayName: Notch
+        CFBundleDisplayName: Encoche
         CFBundleShortVersionString: "0.1.0"
         CFBundleVersion: "1"
         LSUIElement: true
         CFBundleDevelopmentRegion: fr
-        NSCalendarsFullAccessUsageDescription: "Notch affiche les événements de tes calendriers dans l'encoche."
-        NSAppleEventsUsageDescription: "Notch pilote Musique et Spotify pour afficher et contrôler le morceau en cours."
+        NSCalendarsFullAccessUsageDescription: "Encoche affiche les événements de tes calendriers dans l'encoche."
+        NSAppleEventsUsageDescription: "Encoche pilote Musique et Spotify pour afficher et contrôler le morceau en cours."
     settings:
       base:
+        # Nom affiché « Encoche ». L'identifiant reste « notch » : macOS y rattache les
+        # autorisations déjà données (disque, accessibilité, calendrier…).
+        PRODUCT_NAME: Encoche
         PRODUCT_BUNDLE_IDENTIFIER: com.guillaumeprost.notch
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         # Certificat auto-signé local (Trousseau de session) : une identité stable pour que

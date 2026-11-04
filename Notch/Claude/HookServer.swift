@@ -77,12 +77,12 @@ final class HookServer {
                 MainActor.assumeIsolated { self?.accept(connection) }
             }
             listener.stateUpdateHandler = { state in
-                if case .failed(let error) = state { NSLog("[Notch] Hook server failed: \(error)") }
+                if case .failed(let error) = state { NSLog("[Encoche] Hook server failed: \(error)") }
             }
             listener.start(queue: .main)
             self.listener = listener
         } catch {
-            NSLog("[Notch] Hook server could not start: \(error)")
+            NSLog("[Encoche] Hook server could not start: \(error)")
         }
     }
 

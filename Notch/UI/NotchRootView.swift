@@ -99,7 +99,7 @@ struct NotchRootView: View {
         .contextMenu {
             Button("Réglages…") { settings.openSettings() }
             Divider()
-            Button("Quitter Notch") { NSApp.terminate(nil) }
+            Button("Quitter Encoche") { NSApp.terminate(nil) }
         }
         // Plein écran : rangée au-dessus du bord, elle redescend avec la barre de menus.
         // …sauf pour montrer une notification.

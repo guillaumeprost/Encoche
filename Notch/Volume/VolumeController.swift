@@ -138,9 +138,9 @@ final class VolumeController {
         UserDefaults.standard.set(true, forKey: key)
         alerts?.post(NotchAlert(
             icon: .symbol("speaker.wave.2.fill", .gray),
-            source: "Notch",
+            source: "Encoche",
             title: "Remplacer l'indicateur de volume de macOS ?",
-            body: "Clique pour autoriser Notch dans « Accessibilité ».",
+            body: "Clique pour autoriser Encoche dans « Accessibilité ».",
             action: .run { [weak self] in self?.requestAccessibility() }
         ))
     }
