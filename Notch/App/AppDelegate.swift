@@ -19,6 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         let viewModel = NotchViewModel()
         let music = MusicController()
-        windowController = NotchWindowController(viewModel: viewModel, music: music)
+        let calendar = CalendarController()
+        windowController = NotchWindowController(viewModel: viewModel, music: music, calendar: calendar)
     }
 }

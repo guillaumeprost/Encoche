@@ -16,7 +16,15 @@ struct NotchRootView: View {
             if vm.isOpen {
                 VStack(spacing: 0) {
                     Color.clear.frame(height: vm.notchSize.height)
-                    ExpandedMusicView()
+                    HStack(spacing: 20) {
+                        ExpandedMusicView()
+                            .frame(width: 330)
+                        Rectangle()
+                            .fill(.white.opacity(0.12))
+                            .frame(width: 1)
+                            .padding(.vertical, 4)
+                        CalendarView()
+                    }
                         .padding(.top, 8)
                         .padding(.bottom, 18)
                         .padding(.horizontal, 24 + vm.topRadius)

@@ -13,8 +13,8 @@ final class NotchViewModel {
         didSet { UserDefaults.standard.set(useGlass, forKey: "useGlass") }
     }
 
-    static let expandedBodyWidth: CGFloat = 480
-    static let expandedContentHeight: CGFloat = 124
+    static let expandedBodyWidth: CGFloat = 640
+    static let expandedContentHeight: CGFloat = 136
 
     var topRadius: CGFloat { isOpen ? 12 : 6 }
     var bottomRadius: CGFloat { isOpen ? 26 : 9 }

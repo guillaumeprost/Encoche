@@ -3,23 +3,26 @@ import SwiftUI
 
 @MainActor
 final class NotchWindowController {
-    private static let panelSize = CGSize(width: 640, height: 260)
+    private static let panelSize = CGSize(width: 780, height: 280)
 
     private let viewModel: NotchViewModel
     private let music: MusicController
+    private let calendar: CalendarController
     private let panel: NotchPanel
     private var monitors: [Any] = []
     private var pendingToggle: Task<Void, Never>?
     private var screenFrame: NSRect = .zero
 
-    init(viewModel: NotchViewModel, music: MusicController) {
+    init(viewModel: NotchViewModel, music: MusicController, calendar: CalendarController) {
         self.viewModel = viewModel
         self.music = music
+        self.calendar = calendar
         panel = NotchPanel(contentRect: NSRect(origin: .zero, size: Self.panelSize))
 
         let root = NotchRootView()
             .environment(viewModel)
             .environment(music)
+            .environment(calendar)
         let hosting = NSHostingView(rootView: root)
         hosting.sizingOptions = []
         panel.contentView = hosting
@@ -111,6 +114,9 @@ final class NotchWindowController {
     private func setOpen(_ open: Bool) {
         viewModel.isOpen = open
         panel.ignoresMouseEvents = !open
-        if open { music.refreshPosition() }
+        if open {
+            music.refreshPosition()
+            calendar.selectToday()
+        }
     }
 }
