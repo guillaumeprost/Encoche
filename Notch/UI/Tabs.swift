@@ -50,10 +50,6 @@ struct TopBar: View {
                     }
             }
             Spacer()
-            if settings.tab == .home {
-                VolumeSlider()
-                    .transition(.opacity)
-            }
             if settings.tab == .clipboard, !clipboard.items.isEmpty {
                 IconButton(symbol: "trash", help: "Vider l'historique (les épinglés sont conservés)") {
                     withAnimation(.snappy) { clipboard.clearUnpinned() }

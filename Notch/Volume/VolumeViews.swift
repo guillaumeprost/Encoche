@@ -28,31 +28,3 @@ struct VolumeHUDView: View {
         .animation(.snappy(duration: 0.15), value: volume.isMuted)
     }
 }
-
-/// Réglage du volume dans l'encoche ouverte (en haut à droite de l'accueil).
-struct VolumeSlider: View {
-    @Environment(VolumeController.self) private var volume
-
-    var body: some View {
-        if volume.isAdjustable {
-            HStack(spacing: 6) {
-                Button { volume.toggleMute() } label: {
-                    Image(systemName: volume.symbol)
-                        .font(.system(size: 11, weight: .semibold))
-                        .contentTransition(.symbolEffect(.replace))
-                        .frame(width: 18)
-                }
-                .buttonStyle(.plain)
-                .help(volume.isMuted ? "Réactiver le son" : "Couper le son")
-
-                Slider(
-                    value: Binding(get: { Double(volume.volume) }, set: { volume.setVolume(Float($0)) }),
-                    in: 0...1
-                )
-                .controlSize(.mini)
-                .frame(width: 90)
-            }
-            .foregroundStyle(.secondary)
-        }
-    }
-}
