@@ -58,7 +58,7 @@ final class MusicController {
             }
         }
 
-        loadInitialState()
+        Task { await loadInitialState() }
     }
 
     // MARK: - Position
@@ -70,10 +70,13 @@ final class MusicController {
     }
 
     func refreshPosition() {
-        guard let source, source.isRunning,
-              let value = AppleScriptRunner.run("tell application id \"\(source.rawValue)\" to get player position")?.doubleValue
-        else { return }
-        setPosition(value)
+        guard let source, source.isRunning else { return }
+        Task {
+            guard let value = await AppleScriptRunner.run(
+                "tell application id \"\(source.rawValue)\" to get player position"
+            )?.doubleValue, self.source == source else { return }
+            setPosition(value)
+        }
     }
 
     private func setPosition(_ value: Double) {
@@ -88,7 +91,7 @@ final class MusicController {
         refreshPosition()
         isPlaying.toggle()
         baseDate = Date()
-        AppleScriptRunner.run("tell application id \"\(source.rawValue)\" to playpause")
+        Task { _ = await AppleScriptRunner.run("tell application id \"\(source.rawValue)\" to playpause") }
     }
 
     func next() { send("next track") }
@@ -97,7 +100,7 @@ final class MusicController {
     func seek(to seconds: Double) {
         guard let source, source.isRunning else { return }
         setPosition(seconds)
-        AppleScriptRunner.run("tell application id \"\(source.rawValue)\" to set player position to \(seconds)")
+        Task { _ = await AppleScriptRunner.run("tell application id \"\(source.rawValue)\" to set player position to \(seconds)") }
     }
 
     func openSourceApp() {
@@ -115,7 +118,7 @@ final class MusicController {
 
     private func send(_ command: String) {
         guard let source, source.isRunning else { return }
-        AppleScriptRunner.run("tell application id \"\(source.rawValue)\" to \(command)")
+        Task { _ = await AppleScriptRunner.run("tell application id \"\(source.rawValue)\" to \(command)") }
     }
 
     // MARK: - Notifications
@@ -155,10 +158,12 @@ final class MusicController {
         if changed { loadArtwork() }
     }
 
-    private func loadInitialState() {
+    private func loadInitialState() async {
         var paused: (Source, [AnyHashable: Any])?
         for candidate in [Source.spotify, .music] where candidate.isRunning {
-            guard let info = queryState(of: candidate) else { continue }
+            guard let info = await queryState(of: candidate) else { continue }
+            // Une notification de l'app est arrivée entre-temps : elle fait foi.
+            guard track == nil else { return }
             if info["Player State"] as? String == "Playing" {
                 handle(info, from: candidate)
                 return
@@ -169,7 +174,7 @@ final class MusicController {
     }
 
     /// Interroge l'app et renvoie un dictionnaire au même format que ses notifications.
-    private func queryState(of source: Source) -> [AnyHashable: Any]? {
+    private func queryState(of source: Source) async -> [AnyHashable: Any]? {
         let script = """
         tell application id "\(source.rawValue)"
             if player state is stopped then return {"stopped"}
@@ -177,7 +182,7 @@ final class MusicController {
             return {player state as string, name of t, artist of t, album of t, duration of t}
         end tell
         """
-        guard let result = AppleScriptRunner.run(script), result.numberOfItems >= 5 else { return nil }
+        guard let result = await AppleScriptRunner.run(script), result.numberOfItems >= 5 else { return nil }
         let rawState = result.atIndex(1)?.stringValue ?? ""
         let duration = result.atIndex(5)?.doubleValue ?? 0
         return [
@@ -204,21 +209,22 @@ final class MusicController {
         guard let source, source.isRunning else { return }
         let expected = track
 
-        switch source {
-        case .music:
-            let data = AppleScriptRunner.run(
-                "tell application id \"com.apple.Music\" to get raw data of artwork 1 of current track"
-            )?.data
-            applyArtwork(data.flatMap(NSImage.init(data:)))
+        Task {
+            switch source {
+            case .music:
+                let data = await AppleScriptRunner.run(
+                    "tell application id \"com.apple.Music\" to get raw data of artwork 1 of current track"
+                )?.data
+                guard self.track == expected else { return }
+                self.applyArtwork(data.flatMap(NSImage.init(data:)))
 
-        case .spotify:
-            guard let urlString = AppleScriptRunner.run(
-                "tell application id \"com.spotify.client\" to get artwork url of current track"
-            )?.stringValue, let url = URL(string: urlString) else {
-                applyArtwork(nil)
-                return
-            }
-            Task {
+            case .spotify:
+                guard let urlString = await AppleScriptRunner.run(
+                    "tell application id \"com.spotify.client\" to get artwork url of current track"
+                )?.stringValue, let url = URL(string: urlString) else {
+                    if self.track == expected { self.applyArtwork(nil) }
+                    return
+                }
                 let data = try? await URLSession.shared.data(from: url).0
                 guard self.track == expected else { return }
                 self.applyArtwork(data.flatMap(NSImage.init(data:)))
