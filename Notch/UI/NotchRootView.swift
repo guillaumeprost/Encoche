@@ -4,6 +4,7 @@ struct NotchRootView: View {
     @Environment(NotchViewModel.self) private var vm
     @Environment(AppSettings.self) private var settings
     @Environment(MusicController.self) private var music
+    @Environment(VolumeController.self) private var volume
     @Environment(ClaudeCodeMonitor.self) private var claudeCode
     @Environment(LaunchAtLogin.self) private var launchAtLogin
     @Environment(AlertCenter.self) private var alerts
@@ -64,6 +65,15 @@ struct NotchRootView: View {
                     insertion: .opacity.combined(with: .scale(scale: 0.9, anchor: .top)).animation(spring.delay(0.08)),
                     removal: .opacity.animation(.easeOut(duration: 0.12))
                 ))
+            } else if vm.showsVolumeHUD {
+                VStack(spacing: 0) {
+                    Color.clear.frame(height: vm.notchSize.height)
+                    VolumeHUDView()
+                        .padding(.horizontal, 14 + vm.topRadius)
+                        .frame(height: NotchViewModel.volumeHUDHeight)
+                        .padding(.bottom, 2)
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
             } else if claudeCode.needsAttention {
                 CollapsedClaudeView(slotWidth: vm.activitySlotWidth)
                     .padding(.horizontal, vm.topRadius)
@@ -94,6 +104,16 @@ struct NotchRootView: View {
             if systemNotifications.access == .denied {
                 Button("Autoriser les notifications macOS…") { systemNotifications.openPrivacySettings() }
             }
+            Toggle("Remplacer l'indicateur de volume", isOn: Binding(
+                get: { settings.replaceSystemVolumeHUD },
+                set: {
+                    settings.replaceSystemVolumeHUD = $0
+                    volume.setReplacesSystemHUD($0)
+                }
+            ))
+            if settings.replaceSystemVolumeHUD, !volume.isReplacingSystemHUD {
+                Button("Autoriser l'accessibilité (touches de volume)…") { volume.requestAccessibility() }
+            }
             Divider()
             Button("Quitter Notch") { NSApp.terminate(nil) }
         }
@@ -105,6 +125,8 @@ struct NotchRootView: View {
         .animation(spring, value: vm.isOpen)
         .animation(spring, value: settings.tab)
         .animation(spring, value: vm.showsAlert)
+        .animation(spring, value: vm.showsVolumeHUD)
+        .onChange(of: volume.showsHUD, initial: true) { vm.showsVolumeHUD = volume.showsHUD }
         .onChange(of: alerts.current?.id, initial: true) {
             vm.showsAlert = alerts.current != nil
             vm.alertHasButtons = alerts.current?.isPersistent ?? false

@@ -14,6 +14,11 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(mirrorSystemNotifications, forKey: "mirrorSystemNotifications") }
     }
 
+    /// Remplacer l'indicateur de volume de macOS par celui de l'encoche.
+    var replaceSystemVolumeHUD: Bool = UserDefaults.standard.object(forKey: "replaceSystemVolumeHUD") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(replaceSystemVolumeHUD, forKey: "replaceSystemVolumeHUD") }
+    }
+
     /// Dernier onglet ouvert, retrouvé à la prochaine ouverture.
     var tab: NotchTab = UserDefaults.standard.string(forKey: "tab").flatMap(NotchTab.init) ?? .home {
         didSet { UserDefaults.standard.set(tab.rawValue, forKey: "tab") }

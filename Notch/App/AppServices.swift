@@ -6,6 +6,7 @@ struct AppServices {
     let settings: AppSettings
     let alerts: AlertCenter
     let music: MusicController
+    let volume: VolumeController
     let calendar: CalendarController
     let clipboard: ClipboardController
     let shelf: ShelfController
@@ -19,12 +20,15 @@ struct AppServices {
         settings = AppSettings()
         alerts = AlertCenter()
         music = MusicController()
+        volume = VolumeController()
         calendar = CalendarController()
         clipboard = ClipboardController()
         shelf = ShelfController()
         screenshots = ScreenshotWatcher()
         claudeCode = ClaudeCodeMonitor()
         claudeCode.alerts = alerts
+        volume.alerts = alerts
+        volume.setReplacesSystemHUD(settings.replaceSystemVolumeHUD)
         ask = ClaudeAsk()
         launchAtLogin = LaunchAtLogin()
         systemNotifications = SystemNotificationWatcher(alerts: alerts, settings: settings)
@@ -37,6 +41,7 @@ extension View {
         environment(services.settings)
             .environment(services.alerts)
             .environment(services.music)
+            .environment(services.volume)
             .environment(services.calendar)
             .environment(services.clipboard)
             .environment(services.shelf)
