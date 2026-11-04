@@ -18,11 +18,20 @@ final class SystemNotificationWatcher {
     private static let onboardingKey = "systemNotificationsOnboardingShown"
 
     private(set) var access: Access = .denied
+    /// Lancement de l'app (secondes depuis 2001) : rien d'antérieur n'est affiché.
+    private let startDate = Date().timeIntervalSinceReferenceDate - 2
 
     private let alerts: AlertCenter
     private let settings: AppSettings
     private var db: OpaquePointer?
-    private var lastRecordID: Int64 = 0
+    /// Repère des notifications déjà vues. macOS réutilise les numéros (`rec_id`) des
+    /// notifications supprimées : on suit donc la date de réception, qui ne recule pas,
+    /// et l'identifiant unique de chaque notification pour ne jamais l'afficher deux fois.
+    private var lastDate: Double = 0
+    private var seenIDs: [Data] = []
+    private static let seenLimit = 300
+    /// Date de réception (secondes depuis 2001), ou de demande si elle n'est pas encore remise.
+    private static let dateExpression = "COALESCE(delivered_date, request_date, 0)"
     private var timer: Timer?
     private var appNames: [String: String] = [:]
 
@@ -50,14 +59,14 @@ final class SystemNotificationWatcher {
         var handle: OpaquePointer?
         let flags = SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX
         guard sqlite3_open_v2(Self.databaseURL.path, &handle, flags, nil) == SQLITE_OK,
-              let maxID = Self.maxRecordID(handle) else {
+              let latest = Self.latestDate(handle) else {
             sqlite3_close(handle)
             access = .denied
             return
         }
         db = handle
         // On part de maintenant : pas de rafale avec l'historique au lancement.
-        lastRecordID = maxID
+        lastDate = latest
         access = .granted
     }
 
@@ -71,8 +80,8 @@ final class SystemNotificationWatcher {
             return
         }
         guard settings.mirrorSystemNotifications else {
-            // Désactivé : on avance le curseur pour ne pas tout rejouer en réactivant.
-            if let maxID = Self.maxRecordID(db) { lastRecordID = maxID }
+            // Désactivé : on avance le repère pour ne pas tout rejouer en réactivant.
+            if let latest = Self.latestDate(db) { lastDate = latest }
             return
         }
         poll()
@@ -80,7 +89,9 @@ final class SystemNotificationWatcher {
 
     private func poll() {
         var statement: OpaquePointer?
-        let sql = "SELECT rec_id, data FROM record WHERE rec_id > ? ORDER BY rec_id"
+        // Une seconde de marge : deux notifications peuvent partager la même date ;
+        // les identifiants déjà vus évitent les doublons.
+        let sql = "SELECT uuid, data, \(Self.dateExpression) AS d FROM record WHERE d >= ? ORDER BY d"
         guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else {
             // Base fermée ou format changé : on se reconnectera.
             sqlite3_close(db)
@@ -89,24 +100,38 @@ final class SystemNotificationWatcher {
             return
         }
         defer { sqlite3_finalize(statement) }
-        sqlite3_bind_int64(statement, 1, lastRecordID)
+        sqlite3_bind_double(statement, 1, lastDate - 1)
 
         while sqlite3_step(statement) == SQLITE_ROW {
-            lastRecordID = max(lastRecordID, sqlite3_column_int64(statement, 0))
-            guard let bytes = sqlite3_column_blob(statement, 1) else { continue }
-            let data = Data(bytes: bytes, count: Int(sqlite3_column_bytes(statement, 1)))
+            let uuid = Self.blob(statement, column: 0) ?? Data()
+            let date = sqlite3_column_double(statement, 2)
+            guard !seenIDs.contains(uuid) else { continue }
+            remember(uuid)
+            lastDate = max(lastDate, date)
+            // Notification antérieure au lancement (simple mise à jour d'une ancienne) : on l'ignore.
+            guard let data = Self.blob(statement, column: 1), date >= startDate else { continue }
             if let alert = makeAlert(from: data) { alerts.post(alert) }
         }
     }
 
-    private static func maxRecordID(_ db: OpaquePointer?) -> Int64? {
+    private func remember(_ uuid: Data) {
+        seenIDs.append(uuid)
+        if seenIDs.count > Self.seenLimit { seenIDs.removeFirst(seenIDs.count - Self.seenLimit) }
+    }
+
+    private static func blob(_ statement: OpaquePointer?, column: Int32) -> Data? {
+        guard let bytes = sqlite3_column_blob(statement, column) else { return nil }
+        return Data(bytes: bytes, count: Int(sqlite3_column_bytes(statement, column)))
+    }
+
+    /// Date de la notification la plus récente (secondes depuis 2001).
+    private static func latestDate(_ db: OpaquePointer?) -> Double? {
         var statement: OpaquePointer?
-        guard sqlite3_prepare_v2(db, "SELECT IFNULL(MAX(rec_id), 0) FROM record", -1, &statement, nil) == SQLITE_OK else {
-            return nil
-        }
+        let sql = "SELECT IFNULL(MAX(\(dateExpression)), 0) FROM record"
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK else { return nil }
         defer { sqlite3_finalize(statement) }
         guard sqlite3_step(statement) == SQLITE_ROW else { return nil }
-        return sqlite3_column_int64(statement, 0)
+        return sqlite3_column_double(statement, 0)
     }
 
     // MARK: - Décodage
