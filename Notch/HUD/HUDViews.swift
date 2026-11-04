@@ -70,3 +70,27 @@ struct BrightnessHUDView: View {
         )
     }
 }
+
+/// Caméra ou micro utilisés : icône à gauche de l'encoche, point lumineux à droite.
+struct CollapsedPrivacyView: View {
+    @Environment(PrivacyMonitor.self) private var privacy
+    let slotWidth: CGFloat
+
+    private var color: Color { privacy.isCameraInUse ? .green : .orange }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            Image(systemName: privacy.isCameraInUse ? "video.fill" : "mic.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(color)
+                .frame(width: slotWidth)
+            Spacer(minLength: 0)
+            Circle()
+                .fill(color)
+                .frame(width: 7, height: 7)
+                .shadow(color: color.opacity(0.8), radius: 4)
+                .frame(width: slotWidth)
+        }
+        .help(privacy.isCameraInUse ? "Caméra en cours d'utilisation" : "Micro en cours d'utilisation")
+    }
+}

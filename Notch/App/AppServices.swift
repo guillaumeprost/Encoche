@@ -8,6 +8,7 @@ struct AppServices {
     let hud: HUDCenter
     let battery: BatteryMonitor
     let brightness: BrightnessController
+    let privacy: PrivacyMonitor
     let music: MusicController
     let volume: VolumeController
     let calendar: CalendarController
@@ -28,6 +29,7 @@ struct AppServices {
         battery.hud = hud
         brightness = BrightnessController()
         brightness.hud = hud
+        privacy = PrivacyMonitor()
         music = MusicController()
         volume = VolumeController()
         calendar = CalendarController()
@@ -79,6 +81,7 @@ extension View {
             .environment(services.hud)
             .environment(services.battery)
             .environment(services.brightness)
+            .environment(services.privacy)
             .environment(services.music)
             .environment(services.volume)
             .environment(services.calendar)

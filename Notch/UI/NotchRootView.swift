@@ -5,6 +5,7 @@ struct NotchRootView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(MusicController.self) private var music
     @Environment(HUDCenter.self) private var hud
+    @Environment(PrivacyMonitor.self) private var privacy
     @Environment(VolumeController.self) private var volume
     @Environment(ClaudeCodeMonitor.self) private var claudeCode
     @Environment(LaunchAtLogin.self) private var launchAtLogin
@@ -80,6 +81,11 @@ struct NotchRootView: View {
                     .padding(.horizontal, vm.topRadius)
                     .frame(height: vm.notchSize.height)
                     .transition(.opacity)
+            } else if privacy.isActive {
+                CollapsedPrivacyView(slotWidth: vm.activitySlotWidth)
+                    .padding(.horizontal, vm.topRadius)
+                    .frame(height: vm.notchSize.height)
+                    .transition(.opacity)
             } else if music.showsActivity {
                 CollapsedMusicView(slotWidth: vm.activitySlotWidth)
                     .padding(.horizontal, vm.topRadius)
@@ -142,7 +148,7 @@ struct NotchRootView: View {
     }
 
     /// Une « live activity » occupe les côtés de l'encoche repliée : Claude Code en priorité, sinon la musique.
-    private var showsActivity: Bool { claudeCode.needsAttention || music.showsActivity }
+    private var showsActivity: Bool { claudeCode.needsAttention || privacy.isActive || music.showsActivity }
 
     /// Teinte du verre d'après le réglage « Liquid Glass » de macOS : couleur de fond de
     /// l'apparence courante (clair ou sombre), plus ou moins opaque.
