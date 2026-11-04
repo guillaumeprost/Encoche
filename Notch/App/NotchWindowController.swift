@@ -10,6 +10,7 @@ final class NotchWindowController {
     private let viewModel = NotchViewModel()
     private let music: MusicController
     private let calendar: CalendarController
+    private let claudeCode: ClaudeCodeMonitor
     private let panel: NotchPanel
     private var monitors: [Any] = []
     private var pendingToggle: Task<Void, Never>?
@@ -18,6 +19,7 @@ final class NotchWindowController {
     init(screen: NSScreen, services: AppServices) {
         music = services.music
         calendar = services.calendar
+        claudeCode = services.claudeCode
         panel = NotchPanel(contentRect: NSRect(origin: .zero, size: Self.panelSize))
 
         let root = NotchRootView()
@@ -30,6 +32,16 @@ final class NotchWindowController {
         update(screen: screen)
         panel.orderFrontRegardless()
         installMonitors()
+
+        // Clic dans une autre app : on relâche la saisie et on referme si la souris est sortie.
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.didResignKeyNotification, object: panel, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.viewModel.holdOpen = false
+                self?.handleMouse()
+            }
+        }
     }
 
     /// Retire l'encoche (écran débranché).
@@ -88,7 +100,7 @@ final class NotchWindowController {
 
     /// Zone active en coordonnées écran globales (origine en bas à gauche de l'écran principal).
     private func hotRect() -> NSRect {
-        let size = viewModel.shapeSize(showsActivity: music.showsActivity)
+        let size = viewModel.shapeSize(showsActivity: claudeCode.needsAttention || music.showsActivity)
         let rect = NSRect(x: screenFrame.midX - size.width / 2, y: screenFrame.maxY - size.height,
                           width: size.width, height: size.height)
         // Un peu de tolérance quand c'est replié, pour attraper la souris facilement.
@@ -96,7 +108,7 @@ final class NotchWindowController {
     }
 
     private func handleMouse() {
-        let inside = hotRect().contains(NSEvent.mouseLocation)
+        let inside = hotRect().contains(NSEvent.mouseLocation) || (viewModel.isOpen && viewModel.holdOpen)
         if inside == viewModel.isOpen {
             pendingToggle?.cancel()
             pendingToggle = nil
@@ -115,6 +127,7 @@ final class NotchWindowController {
 
     private func setOpen(_ open: Bool) {
         viewModel.isOpen = open
+        if !open { viewModel.holdOpen = false }
         panel.ignoresMouseEvents = !open
         if open {
             music.refreshPosition()

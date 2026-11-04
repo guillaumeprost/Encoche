@@ -4,12 +4,13 @@ struct NotchRootView: View {
     @Environment(NotchViewModel.self) private var vm
     @Environment(AppSettings.self) private var settings
     @Environment(MusicController.self) private var music
+    @Environment(ClaudeCodeMonitor.self) private var claudeCode
 
     private let spring = Animation.spring(response: 0.42, dampingFraction: 0.82)
     private let tabTransition = AnyTransition.opacity.combined(with: .scale(scale: 0.97))
 
     var body: some View {
-        let size = vm.shapeSize(showsActivity: music.showsActivity)
+        let size = vm.shapeSize(showsActivity: showsActivity)
         let shape = NotchShape(topRadius: vm.topRadius, bottomRadius: vm.bottomRadius)
 
         ZStack(alignment: .top) {
@@ -25,6 +26,7 @@ struct NotchRootView: View {
                         switch settings.tab {
                         case .home: HomeTab().transition(tabTransition)
                         case .clipboard: ClipboardView().transition(tabTransition)
+                        case .claude: ClaudeTab().transition(tabTransition)
                         }
                     }
                     .padding(.top, 8)
@@ -37,6 +39,11 @@ struct NotchRootView: View {
                         .animation(spring.delay(0.06)),
                     removal: .opacity.animation(.easeOut(duration: 0.12))
                 ))
+            } else if claudeCode.needsAttention {
+                CollapsedClaudeView(slotWidth: vm.activitySlotWidth)
+                    .padding(.horizontal, vm.topRadius)
+                    .frame(height: vm.notchSize.height)
+                    .transition(.opacity)
             } else if music.showsActivity {
                 CollapsedMusicView(slotWidth: vm.activitySlotWidth)
                     .padding(.horizontal, vm.topRadius)
@@ -54,9 +61,13 @@ struct NotchRootView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .animation(spring, value: vm.isOpen)
-        .animation(spring, value: music.showsActivity)
+        .animation(spring, value: showsActivity)
+        .animation(spring, value: claudeCode.needsAttention)
         .preferredColorScheme(.dark)
     }
+
+    /// Une « live activity » occupe les côtés de l'encoche repliée : Claude Code en priorité, sinon la musique.
+    private var showsActivity: Bool { claudeCode.needsAttention || music.showsActivity }
 
     /// Repliée : noir pur, pour se fondre dans l'encoche physique.
     /// Ouverte : Liquid Glass teinté. L'encoche matérielle masque déjà ce qui est

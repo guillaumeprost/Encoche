@@ -3,11 +3,13 @@ import SwiftUI
 enum NotchTab: String, CaseIterable {
     case home
     case clipboard
+    case claude
 
     var symbol: String {
         switch self {
         case .home: "music.note.house"
         case .clipboard: "doc.on.clipboard"
+        case .claude: "sparkle"
         }
     }
 
@@ -15,6 +17,7 @@ enum NotchTab: String, CaseIterable {
         switch self {
         case .home: "Accueil"
         case .clipboard: "Presse-papier"
+        case .claude: "Claude"
         }
     }
 }
@@ -24,11 +27,17 @@ enum NotchTab: String, CaseIterable {
 struct TopBar: View {
     @Environment(AppSettings.self) private var settings
     @Environment(ClipboardController.self) private var clipboard
+    @Environment(ClaudeCodeMonitor.self) private var claudeCode
 
     var body: some View {
         HStack(spacing: 4) {
             ForEach(NotchTab.allCases, id: \.self) { tab in
                 TabButton(tab: tab, isSelected: settings.tab == tab) { settings.tab = tab }
+                    .overlay(alignment: .topTrailing) {
+                        if tab == .claude, claudeCode.waitingCount > 0 {
+                            Circle().fill(Color.claude).frame(width: 6, height: 6).offset(x: -3, y: 2)
+                        }
+                    }
             }
             Spacer()
             if settings.tab == .clipboard, !clipboard.items.isEmpty {
