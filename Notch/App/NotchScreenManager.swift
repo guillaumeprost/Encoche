@@ -4,15 +4,11 @@ import AppKit
 /// ou changements de résolution.
 @MainActor
 final class NotchScreenManager {
-    private let settings: AppSettings
-    private let music: MusicController
-    private let calendar: CalendarController
+    private let services: AppServices
     private var controllers: [CGDirectDisplayID: NotchWindowController] = [:]
 
-    init(settings: AppSettings, music: MusicController, calendar: CalendarController) {
-        self.settings = settings
-        self.music = music
-        self.calendar = calendar
+    init(services: AppServices) {
+        self.services = services
 
         syncScreens()
         NotificationCenter.default.addObserver(
@@ -38,9 +34,7 @@ final class NotchScreenManager {
             if let controller = controllers[id] {
                 controller.update(screen: screen)
             } else {
-                controllers[id] = NotchWindowController(
-                    screen: screen, settings: settings, music: music, calendar: calendar
-                )
+                controllers[id] = NotchWindowController(screen: screen, services: services)
             }
         }
     }

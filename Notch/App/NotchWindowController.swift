@@ -15,16 +15,14 @@ final class NotchWindowController {
     private var pendingToggle: Task<Void, Never>?
     private var screenFrame: NSRect = .zero
 
-    init(screen: NSScreen, settings: AppSettings, music: MusicController, calendar: CalendarController) {
-        self.music = music
-        self.calendar = calendar
+    init(screen: NSScreen, services: AppServices) {
+        music = services.music
+        calendar = services.calendar
         panel = NotchPanel(contentRect: NSRect(origin: .zero, size: Self.panelSize))
 
         let root = NotchRootView()
             .environment(viewModel)
-            .environment(settings)
-            .environment(music)
-            .environment(calendar)
+            .environment(services)
         let hosting = NSHostingView(rootView: root)
         hosting.sizingOptions = []
         panel.contentView = hosting

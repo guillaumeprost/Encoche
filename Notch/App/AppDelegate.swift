@@ -17,10 +17,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        screenManager = NotchScreenManager(
-            settings: AppSettings(),
-            music: MusicController(),
-            calendar: CalendarController()
-        )
+        screenManager = NotchScreenManager(services: AppServices())
     }
 }

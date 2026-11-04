@@ -6,6 +6,7 @@ struct NotchRootView: View {
     @Environment(MusicController.self) private var music
 
     private let spring = Animation.spring(response: 0.42, dampingFraction: 0.82)
+    private let tabTransition = AnyTransition.opacity.combined(with: .scale(scale: 0.97))
 
     var body: some View {
         let size = vm.shapeSize(showsActivity: music.showsActivity)
@@ -16,19 +17,20 @@ struct NotchRootView: View {
 
             if vm.isOpen {
                 VStack(spacing: 0) {
-                    Color.clear.frame(height: vm.notchSize.height)
-                    HStack(spacing: 20) {
-                        ExpandedMusicView()
-                            .frame(width: 330)
-                        Rectangle()
-                            .fill(.white.opacity(0.12))
-                            .frame(width: 1)
-                            .padding(.vertical, 4)
-                        CalendarView()
+                    TopBar()
+                        .frame(height: vm.notchSize.height)
+                        .padding(.horizontal, 18 + vm.topRadius)
+
+                    ZStack {
+                        switch settings.tab {
+                        case .home: HomeTab().transition(tabTransition)
+                        case .clipboard: ClipboardView().transition(tabTransition)
+                        }
                     }
-                        .padding(.top, 8)
-                        .padding(.bottom, 18)
-                        .padding(.horizontal, 24 + vm.topRadius)
+                    .padding(.top, 8)
+                    .padding(.bottom, 18)
+                    .padding(.horizontal, 24 + vm.topRadius)
+                    .animation(.snappy(duration: 0.25), value: settings.tab)
                 }
                 .transition(.asymmetric(
                     insertion: .opacity.combined(with: .scale(scale: 0.92, anchor: .top))
