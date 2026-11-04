@@ -1,0 +1,11 @@
+import Foundation
+import Observation
+
+/// Réglages partagés par toutes les encoches, persistés dans les UserDefaults.
+@Observable
+@MainActor
+final class AppSettings {
+    var useGlass: Bool = UserDefaults.standard.object(forKey: "useGlass") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(useGlass, forKey: "useGlass") }
+    }
+}

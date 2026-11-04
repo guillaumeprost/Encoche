@@ -1,11 +1,13 @@
 import AppKit
 import SwiftUI
 
+/// Une encoche sur un écran donné. Chaque écran a la sienne, avec son propre état
+/// ouvert/fermé ; la musique, le calendrier et les réglages sont partagés.
 @MainActor
 final class NotchWindowController {
     private static let panelSize = CGSize(width: 780, height: 280)
 
-    private let viewModel: NotchViewModel
+    private let viewModel = NotchViewModel()
     private let music: MusicController
     private let calendar: CalendarController
     private let panel: NotchPanel
@@ -13,36 +15,37 @@ final class NotchWindowController {
     private var pendingToggle: Task<Void, Never>?
     private var screenFrame: NSRect = .zero
 
-    init(viewModel: NotchViewModel, music: MusicController, calendar: CalendarController) {
-        self.viewModel = viewModel
+    init(screen: NSScreen, settings: AppSettings, music: MusicController, calendar: CalendarController) {
         self.music = music
         self.calendar = calendar
         panel = NotchPanel(contentRect: NSRect(origin: .zero, size: Self.panelSize))
 
         let root = NotchRootView()
             .environment(viewModel)
+            .environment(settings)
             .environment(music)
             .environment(calendar)
         let hosting = NSHostingView(rootView: root)
         hosting.sizingOptions = []
         panel.contentView = hosting
 
-        reposition()
+        update(screen: screen)
         panel.orderFrontRegardless()
         installMonitors()
+    }
 
-        NotificationCenter.default.addObserver(
-            forName: NSApplication.didChangeScreenParametersNotification,
-            object: nil, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.reposition() }
-        }
+    /// Retire l'encoche (écran débranché).
+    func invalidate() {
+        pendingToggle?.cancel()
+        monitors.forEach(NSEvent.removeMonitor)
+        monitors.removeAll()
+        panel.orderOut(nil)
+        panel.close()
     }
 
     // MARK: - Placement
 
-    private func reposition() {
-        let screen = NSScreen.screens.first { $0.safeAreaInsets.top > 0 } ?? NSScreen.main ?? NSScreen.screens[0]
+    func update(screen: NSScreen) {
         screenFrame = screen.frame
 
         if screen.safeAreaInsets.top > 0,
@@ -54,8 +57,9 @@ final class NotchWindowController {
             )
             viewModel.hasPhysicalNotch = true
         } else {
+            // Écran sans encoche : on en simule une, à la hauteur de la barre de menus.
             let menuBarHeight = screen.frame.maxY - screen.visibleFrame.maxY
-            viewModel.notchSize = CGSize(width: 190, height: max(menuBarHeight, 24))
+            viewModel.notchSize = CGSize(width: 190, height: menuBarHeight > 0 ? menuBarHeight : 24)
             viewModel.hasPhysicalNotch = false
         }
 
@@ -84,7 +88,7 @@ final class NotchWindowController {
         }
     }
 
-    /// Zone active en coordonnées écran (origine en bas à gauche).
+    /// Zone active en coordonnées écran globales (origine en bas à gauche de l'écran principal).
     private func hotRect() -> NSRect {
         let size = viewModel.shapeSize(showsActivity: music.showsActivity)
         let rect = NSRect(x: screenFrame.midX - size.width / 2, y: screenFrame.maxY - size.height,

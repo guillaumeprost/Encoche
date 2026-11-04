@@ -2,6 +2,7 @@ import SwiftUI
 
 struct NotchRootView: View {
     @Environment(NotchViewModel.self) private var vm
+    @Environment(AppSettings.self) private var settings
     @Environment(MusicController.self) private var music
 
     private let spring = Animation.spring(response: 0.42, dampingFraction: 0.82)
@@ -45,7 +46,7 @@ struct NotchRootView: View {
         .clipShape(shape)
         .shadow(color: .black.opacity(vm.isOpen ? 0.35 : 0), radius: 18, y: 8)
         .contextMenu {
-            Toggle("Liquid Glass", isOn: Binding(get: { vm.useGlass }, set: { vm.useGlass = $0 }))
+            Toggle("Liquid Glass", isOn: Binding(get: { settings.useGlass }, set: { settings.useGlass = $0 }))
             Divider()
             Button("Quitter Notch") { NSApp.terminate(nil) }
         }
@@ -56,10 +57,11 @@ struct NotchRootView: View {
     }
 
     /// Repliée : noir pur, pour se fondre dans l'encoche physique.
-    /// Ouverte : Liquid Glass teinté, avec un bandeau noir sous l'encoche matérielle.
+    /// Ouverte : Liquid Glass teinté. L'encoche matérielle masque déjà ce qui est
+    /// derrière elle, inutile de dessiner quoi que ce soit dessous.
     @ViewBuilder
     private func background(_ shape: NotchShape) -> some View {
-        let glass = vm.isOpen && vm.useGlass
+        let glass = vm.isOpen && settings.useGlass
         ZStack(alignment: .top) {
             shape.fill(.black)
                 .opacity(glass ? 0 : 1)
@@ -67,13 +69,6 @@ struct NotchRootView: View {
             Color.clear
                 .glassEffect(.regular.tint(.black.opacity(0.5)), in: shape)
                 .opacity(glass ? 1 : 0)
-
-            if glass {
-                Rectangle()
-                    .fill(.black)
-                    .frame(width: vm.notchSize.width, height: vm.notchSize.height)
-                    .mask(LinearGradient(colors: [.black, .black, .clear], startPoint: .top, endPoint: .bottom))
-            }
         }
     }
 }

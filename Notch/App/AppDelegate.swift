@@ -5,7 +5,7 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private static var shared: AppDelegate?
 
-    private var windowController: NotchWindowController?
+    private var screenManager: NotchScreenManager?
 
     static func main() {
         let app = NSApplication.shared
@@ -17,9 +17,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let viewModel = NotchViewModel()
-        let music = MusicController()
-        let calendar = CalendarController()
-        windowController = NotchWindowController(viewModel: viewModel, music: music, calendar: calendar)
+        screenManager = NotchScreenManager(
+            settings: AppSettings(),
+            music: MusicController(),
+            calendar: CalendarController()
+        )
     }
 }

@@ -9,10 +9,6 @@ final class NotchViewModel {
     var notchSize = CGSize(width: 185, height: 32)
     var hasPhysicalNotch = true
 
-    var useGlass: Bool = UserDefaults.standard.object(forKey: "useGlass") as? Bool ?? true {
-        didSet { UserDefaults.standard.set(useGlass, forKey: "useGlass") }
-    }
-
     static let expandedBodyWidth: CGFloat = 640
     static let expandedContentHeight: CGFloat = 136
 
