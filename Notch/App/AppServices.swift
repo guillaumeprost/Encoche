@@ -15,6 +15,7 @@ struct AppServices {
     let clipboard: ClipboardController
     let shelf: ShelfController
     let screenshots: ScreenshotWatcher
+    let home: HomeShortcuts
     let claudeCode: ClaudeCodeMonitor
     let ask: ClaudeAsk
     let launchAtLogin: LaunchAtLogin
@@ -36,6 +37,7 @@ struct AppServices {
         clipboard = ClipboardController()
         shelf = ShelfController()
         screenshots = ScreenshotWatcher()
+        home = HomeShortcuts()
         claudeCode = ClaudeCodeMonitor()
         claudeCode.alerts = alerts
         volume.alerts = alerts
@@ -87,6 +89,7 @@ extension View {
             .environment(services.clipboard)
             .environment(services.shelf)
             .environment(services.screenshots)
+            .environment(services.home)
             .environment(services.claudeCode)
             .environment(services.ask)
             .environment(services.launchAtLogin)

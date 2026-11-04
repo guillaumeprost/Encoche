@@ -2,6 +2,7 @@ import SwiftUI
 
 enum NotchTab: String, CaseIterable {
     case home
+    case house
     case shelf
     case clipboard
     case notifications
@@ -10,6 +11,7 @@ enum NotchTab: String, CaseIterable {
     var symbol: String {
         switch self {
         case .home: "music.note.house"
+        case .house: "homekit"
         case .shelf: "tray.full"
         case .clipboard: "doc.on.clipboard"
         case .notifications: "bell"
@@ -20,6 +22,7 @@ enum NotchTab: String, CaseIterable {
     var label: String {
         switch self {
         case .home: "Accueil"
+        case .house: "Maison"
         case .shelf: "Étagère"
         case .clipboard: "Presse-papier"
         case .notifications: "Notifications"

@@ -17,6 +17,7 @@ Encoche vit dans l'encoche de l'écran. Elle reste noire et discrète pour se fo
 
 ### Dans l'encoche ouverte
 - **Accueil** : le morceau en cours (Musique ou Spotify) avec ses commandes, l'agenda du jour, et un champ pour poser une question à Claude.
+- **Maison** : une tuile par raccourci du dossier « Encoche » de l'app Raccourcis (allumer une lampe, lancer une scène…). Crée-le dans Raccourcis et ajoutes-y tes actions Maison.
 - **Étagère** : les dernières captures d'écran, à glisser où tu veux.
 - **Presse-papier** : l'historique de ce que tu as copié. Les mots de passe des gestionnaires sont ignorés.
 - **Notifications** : l'historique des notifications, conservé d'un redémarrage à l'autre.
@@ -95,6 +96,7 @@ swift scripts/make-icon.swift
 | `Notch/Music` | Musique et Spotify |
 | `Notch/Calendar` | Agenda et rappels de réunion |
 | `Notch/Clipboard` | Historique du presse-papier |
+| `Notch/Home` | Onglet Maison (raccourcis) |
 | `Notch/Shelf` | Étagère et captures d'écran |
 | `Notch/Notifications` | Notifications macOS, bannières, historique |
 | `Notch/Claude` | Questions à Claude, suivi des sessions Claude Code, hooks |

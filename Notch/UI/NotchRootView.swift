@@ -33,6 +33,7 @@ struct NotchRootView: View {
                     ZStack {
                         switch settings.tab {
                         case .home: HomeTab().transition(tabTransition)
+                        case .house: HomeControlView().transition(tabTransition)
                         case .shelf: ShelfView().transition(tabTransition)
                         case .clipboard: ClipboardView().transition(tabTransition)
                         case .notifications: NotificationHistoryView().transition(tabTransition)
