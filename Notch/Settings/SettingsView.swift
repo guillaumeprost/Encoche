@@ -60,6 +60,7 @@ struct SettingsView: View {
                     Toggle("Afficher les notifications macOS dans l'encoche", isOn: $settings.mirrorSystemNotifications)
                     Toggle("Masquer les bannières de macOS", isOn: $settings.hideSystemBanners)
                         .disabled(!settings.mirrorSystemNotifications)
+                    Toggle("Seulement sur l'écran principal", isOn: $settings.notificationsOnPrimaryScreenOnly)
                     PermissionRow(
                         title: "Accès complet au disque",
                         detail: "Pour lire les notifications des autres apps.",

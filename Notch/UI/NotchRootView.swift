@@ -111,12 +111,18 @@ struct NotchRootView: View {
         .animation(spring, value: vm.showsAlert)
         .animation(spring, value: vm.showsHUD)
         .onChange(of: hud.current, initial: true) { vm.showsHUD = hud.current != nil }
-        .onChange(of: alerts.current?.id, initial: true) {
-            vm.showsAlert = alerts.current != nil
-            vm.alertHasButtons = alerts.current?.isPersistent ?? false
-        }
+        .onChange(of: alerts.current?.id, initial: true) { updateAlert() }
+        .onChange(of: vm.isPrimaryScreen) { updateAlert() }
+        .onChange(of: settings.notificationsOnPrimaryScreenOnly) { updateAlert() }
         .animation(spring, value: showsActivity)
         .animation(spring, value: claudeCode.needsAttention)
+    }
+
+    /// Affiche la notification en cours, sur l'écran principal seulement si c'est réglé ainsi.
+    private func updateAlert() {
+        let allowed = vm.isPrimaryScreen || !settings.notificationsOnPrimaryScreenOnly
+        vm.showsAlert = allowed && alerts.current != nil
+        vm.alertHasButtons = alerts.current?.isPersistent ?? false
     }
 
     /// Une « live activity » occupe les côtés de l'encoche repliée : Claude Code en priorité, sinon la musique.

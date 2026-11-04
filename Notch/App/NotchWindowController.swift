@@ -81,6 +81,8 @@ final class NotchWindowController {
 
     func update(screen: NSScreen) {
         screenFrame = screen.frame
+        // Le premier écran de la liste est l'écran principal choisi dans Réglages Système.
+        viewModel.isPrimaryScreen = screen == NSScreen.screens.first
 
         if screen.safeAreaInsets.top > 0,
            let left = screen.auxiliaryTopLeftArea,

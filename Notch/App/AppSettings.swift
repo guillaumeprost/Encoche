@@ -21,6 +21,12 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(hideSystemBanners, forKey: "hideSystemBanners") }
     }
 
+    /// Montrer les notifications seulement sur l'écran principal (celui de la barre de menus,
+    /// choisi dans Réglages Système → Moniteurs), comme macOS.
+    var notificationsOnPrimaryScreenOnly: Bool = UserDefaults.standard.object(forKey: "notificationsOnPrimaryScreenOnly") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(notificationsOnPrimaryScreenOnly, forKey: "notificationsOnPrimaryScreenOnly") }
+    }
+
     /// Remplacer l'indicateur de volume de macOS par celui de l'encoche.
     var replaceSystemVolumeHUD: Bool = UserDefaults.standard.object(forKey: "replaceSystemVolumeHUD") as? Bool ?? true {
         didSet { UserDefaults.standard.set(replaceSystemVolumeHUD, forKey: "replaceSystemVolumeHUD") }

@@ -8,6 +8,8 @@ final class NotchViewModel {
     /// Taille de l'encoche physique (ou d'une encoche simulée sur un écran sans encoche).
     var notchSize = CGSize(width: 185, height: 32)
     var hasPhysicalNotch = true
+    /// Écran principal de macOS (celui qui porte la barre de menus).
+    var isPrimaryScreen = true
     /// Garde l'encoche ouverte même si la souris sort (saisie en cours dans un champ).
     var holdOpen = false
     /// Rangée au-dessus de l'écran (app en plein écran, barre de menus masquée).
