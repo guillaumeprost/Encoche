@@ -32,7 +32,7 @@ final class MusicController {
     private(set) var track: Track?
     private(set) var isPlaying = false
     private(set) var artwork: NSImage?
-    private(set) var accent: Color = .white
+    private(set) var accent: Color = .primary
 
     private var basePosition: Double = 0
     private var baseDate = Date()
@@ -195,7 +195,7 @@ final class MusicController {
         track = nil
         isPlaying = false
         artwork = nil
-        accent = .white
+        accent = .primary
     }
 
     // MARK: - Pochette
@@ -229,7 +229,7 @@ final class MusicController {
     private func applyArtwork(_ image: NSImage?) {
         withAnimation(.easeInOut(duration: 0.3)) {
             artwork = image
-            accent = image?.vividAverageColor.map(Color.init(nsColor:)) ?? .white
+            accent = image?.vividAverageColor.map(Color.init(nsColor:)) ?? .primary
         }
     }
 }

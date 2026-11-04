@@ -15,7 +15,7 @@ struct ClipboardView: View {
                 Text("Copie quelque chose, ça apparaîtra ici")
                     .font(.system(size: 12))
             }
-            .foregroundStyle(.white.opacity(0.5))
+            .foregroundStyle(.primary.opacity(0.5))
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollView(.horizontal) {
@@ -68,7 +68,7 @@ private struct ClipCard: View {
                 }
                 Text(item.date, format: .relative(presentation: .numeric, unitsStyle: .abbreviated))
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.5))
+                    .foregroundStyle(.primary.opacity(0.5))
                     .lineLimit(1)
                 Spacer(minLength: 0)
                 if item.pinned {
@@ -85,7 +85,7 @@ private struct ClipCard: View {
         .frame(width: 150, height: 104)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(.white.opacity(hovering ? 0.14 : 0.08))
+                .fill(.primary.opacity(hovering ? 0.14 : 0.08))
         )
         .overlay {
             if isCopied {
@@ -103,7 +103,7 @@ private struct ClipCard: View {
         .scaleEffect(hovering ? 1.03 : 1)
         .onHover { hovering = $0 }
         .animation(.snappy(duration: 0.2), value: hovering)
-        .foregroundStyle(.white)
+        .foregroundStyle(.primary)
     }
 
     @ViewBuilder
@@ -122,7 +122,7 @@ private struct ClipCard: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             } else {
-                Image(systemName: "photo").foregroundStyle(.white.opacity(0.5))
+                Image(systemName: "photo").foregroundStyle(.primary.opacity(0.5))
             }
 
         case .files(let urls):
@@ -139,7 +139,7 @@ private struct ClipCard: View {
                     if urls.count > 1 {
                         Text("+ \(urls.count - 1) autre\(urls.count > 2 ? "s" : "")")
                             .font(.system(size: 10))
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(.primary.opacity(0.5))
                     }
                 }
             }

@@ -8,6 +8,8 @@ struct NotchRootView: View {
     @Environment(LaunchAtLogin.self) private var launchAtLogin
     @Environment(AlertCenter.self) private var alerts
     @Environment(SystemNotificationWatcher.self) private var systemNotifications
+    /// Apparence du Mac (clair / sombre).
+    @Environment(\.colorScheme) private var systemColorScheme
 
     private let spring = Animation.spring(response: 0.42, dampingFraction: 0.82)
     private let tabTransition = AnyTransition.opacity.combined(with: .scale(scale: 0.97))
@@ -72,6 +74,9 @@ struct NotchRootView: View {
                     .transition(.opacity)
             }
         }
+        // En verre, le contenu suit l'apparence du Mac ; sur fond noir (repliée, ou verre
+        // désactivé), il reste en style sombre pour rester lisible.
+        .environment(\.colorScheme, glassActive ? systemColorScheme : .dark)
         .frame(width: size.width, height: size.height, alignment: .top)
         .clipShape(shape)
         .shadow(color: .black.opacity(vm.isOpen || vm.showsAlert ? 0.35 : 0), radius: 18, y: 8)
@@ -104,26 +109,32 @@ struct NotchRootView: View {
         }
         .animation(spring, value: showsActivity)
         .animation(spring, value: claudeCode.needsAttention)
-        .preferredColorScheme(.dark)
     }
 
     /// Une « live activity » occupe les côtés de l'encoche repliée : Claude Code en priorité, sinon la musique.
     private var showsActivity: Bool { claudeCode.needsAttention || music.showsActivity }
 
+    /// Teinte du verre d'après le réglage « Liquid Glass » de macOS : couleur de fond de
+    /// l'apparence courante (clair ou sombre), plus ou moins opaque.
+    private var glassTint: Color {
+        Color(nsColor: .windowBackgroundColor).opacity(settings.systemGlassTint * 0.85)
+    }
+
+    /// Ouverte ou notification, avec le Liquid Glass activé.
+    private var glassActive: Bool { (vm.isOpen || vm.showsAlert) && settings.useGlass }
+
     /// Repliée : noir pur, pour se fondre dans l'encoche physique.
-    /// Ouverte ou notification : Liquid Glass teinté. L'encoche matérielle masque déjà ce qui est
-    /// derrière elle, inutile de dessiner quoi que ce soit dessous.
+    /// Ouverte ou notification : Liquid Glass natif, sans teinte imposée — il suit l'apparence
+    /// du Mac et ses réglages d'accessibilité (réduire la transparence, augmenter le contraste).
     @ViewBuilder
     private func background(_ shape: NotchShape) -> some View {
-        // Les notifications prennent aussi le Liquid Glass, comme l'encoche ouverte.
-        let glass = (vm.isOpen || vm.showsAlert) && settings.useGlass
         ZStack(alignment: .top) {
             shape.fill(.black)
-                .opacity(glass ? 0 : 1)
+                .opacity(glassActive ? 0 : 1)
 
             Color.clear
-                .glassEffect(.regular.tint(.black.opacity(0.5)), in: shape)
-                .opacity(glass ? 1 : 0)
+                .glassEffect(.regular.tint(glassTint), in: shape)
+                .opacity(glassActive ? 1 : 0)
         }
     }
 }

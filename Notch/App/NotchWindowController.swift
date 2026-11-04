@@ -201,6 +201,7 @@ final class NotchWindowController {
         if !open { viewModel.holdOpen = false }
         panel.ignoresMouseEvents = !open
         if open {
+            settings.refreshSystemGlassTint()
             music.refreshPosition()
             calendar.selectToday()
         }

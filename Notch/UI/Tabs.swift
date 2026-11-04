@@ -47,7 +47,7 @@ struct TopBar: View {
                 .transition(.opacity)
             }
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(.primary)
         .animation(.snappy(duration: 0.2), value: settings.tab)
     }
 }
@@ -64,7 +64,7 @@ private struct TabButton: View {
                 .font(.system(size: 12, weight: .semibold))
                 .frame(width: 30, height: 22)
                 .background(
-                    Capsule().fill(.white.opacity(isSelected ? 0.2 : hovering ? 0.1 : 0))
+                    Capsule().fill(.primary.opacity(isSelected ? 0.2 : hovering ? 0.1 : 0))
                 )
                 .opacity(isSelected ? 1 : 0.6)
                 .contentShape(Capsule())
@@ -86,7 +86,7 @@ private struct IconButton: View {
             Image(systemName: symbol)
                 .font(.system(size: 11, weight: .semibold))
                 .frame(width: 26, height: 22)
-                .background(Capsule().fill(.white.opacity(hovering ? 0.12 : 0)))
+                .background(Capsule().fill(.primary.opacity(hovering ? 0.12 : 0)))
                 .opacity(hovering ? 1 : 0.6)
                 .contentShape(Capsule())
         }
@@ -107,7 +107,7 @@ struct HomeTab: View {
                 ExpandedMusicView()
                     .frame(width: 330)
                 Rectangle()
-                    .fill(.white.opacity(0.12))
+                    .fill(.primary.opacity(0.12))
                     .frame(width: 1)
                     .padding(.vertical, 4)
                 CalendarView()

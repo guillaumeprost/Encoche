@@ -23,7 +23,7 @@ struct CalendarView: View {
                 )
             }
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(.primary)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
@@ -60,20 +60,20 @@ private struct DayCell: View {
         VStack(spacing: 2) {
             Text(day.formatted(.dateTime.weekday(.narrow)).uppercased())
                 .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.45))
+                .foregroundStyle(.primary.opacity(0.45))
             Text(day.formatted(.dateTime.day()))
                 .font(.system(size: 13, weight: isSelected || isToday ? .bold : .medium).monospacedDigit())
                 .foregroundStyle(numberColor)
                 .frame(width: 24, height: 24)
                 .background {
                     if isSelected {
-                        Circle().fill(isToday ? .red : .white)
+                        Circle().fill(isToday ? Color.red : Color.primary)
                     } else if hovering {
-                        Circle().fill(.white.opacity(0.12))
+                        Circle().fill(.primary.opacity(0.12))
                     }
                 }
             Circle()
-                .fill(.white.opacity(isBusy ? 0.5 : 0))
+                .fill(.primary.opacity(isBusy ? 0.5 : 0))
                 .frame(width: 3, height: 3)
         }
         .frame(maxWidth: .infinity)
@@ -82,8 +82,9 @@ private struct DayCell: View {
     }
 
     private var numberColor: Color {
-        if isSelected { return isToday ? .white : .black }
-        return isToday ? .red : .white
+        // Sélectionné : texte en couleur de fond sur une pastille de la couleur du texte.
+        if isSelected { return isToday ? .white : Color(nsColor: .windowBackgroundColor) }
+        return isToday ? .red : .primary
     }
 }
 
@@ -96,7 +97,7 @@ private struct Agenda: View {
         if calendar.events.isEmpty {
             Text("Aucun événement")
                 .font(.system(size: 12))
-                .foregroundStyle(.white.opacity(0.45))
+                .foregroundStyle(.primary.opacity(0.45))
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             TimelineView(.everyMinute) { context in
@@ -144,7 +145,7 @@ private struct EventRow: View {
                     .lineLimit(1)
                 Text(timeLabel)
                     .font(.system(size: 10, weight: .medium).monospacedDigit())
-                    .foregroundStyle(isNow ? event.color : .white.opacity(0.5))
+                    .foregroundStyle(isNow ? event.color : .primary.opacity(0.5))
             }
             Spacer(minLength: 0)
         }
@@ -153,7 +154,7 @@ private struct EventRow: View {
         .frame(height: 36)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(isNow ? event.color.opacity(0.18) : .white.opacity(hovering ? 0.08 : 0))
+                .fill(isNow ? event.color.opacity(0.18) : .primary.opacity(hovering ? 0.08 : 0))
         )
         .opacity(isPast ? 0.45 : 1)
         .contentShape(Rectangle())
@@ -183,10 +184,10 @@ private struct AccessPrompt: View {
         VStack(spacing: 10) {
             Image(systemName: "calendar")
                 .font(.system(size: 22))
-                .foregroundStyle(.white.opacity(0.6))
+                .foregroundStyle(.primary.opacity(0.6))
             Text(message)
                 .font(.system(size: 12))
-                .foregroundStyle(.white.opacity(0.6))
+                .foregroundStyle(.primary.opacity(0.6))
             Button(button, action: action)
                 .buttonStyle(.glass)
                 .controlSize(.small)

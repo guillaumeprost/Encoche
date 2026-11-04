@@ -12,13 +12,13 @@ struct ClaudeTab: View {
         HStack(spacing: 20) {
             AskPanel()
             Rectangle()
-                .fill(.white.opacity(0.12))
+                .fill(.primary.opacity(0.12))
                 .frame(width: 1)
                 .padding(.vertical, 4)
             SessionsPanel()
                 .frame(width: 220)
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(.primary)
     }
 }
 
@@ -44,7 +44,7 @@ private struct AskPanel: View {
                     .font(.system(size: 12, weight: .semibold))
                 Text("Installe la CLI Claude Code et connecte-toi pour poser des questions avec ton abonnement.")
                     .font(.system(size: 11))
-                    .foregroundStyle(.white.opacity(0.6))
+                    .foregroundStyle(.primary.opacity(0.6))
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
@@ -61,14 +61,14 @@ private struct AskPanel: View {
                 if ask.needsLogin {
                     Text("Dans un terminal, lance `claude` puis `/login`.")
                         .font(.system(size: 11))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(.primary.opacity(0.6))
                 }
             }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         } else if ask.askedQuestion.isEmpty {
             Text("Entrée pour envoyer · Échap pour quitter le champ")
                 .font(.system(size: 11))
-                .foregroundStyle(.white.opacity(0.4))
+                .foregroundStyle(.primary.opacity(0.4))
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .padding(.leading, 4)
         } else {
@@ -77,7 +77,7 @@ private struct AskPanel: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(ask.askedQuestion)
                             .font(.system(size: 11, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.5))
+                            .foregroundStyle(.primary.opacity(0.5))
                             .lineLimit(1)
                         if ask.answer.isEmpty && ask.isStreaming {
                             ThinkingDots()
@@ -159,7 +159,7 @@ struct ClaudeAskField: View {
         }
         .padding(.horizontal, 12)
         .frame(height: 32)
-        .glassEffect(.regular.tint(.white.opacity(0.05)).interactive(), in: Capsule())
+        .glassEffect(.regular.tint(.primary.opacity(0.05)).interactive(), in: Capsule())
         .onChange(of: focused) { vm.holdOpen = focused }
         .onDisappear { vm.holdOpen = false }
     }
@@ -181,7 +181,7 @@ private struct SessionsPanel: View {
             HStack {
                 Text("Claude Code")
                     .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.55))
+                    .foregroundStyle(.primary.opacity(0.55))
                 Spacer()
             }
 
@@ -189,7 +189,7 @@ private struct SessionsPanel: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Affiche l'état de tes sessions et te prévient quand l'une d'elles t'attend.")
                         .font(.system(size: 11))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(.primary.opacity(0.6))
                         .fixedSize(horizontal: false, vertical: true)
                     Button("Installer les hooks") { monitor.installHooks() }
                         .buttonStyle(.glass)
@@ -201,7 +201,7 @@ private struct SessionsPanel: View {
             } else if monitor.sessions.isEmpty {
                 Text("Aucune session active")
                     .font(.system(size: 12))
-                    .foregroundStyle(.white.opacity(0.45))
+                    .foregroundStyle(.primary.opacity(0.45))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView(.vertical) {
@@ -245,7 +245,7 @@ private struct SessionRow: View {
         .padding(.horizontal, 6)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(session.state == .waiting ? Color.claude.opacity(0.18) : .white.opacity(0.06))
+                .fill(session.state == .waiting ? Color.claude.opacity(0.18) : .primary.opacity(0.06))
         )
         .help(session.cwd)
     }
@@ -257,7 +257,7 @@ private struct SessionRow: View {
                 .foregroundStyle(filled ? .white : color)
                 .padding(.horizontal, 9)
                 .frame(height: 20)
-                .background(Capsule().fill(filled ? color : .white.opacity(0.08)))
+                .background(Capsule().fill(filled ? color : .primary.opacity(0.08)))
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
@@ -273,7 +273,7 @@ private struct SessionRow: View {
                     .lineLimit(1)
                 Text(subtitle)
                     .font(.system(size: 10))
-                    .foregroundStyle(session.state == .waiting ? Color.claude : .white.opacity(0.5))
+                    .foregroundStyle(session.state == .waiting ? Color.claude : .primary.opacity(0.5))
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
@@ -297,7 +297,7 @@ struct SessionStateIcon: View {
     var body: some View {
         switch state {
         case .idle:
-            Image(systemName: "circle").foregroundStyle(.white.opacity(0.4)).font(.system(size: 9))
+            Image(systemName: "circle").foregroundStyle(.primary.opacity(0.4)).font(.system(size: 9))
         case .working:
             ProgressView().controlSize(.mini).tint(Color.claude)
         case .waiting:

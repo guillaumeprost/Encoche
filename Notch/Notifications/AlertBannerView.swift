@@ -32,18 +32,18 @@ struct AlertBannerView: View {
                     Spacer(minLength: 4)
                     Text(alert.source)
                         .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.45))
+                        .foregroundStyle(.primary.opacity(0.45))
                         .lineLimit(1)
                 }
                 if let body = alert.body, !body.isEmpty {
                     Text(body)
                         .font(.system(size: 11.5))
-                        .foregroundStyle(.white.opacity(0.75))
+                        .foregroundStyle(.primary.opacity(0.75))
                         .lineLimit(2)
                 }
             }
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(.primary)
         .contentShape(Rectangle())
     }
 
@@ -83,7 +83,7 @@ private struct AlertButtonView: View {
         Button(action: action) {
             Text(button.label)
                 .font(.system(size: 11.5, weight: button.role == .primary ? .semibold : .medium))
-                .foregroundStyle(button.role == .destructive ? Color.red : .white)
+                .foregroundStyle(button.role == .destructive ? Color.red : button.role == .primary ? Color.white : Color.primary)
                 .padding(.horizontal, 12)
                 .frame(height: 26)
                 .background {
@@ -94,7 +94,7 @@ private struct AlertButtonView: View {
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .glassEffect(.regular.tint(.white.opacity(hovering ? 0.12 : 0.04)).interactive(), in: Capsule())
+        .glassEffect(.regular.tint(.primary.opacity(hovering ? 0.12 : 0.04)).interactive(), in: Capsule())
         .onHover { hovering = $0 }
     }
 }

@@ -39,7 +39,7 @@ struct ExpandedMusicView: View {
                                 .lineLimit(1)
                             Text(track.artist)
                                 .font(.system(size: 12))
-                                .foregroundStyle(.white.opacity(0.6))
+                                .foregroundStyle(.primary.opacity(0.6))
                                 .lineLimit(1)
                         }
                         Spacer(minLength: 8)
@@ -54,7 +54,7 @@ struct ExpandedMusicView: View {
                     Controls()
                 }
             }
-            .foregroundStyle(.white)
+            .foregroundStyle(.primary)
         } else {
             EmptyMusicView()
         }
@@ -86,7 +86,7 @@ private struct ControlButton: View {
             Image(systemName: symbol)
                 .font(.system(size: size, weight: .semibold))
                 .frame(width: 34, height: 30)
-                .background(Circle().fill(.white.opacity(hovering ? 0.12 : 0)))
+                .background(Circle().fill(.primary.opacity(hovering ? 0.12 : 0)))
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
@@ -107,7 +107,7 @@ private struct ProgressBar: View {
                 Text(format(current))
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
-                        Capsule().fill(.white.opacity(0.2))
+                        Capsule().fill(.primary.opacity(0.2))
                         Capsule().fill(music.accent)
                             .frame(width: geo.size.width * min(current / duration, 1))
                     }
@@ -125,7 +125,7 @@ private struct ProgressBar: View {
                 Text("-" + format(max(duration - current, 0)))
             }
             .font(.system(size: 10, weight: .medium).monospacedDigit())
-            .foregroundStyle(.white.opacity(0.55))
+            .foregroundStyle(.primary.opacity(0.55))
             .animation(.easeOut(duration: 0.15), value: dragFraction == nil)
         }
     }
@@ -144,7 +144,7 @@ private struct EmptyMusicView: View {
             Image(systemName: "music.note")
                 .font(.system(size: 22))
                 .frame(width: 56, height: 56)
-                .background(RoundedRectangle(cornerRadius: 12).fill(.white.opacity(0.08)))
+                .background(RoundedRectangle(cornerRadius: 12).fill(.primary.opacity(0.08)))
             VStack(alignment: .leading, spacing: 8) {
                 Text("Rien en lecture")
                     .font(.system(size: 14, weight: .semibold))
@@ -161,7 +161,7 @@ private struct EmptyMusicView: View {
             }
             Spacer()
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(.primary)
         .frame(maxHeight: .infinity)
     }
 }
@@ -177,8 +177,8 @@ struct Artwork: View {
             if let image {
                 Image(nsImage: image).resizable().scaledToFill()
             } else {
-                Rectangle().fill(.white.opacity(0.1))
-                Image(systemName: "music.note").foregroundStyle(.white.opacity(0.5))
+                Rectangle().fill(.primary.opacity(0.1))
+                Image(systemName: "music.note").foregroundStyle(.primary.opacity(0.5))
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
