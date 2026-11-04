@@ -27,7 +27,10 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.guillaumeprost.notch
-        CODE_SIGN_STYLE: Automatic
-        CODE_SIGN_IDENTITY: "-"
+        # Certificat auto-signé local (Trousseau de session) : une identité stable pour que
+        # macOS garde les autorisations (disque, calendrier, automatisation) entre deux builds.
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "Notch Local Signing"
+        DEVELOPMENT_TEAM: ""
         ENABLE_HARDENED_RUNTIME: NO
         ENABLE_APP_SANDBOX: NO
