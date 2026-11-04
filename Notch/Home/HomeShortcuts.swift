@@ -117,8 +117,14 @@ struct HomeShortcutStyle {
     ]
 
     init(name: String) {
-        let lowered = name.lowercased()
-        let match = Self.rules.first { rule in rule.keywords.contains { lowered.contains($0) } }
+        // Mots entiers (ou leur début : « lumières », « lampes ») pour que « accessoire »
+        // ne soit pas pris pour « soir ».
+        let words = name.lowercased()
+            .split { !$0.isLetter }
+            .map(String.init)
+        let match = Self.rules.first { rule in
+            rule.keywords.contains { keyword in words.contains { $0.hasPrefix(keyword) } }
+        }
         symbol = match?.symbol ?? "sparkles"
         tint = match?.tint ?? .accentColor
     }
