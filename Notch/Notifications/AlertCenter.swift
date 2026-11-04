@@ -1,0 +1,132 @@
+import AppKit
+import Observation
+import SwiftUI
+
+/// Une notification affichée dans l'encoche, façon Dynamic Island.
+struct NotchAlert: Identifiable {
+    enum Icon {
+        case app(bundleID: String)
+        case symbol(String, Color)
+    }
+
+    enum Action {
+        case openApp(bundleID: String)
+        case openURL(URL)
+        case run(@MainActor () -> Void)
+    }
+
+    /// Bouton d'action (ex. Autoriser / Refuser une demande de Claude Code).
+    struct Button: Identifiable {
+        enum Role { case primary, normal, destructive }
+        let id = UUID()
+        let label: String
+        let role: Role
+        let action: @MainActor () -> Void
+    }
+
+    let id = UUID()
+    let icon: Icon
+    /// Nom de l'app ou du module d'origine.
+    let source: String
+    let title: String
+    let body: String?
+    var date = Date()
+    var action: Action?
+    /// Une notification avec des boutons attend une réponse : elle reste affichée.
+    var buttons: [Button] = []
+
+    var isPersistent: Bool { !buttons.isEmpty }
+}
+
+/// File d'attente des notifications : une seule affichée à la fois, environ 5 secondes,
+/// prolongée tant que la souris est dessus.
+@Observable
+@MainActor
+final class AlertCenter {
+    private static let displayDuration: Duration = .seconds(5)
+    private static let afterHoverDuration: Duration = .seconds(2)
+    /// Au-delà, une notification restée en file n'a plus d'intérêt.
+    private static let maxAge: TimeInterval = 60
+
+    private(set) var current: NotchAlert?
+    private var queue: [NotchAlert] = []
+    /// Écrans dont la notification est survolée (une encoche par écran).
+    private var hoveringSources: Set<ObjectIdentifier> = []
+    private var dismissTask: Task<Void, Never>?
+
+    func post(_ alert: NotchAlert) {
+        queue.append(alert)
+        if current == nil { showNext() }
+    }
+
+    func setHovering(_ hovering: Bool, from source: ObjectIdentifier) {
+        let wasHovering = !hoveringSources.isEmpty
+        if hovering { hoveringSources.insert(source) } else { hoveringSources.remove(source) }
+        let isHovering = !hoveringSources.isEmpty
+        guard isHovering != wasHovering, let current, !current.isPersistent else { return }
+        if isHovering {
+            dismissTask?.cancel()
+        } else {
+            scheduleDismiss(after: Self.afterHoverDuration)
+        }
+    }
+
+    /// Clic sur la notification : on exécute son action et on la retire.
+    func activate() {
+        guard let alert = current, !alert.isPersistent else { return }
+        switch alert.action {
+        case .openApp(let bundleID):
+            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
+                NSWorkspace.shared.openApplication(at: url, configuration: .init())
+            }
+        case .openURL(let url):
+            NSWorkspace.shared.open(url)
+        case .run(let block):
+            block()
+        case nil:
+            break
+        }
+        dismiss()
+    }
+
+    /// Clic sur un bouton de la notification.
+    func press(_ button: NotchAlert.Button) {
+        button.action()
+        if current?.buttons.contains(where: { $0.id == button.id }) == true { dismiss() }
+    }
+
+    /// Retire une notification précise, affichée ou en file (demande tranchée ailleurs).
+    func dismiss(alertID: UUID) {
+        queue.removeAll { $0.id == alertID }
+        if current?.id == alertID { dismiss() }
+    }
+
+    func dismiss() {
+        dismissTask?.cancel()
+        hoveringSources.removeAll()
+        current = nil
+        // Laisse l'encoche se replier avant d'afficher la suivante.
+        Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(450))
+            if let self, self.current == nil { self.showNext() }
+        }
+    }
+
+    private func showNext() {
+        queue.removeAll { !$0.isPersistent && Date().timeIntervalSince($0.date) > Self.maxAge }
+        guard !queue.isEmpty else { return }
+        // Les demandes qui attendent une réponse passent devant.
+        let index = queue.firstIndex(where: \.isPersistent) ?? 0
+        current = queue.remove(at: index)
+        if current?.isPersistent == false { scheduleDismiss(after: Self.displayDuration) }
+    }
+
+    private func scheduleDismiss(after duration: Duration) {
+        dismissTask?.cancel()
+        dismissTask = Task { [weak self] in
+            try? await Task.sleep(for: duration)
+            guard !Task.isCancelled else { return }
+            self?.dismiss()
+        }
+    }
+}

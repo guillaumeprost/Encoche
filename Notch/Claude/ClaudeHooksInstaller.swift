@@ -17,10 +17,23 @@ enum ClaudeHooksInstaller {
         }
     }
 
-    static let events = ["SessionStart", "UserPromptSubmit", "PreToolUse", "Notification", "Stop", "SessionEnd"]
+    static let events = [
+        "SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PermissionRequest", "Notification", "Stop", "SessionEnd",
+    ]
+    /// Les événements d'outils (`PreToolUse`…) exigent un matcher.
+    private static let toolEvents: Set<String> = ["PreToolUse", "PostToolUse", "PermissionRequest"]
+
     static let marker = "127.0.0.1:\(HookServer.port)\(HookServer.path)"
     static let command =
         "curl -s -m 1 -X POST -H 'Content-Type: application/json' --data-binary @- http://\(marker) >/dev/null 2>&1 || true"
+
+    /// Demande de permission : on attend ta réponse dans l'encoche (5 min max) et on renvoie
+    /// la décision sur stdout. Sans réponse, ou si l'app n'est pas lancée, rien n'est écrit :
+    /// Claude Code garde son fonctionnement habituel.
+    static let permissionTimeout = 300
+    static let permissionCommand =
+        "curl -s -m \(permissionTimeout - 10) -X POST -H 'Content-Type: application/json' --data-binary @- "
+        + "http://127.0.0.1:\(HookServer.port)\(HookServer.permissionPath) 2>/dev/null || true"
 
     static var settingsURL: URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/settings.json")
@@ -31,17 +44,25 @@ enum ClaudeHooksInstaller {
         return String(decoding: data, as: UTF8.self).contains(marker)
     }
 
+    /// Ajoute les hooks manquants (idempotent : n'écrit rien si tout est déjà là).
     static func install() throws {
         var root = try readSettings()
         var hooks = root["hooks"] as? [String: Any] ?? [:]
+        var changed = false
         for event in events {
             var groups = hooks[event] as? [[String: Any]] ?? []
             guard !groups.contains(where: isOurs) else { continue }
-            var group: [String: Any] = ["hooks": [["type": "command", "command": command]]]
-            if event == "PreToolUse" { group["matcher"] = "*" }
+            var handler: [String: Any] = ["type": "command", "command": command]
+            if event == "PermissionRequest" {
+                handler = ["type": "command", "command": permissionCommand, "timeout": permissionTimeout]
+            }
+            var group: [String: Any] = ["hooks": [handler]]
+            if toolEvents.contains(event) { group["matcher"] = "*" }
             groups.append(group)
             hooks[event] = groups
+            changed = true
         }
+        guard changed else { return }
         root["hooks"] = hooks
         try writeSettings(root)
     }

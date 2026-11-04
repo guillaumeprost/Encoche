@@ -12,6 +12,7 @@ final class NotchWindowController {
     private let calendar: CalendarController
     private let claudeCode: ClaudeCodeMonitor
     private let settings: AppSettings
+    private let alerts: AlertCenter
     private let panel: NotchPanel
     private var monitors: [Any] = []
     private var pendingToggle: Task<Void, Never>?
@@ -25,6 +26,7 @@ final class NotchWindowController {
         calendar = services.calendar
         claudeCode = services.claudeCode
         settings = services.settings
+        alerts = services.alerts
         panel = NotchPanel(contentRect: NSRect(origin: .zero, size: Self.panelSize))
 
         let root = NotchRootView()
@@ -130,6 +132,20 @@ final class NotchWindowController {
 
     private func handleMouse() {
         let mouse = NSEvent.mouseLocation
+
+        // Notification affichée : le survol la garde à l'écran, le clic l'ouvre ;
+        // on n'ouvre pas l'encoche par-dessus.
+        if viewModel.showsAlert, !viewModel.isOpen {
+            let over = hotRect().contains(mouse)
+            alerts.setHovering(over, from: ObjectIdentifier(self))
+            panel.ignoresMouseEvents = !over
+            pendingToggle?.cancel()
+            pendingToggle = nil
+            return
+        }
+        alerts.setHovering(false, from: ObjectIdentifier(self))
+        if !viewModel.isOpen { panel.ignoresMouseEvents = true }
+
         if isFullScreen, !handleFullScreenReveal(mouse) { return }
 
         let inside = hotRect().contains(NSEvent.mouseLocation) || (viewModel.isOpen && viewModel.holdOpen)

@@ -22,26 +22,67 @@ struct ClaudeCodeSession: Identifiable, Equatable {
     }
 }
 
+/// Demande de permission de Claude Code en attente de ta décision dans l'encoche.
+@MainActor
+final class PendingPermission: Identifiable {
+    enum Decision {
+        case allow
+        /// Autoriser et ajouter la règle suggérée par Claude Code (plus de question la prochaine fois).
+        case allowAlways
+        case deny
+        /// Ne rien décider ici : Claude Code poursuit avec sa demande habituelle dans le terminal.
+        case terminal
+    }
+
+    let id = UUID()
+    let sessionID: String
+    let projectName: String
+    let toolName: String
+    let summary: String
+    /// Mises à jour de permissions suggérées par Claude Code (« toujours autoriser »).
+    let suggestions: [[String: Any]]
+    let reply: HookReply
+    var alertID: UUID?
+
+    init(sessionID: String, projectName: String, toolName: String, summary: String,
+         suggestions: [[String: Any]], reply: HookReply) {
+        self.sessionID = sessionID
+        self.projectName = projectName
+        self.toolName = toolName
+        self.summary = summary
+        self.suggestions = suggestions
+        self.reply = reply
+    }
+
+    var canAllowAlways: Bool { !suggestions.isEmpty }
+}
+
 /// État des sessions Claude Code, alimenté par les hooks.
 @Observable
 @MainActor
 final class ClaudeCodeMonitor {
-    /// Combien de temps une fin de tâche reste signalée dans l'encoche repliée.
-    private static let finishedFlash: TimeInterval = 6
     private static let staleAfter: TimeInterval = 2 * 3600
 
     private(set) var sessions: [ClaudeCodeSession] = []
+    private(set) var permissions: [PendingPermission] = []
     private(set) var hooksInstalled = ClaudeHooksInstaller.isInstalled
     private(set) var hooksError: String?
-    private(set) var flashUntil: Date?
 
     private var server: HookServer?
+    /// Pour signaler dans l'encoche une session qui t'attend ou qui a fini.
+    var alerts: AlertCenter?
     private var cleanupTimer: Timer?
 
     init() {
-        let server = HookServer { [weak self] event in self?.handle(event) }
+        let server = HookServer(
+            onEvent: { [weak self] event in self?.handle(event) },
+            onPermission: { [weak self] event, reply in self?.handlePermission(event, reply: reply) }
+        )
         server.start()
         self.server = server
+
+        // Ajoute les hooks apparus depuis l'installation (ex. demandes de permission).
+        if hooksInstalled { try? ClaudeHooksInstaller.install() }
 
         cleanupTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.removeStale() }
@@ -49,10 +90,9 @@ final class ClaudeCodeMonitor {
     }
 
     var waitingCount: Int { sessions.filter { $0.state == .waiting }.count }
-    var isFlashingFinished: Bool { flashUntil.map { $0 > Date() } ?? false }
-
-    /// L'encoche repliée doit-elle signaler quelque chose ?
-    var needsAttention: Bool { waitingCount > 0 || isFlashingFinished }
+    /// L'encoche repliée signale en continu les sessions qui t'attendent
+    /// (les fins de tâche passent par une notification).
+    var needsAttention: Bool { waitingCount > 0 }
 
     /// Plus récentes d'abord, celles qui t'attendent en tête.
     var sortedSessions: [ClaudeCodeSession] {
@@ -60,6 +100,10 @@ final class ClaudeCodeMonitor {
             if (a.state == .waiting) != (b.state == .waiting) { return a.state == .waiting }
             return a.updatedAt > b.updatedAt
         }
+    }
+
+    func permission(for sessionID: String) -> PendingPermission? {
+        permissions.first { $0.sessionID == sessionID }
     }
 
     // MARK: - Hooks
@@ -85,37 +129,165 @@ final class ClaudeCodeMonitor {
     }
 
     func dismiss(_ session: ClaudeCodeSession) {
+        resolvePermissions(of: session.id)
         sessions.removeAll { $0.id == session.id }
     }
 
+    // MARK: - Permissions
+
+    func decide(_ permission: PendingPermission, _ decision: Decision) {
+        var output: [String: Any]?
+        switch decision {
+        case .allow:
+            output = ["behavior": "allow"]
+        case .allowAlways:
+            output = ["behavior": "allow", "updatedPermissions": permission.suggestions]
+        case .deny:
+            output = ["behavior": "deny", "message": "Refusé depuis l'encoche Notch."]
+        case .terminal:
+            output = nil
+        }
+
+        let body = output.flatMap {
+            try? JSONSerialization.data(withJSONObject: [
+                "hookSpecificOutput": ["hookEventName": "PermissionRequest", "decision": $0],
+            ])
+        }
+        permission.reply.send(body)
+        remove(permission)
+
+        if decision != .terminal { update(permission.sessionID) { $0.state = .working; $0.detail = permission.toolName } }
+    }
+
+    typealias Decision = PendingPermission.Decision
+
+    private func handlePermission(_ event: [String: Any], reply: HookReply) {
+        guard let sessionID = event["session_id"] as? String else {
+            reply.send(nil)
+            return
+        }
+        let cwd = event["cwd"] as? String ?? ""
+        if isAskSession(cwd) {
+            reply.send(nil)
+            return
+        }
+
+        let tool = event["tool_name"] as? String ?? "Outil"
+        let input = event["tool_input"] as? [String: Any] ?? [:]
+        let project = URL(fileURLWithPath: cwd).lastPathComponent
+        let permission = PendingPermission(
+            sessionID: sessionID,
+            projectName: project.isEmpty ? "Claude Code" : project,
+            toolName: tool,
+            summary: Self.summarize(tool: tool, input: input),
+            suggestions: event["permission_suggestions"] as? [[String: Any]] ?? [],
+            reply: reply
+        )
+        reply.onClosed = { [weak self, weak permission] in
+            guard let self, let permission else { return }
+            self.remove(permission)
+        }
+        permissions.append(permission)
+
+        upsert(sessionID, cwd: cwd) { session in
+            session.state = .waiting
+            session.detail = "\(tool) · \(permission.summary)"
+        }
+
+        var alert = NotchAlert(
+            icon: .symbol("hand.raised.fill", .claude),
+            source: "Claude Code",
+            title: "\(permission.projectName) demande : \(tool)",
+            body: permission.summary
+        )
+        var buttons: [NotchAlert.Button] = [
+            .init(label: "Refuser", role: .destructive) { [weak self, weak permission] in
+                if let permission { self?.decide(permission, .deny) }
+            },
+            .init(label: "Terminal", role: .normal) { [weak self, weak permission] in
+                if let permission { self?.decide(permission, .terminal) }
+            },
+        ]
+        if permission.canAllowAlways {
+            buttons.append(.init(label: "Toujours", role: .normal) { [weak self, weak permission] in
+                if let permission { self?.decide(permission, .allowAlways) }
+            })
+        }
+        buttons.append(.init(label: "Autoriser", role: .primary) { [weak self, weak permission] in
+            if let permission { self?.decide(permission, .allow) }
+        })
+        alert.buttons = buttons
+        permission.alertID = alert.id
+        alerts?.post(alert)
+    }
+
+    private func remove(_ permission: PendingPermission) {
+        permissions.removeAll { $0 === permission }
+        if let alertID = permission.alertID { alerts?.dismiss(alertID: alertID) }
+    }
+
+    /// La session a avancé sans nous (réponse dans le terminal, annulation…) :
+    /// les demandes en attente n'ont plus lieu d'être.
+    private func resolvePermissions(of sessionID: String) {
+        for permission in permissions where permission.sessionID == sessionID {
+            permission.reply.send(nil)
+            remove(permission)
+        }
+    }
+
+    private static func summarize(tool: String, input: [String: Any]) -> String {
+        let value: String?
+        switch tool {
+        case "Bash":
+            value = input["command"] as? String
+        case "Edit", "MultiEdit", "Write", "Read", "NotebookEdit":
+            value = (input["file_path"] as? String ?? input["notebook_path"] as? String)
+                .map { URL(fileURLWithPath: $0).lastPathComponent }
+        case "WebFetch":
+            value = input["url"] as? String
+        case "WebSearch":
+            value = input["query"] as? String
+        default:
+            value = input["description"] as? String
+        }
+        let text = (value ?? tool).replacingOccurrences(of: "\n", with: " ")
+        return text.count > 140 ? String(text.prefix(140)) + "…" : text
+    }
+
     // MARK: - Événements
+
+    private func isAskSession(_ cwd: String) -> Bool {
+        // Les questions rapides de l'encoche passent aussi par Claude Code : on ne les liste pas.
+        URL(fileURLWithPath: cwd).standardizedFileURL == ClaudeAsk.workingDirectory.standardizedFileURL
+    }
 
     private func handle(_ event: [String: Any]) {
         guard let id = event["session_id"] as? String,
               let name = event["hook_event_name"] as? String else { return }
         let cwd = event["cwd"] as? String ?? ""
-        // Les questions rapides de l'encoche passent aussi par Claude Code : on ne les liste pas.
-        if URL(fileURLWithPath: cwd).standardizedFileURL == ClaudeAsk.workingDirectory.standardizedFileURL { return }
+        if isAskSession(cwd) { return }
+
+        // Tout événement qui suit montre que la demande a été tranchée ailleurs.
+        if ["PreToolUse", "PostToolUse", "UserPromptSubmit", "Stop", "SessionEnd"].contains(name) {
+            resolvePermissions(of: id)
+        }
 
         if name == "SessionEnd" {
             sessions.removeAll { $0.id == id }
             return
         }
 
-        var session = sessions.first { $0.id == id }
-            ?? ClaudeCodeSession(id: id, cwd: cwd, state: .idle, detail: nil, updatedAt: Date())
-        if !cwd.isEmpty { session.cwd = cwd }
+        let previousState = sessions.first { $0.id == id }?.state
 
         switch name {
         case "SessionStart":
-            session.state = .idle
-            session.detail = nil
+            upsert(id, cwd: cwd) { $0.state = .idle; $0.detail = nil }
         case "UserPromptSubmit":
-            session.state = .working
-            session.detail = nil
+            upsert(id, cwd: cwd) { $0.state = .working; $0.detail = nil }
         case "PreToolUse":
-            session.state = .working
-            session.detail = event["tool_name"] as? String
+            upsert(id, cwd: cwd) { $0.state = .working; $0.detail = event["tool_name"] as? String }
+        case "PostToolUse":
+            upsert(id, cwd: cwd) { $0.state = .working }
         case "Notification":
             let message = event["message"] as? String ?? ""
             let type = event["notification_type"] as? String ?? ""
@@ -123,27 +295,47 @@ final class ClaudeCodeMonitor {
             if type == "idle_prompt" || message.localizedCaseInsensitiveContains("waiting for your input") {
                 return
             }
-            session.state = .waiting
-            session.detail = message.isEmpty ? nil : message
+            // Déjà signalée (demande de permission en cours) : pas de doublon.
+            guard previousState != .waiting else { return }
+            upsert(id, cwd: cwd) { $0.state = .waiting; $0.detail = message.isEmpty ? nil : message }
+            let project = sessions.first { $0.id == id }?.projectName ?? "Claude Code"
+            alerts?.post(NotchAlert(
+                icon: .symbol("hand.raised.fill", .claude),
+                source: "Claude Code",
+                title: "\(project) t'attend",
+                body: message.isEmpty ? nil : message
+            ))
         case "Stop":
-            session.state = .done
-            session.detail = nil
-            flashUntil = Date().addingTimeInterval(Self.finishedFlash)
-            Task { [weak self] in
-                try? await Task.sleep(for: .seconds(Self.finishedFlash + 0.1))
-                // Force la réévaluation de `needsAttention`.
-                if let self, !self.isFlashingFinished { self.flashUntil = nil }
-            }
+            upsert(id, cwd: cwd) { $0.state = .done; $0.detail = nil }
+            let project = sessions.first { $0.id == id }?.projectName ?? "Claude Code"
+            alerts?.post(NotchAlert(
+                icon: .symbol("checkmark", .green),
+                source: "Claude Code",
+                title: "Tâche terminée",
+                body: project
+            ))
         default:
             return
         }
+    }
 
+    private func upsert(_ id: String, cwd: String, _ change: (inout ClaudeCodeSession) -> Void) {
+        var session = sessions.first { $0.id == id }
+            ?? ClaudeCodeSession(id: id, cwd: cwd, state: .idle, detail: nil, updatedAt: Date())
+        if !cwd.isEmpty { session.cwd = cwd }
+        change(&session)
         session.updatedAt = Date()
         if let index = sessions.firstIndex(where: { $0.id == id }) {
             sessions[index] = session
         } else {
             sessions.append(session)
         }
+    }
+
+    private func update(_ id: String, _ change: (inout ClaudeCodeSession) -> Void) {
+        guard let index = sessions.firstIndex(where: { $0.id == id }) else { return }
+        change(&sessions[index])
+        sessions[index].updatedAt = Date()
     }
 
     private func removeStale() {

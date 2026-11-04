@@ -227,9 +227,43 @@ private struct SessionsPanel: View {
 }
 
 private struct SessionRow: View {
+    @Environment(ClaudeCodeMonitor.self) private var monitor
     let session: ClaudeCodeSession
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            header
+            if let permission = monitor.permission(for: session.id) {
+                HStack(spacing: 6) {
+                    Spacer(minLength: 0)
+                    smallButton("Refuser", color: .red) { monitor.decide(permission, .deny) }
+                    smallButton("Autoriser", color: .claude, filled: true) { monitor.decide(permission, .allow) }
+                }
+                .padding(.bottom, 4)
+            }
+        }
+        .padding(.horizontal, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(session.state == .waiting ? Color.claude.opacity(0.18) : .white.opacity(0.06))
+        )
+        .help(session.cwd)
+    }
+
+    private func smallButton(_ label: String, color: Color, filled: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 10.5, weight: .semibold))
+                .foregroundStyle(filled ? .white : color)
+                .padding(.horizontal, 9)
+                .frame(height: 20)
+                .background(Capsule().fill(filled ? color : .white.opacity(0.08)))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var header: some View {
         HStack(spacing: 8) {
             SessionStateIcon(state: session.state)
                 .frame(width: 16)
@@ -244,13 +278,7 @@ private struct SessionRow: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 6)
         .frame(height: 34)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(session.state == .waiting ? Color.claude.opacity(0.18) : .white.opacity(0.06))
-        )
-        .help(session.cwd)
     }
 
     private var subtitle: String {

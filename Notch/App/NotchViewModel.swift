@@ -12,14 +12,21 @@ final class NotchViewModel {
     var holdOpen = false
     /// Rangée au-dessus de l'écran (app en plein écran, barre de menus masquée).
     var isRetracted = false
+    /// Une notification est affichée (encoche élargie façon Dynamic Island).
+    var showsAlert = false
+    /// La notification affichée porte des boutons (demande de permission).
+    var alertHasButtons = false
 
     static let expandedBodyWidth: CGFloat = 640
     static let expandedContentHeight: CGFloat = 136
     /// Hauteur en plus pour l'accueil, qui porte le champ Claude sous la musique et le calendrier.
     static let homeExtraHeight: CGFloat = 42
+    static let alertBodyWidth: CGFloat = 380
+    static let alertContentHeight: CGFloat = 60
+    static let alertButtonsHeight: CGFloat = 36
 
-    var topRadius: CGFloat { isOpen ? 12 : 6 }
-    var bottomRadius: CGFloat { isOpen ? 26 : 9 }
+    var topRadius: CGFloat { isOpen || showsAlert ? 12 : 6 }
+    var bottomRadius: CGFloat { isOpen ? 26 : showsAlert ? 22 : 9 }
 
     /// Largeur d'une case latérale de la « live activity » repliée.
     var activitySlotWidth: CGFloat { notchSize.height + 8 }
@@ -31,6 +38,9 @@ final class NotchViewModel {
         if isOpen {
             bodyWidth = Self.expandedBodyWidth
             height = notchSize.height + Self.expandedContentHeight + extraHeight
+        } else if showsAlert {
+            bodyWidth = max(alertHasButtons ? 440 : Self.alertBodyWidth, notchSize.width + 2 * activitySlotWidth)
+            height = notchSize.height + Self.alertContentHeight + (alertHasButtons ? Self.alertButtonsHeight : 0)
         } else if showsActivity {
             bodyWidth = notchSize.width + 2 * activitySlotWidth
             height = notchSize.height
