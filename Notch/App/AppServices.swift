@@ -59,8 +59,7 @@ struct AppServices {
         let alertCenter = alerts
         bannerSuppressor.onUnreadBanner = { appName, title, body in
             guard !alertCenter.hasRecent(title: title) else { return }
-            let bundleID = NSWorkspace.shared.runningApplications
-                .first { $0.localizedName == appName }?.bundleIdentifier
+            let bundleID = AppDirectory.bundleID(forName: appName)
             alertCenter.post(NotchAlert(
                 icon: bundleID.map { .app(bundleID: $0) } ?? .symbol("bell.fill", .gray),
                 source: appName,

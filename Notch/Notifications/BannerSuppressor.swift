@@ -6,11 +6,14 @@ import ApplicationServices
 /// rien n'est intercepté et macOS affiche ses bannières comme d'habitude.
 ///
 /// Passe par l'Accessibilité : chaque bannière est un élément `AXNotificationCenterBanner`
-/// du processus Centre de notifications, avec une action « Fermer ».
+/// du processus Centre de notifications, avec une action « Fermer ». Les notifications
+/// au style « Alertes », qui restent à l'écran (rappels de Calendrier…), sont des
+/// `AXNotificationCenterAlert` : elles sont relayées de la même façon. Calendrier ne les
+/// enregistre pas dans la base des notifications, l'encoche les reçoit donc par leur contenu.
 @MainActor
 final class BannerSuppressor {
     private static let bundleID = "com.apple.notificationcenterui"
-    private static let bannerSubrole = "AXNotificationCenterBanner"
+    private static let bannerSubroles: Set<String> = ["AXNotificationCenterBanner", "AXNotificationCenterAlert"]
     /// Nom de l'action de fermeture selon la langue du système.
     private static let closeActionNames = ["Fermer", "Close", "Schließen", "Cerrar", "Chiudi"]
 
@@ -99,7 +102,9 @@ final class BannerSuppressor {
     }
 
     private func findBanners(in element: AXUIElement, depth: Int) -> [AXUIElement] {
-        if attribute(element, kAXSubroleAttribute) as? String == Self.bannerSubrole { return [element] }
+        if let subrole = attribute(element, kAXSubroleAttribute) as? String, Self.bannerSubroles.contains(subrole) {
+            return [element]
+        }
         guard depth < 6, let children = attribute(element, kAXChildrenAttribute) as? [AXUIElement] else { return [] }
         return children.flatMap { findBanners(in: $0, depth: depth + 1) }
     }
