@@ -5,6 +5,7 @@ struct NotchRootView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(MusicController.self) private var music
     @Environment(ClaudeCodeMonitor.self) private var claudeCode
+    @Environment(LaunchAtLogin.self) private var launchAtLogin
 
     private let spring = Animation.spring(response: 0.42, dampingFraction: 0.82)
     private let tabTransition = AnyTransition.opacity.combined(with: .scale(scale: 0.97))
@@ -56,6 +57,9 @@ struct NotchRootView: View {
         .shadow(color: .black.opacity(vm.isOpen ? 0.35 : 0), radius: 18, y: 8)
         .contextMenu {
             Toggle("Liquid Glass", isOn: Binding(get: { settings.useGlass }, set: { settings.useGlass = $0 }))
+            if launchAtLogin.isInstalledCopy {
+                Toggle("Ouvrir au démarrage", isOn: Binding(get: { launchAtLogin.isEnabled }, set: { launchAtLogin.set($0) }))
+            }
             Divider()
             Button("Quitter Notch") { NSApp.terminate(nil) }
         }

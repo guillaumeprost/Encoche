@@ -6,8 +6,8 @@ import Network
 /// N'écoute que sur la boucle locale : rien n'est joignable depuis le réseau.
 @MainActor
 final class HookServer {
-    static let port: UInt16 = 47823
-    static let path = "/claude-code"
+    nonisolated static let port: UInt16 = 47823
+    nonisolated static let path = "/claude-code"
 
     private var listener: NWListener?
     private let onEvent: ([String: Any]) -> Void

@@ -9,6 +9,7 @@ struct AppServices {
     let clipboard = ClipboardController()
     let claudeCode = ClaudeCodeMonitor()
     let ask = ClaudeAsk()
+    let launchAtLogin = LaunchAtLogin()
 }
 
 extension View {
@@ -20,5 +21,6 @@ extension View {
             .environment(services.clipboard)
             .environment(services.claudeCode)
             .environment(services.ask)
+            .environment(services.launchAtLogin)
     }
 }
