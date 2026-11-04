@@ -24,15 +24,18 @@ enum ClaudeHooksInstaller {
     private static let toolEvents: Set<String> = ["PreToolUse", "PostToolUse", "PermissionRequest"]
 
     static let marker = "127.0.0.1:\(HookServer.port)\(HookServer.path)"
+    /// `$PPID` = processus Claude Code qui lance le hook : Notch remonte jusqu'à son app.
+    private static let pidHeader = "-H \"\(HookServer.pidHeader): $PPID\""
+
     static let command =
-        "curl -s -m 1 -X POST -H 'Content-Type: application/json' --data-binary @- http://\(marker) >/dev/null 2>&1 || true"
+        "curl -s -m 1 -X POST -H 'Content-Type: application/json' \(pidHeader) --data-binary @- http://\(marker) >/dev/null 2>&1 || true"
 
     /// Demande de permission : on attend ta réponse dans l'encoche (5 min max) et on renvoie
     /// la décision sur stdout. Sans réponse, ou si l'app n'est pas lancée, rien n'est écrit :
     /// Claude Code garde son fonctionnement habituel.
     static let permissionTimeout = 300
     static let permissionCommand =
-        "curl -s -m \(permissionTimeout - 10) -X POST -H 'Content-Type: application/json' --data-binary @- "
+        "curl -s -m \(permissionTimeout - 10) -X POST -H 'Content-Type: application/json' \(pidHeader) --data-binary @- "
         + "http://127.0.0.1:\(HookServer.port)\(HookServer.permissionPath) 2>/dev/null || true"
 
     static var settingsURL: URL {
@@ -51,7 +54,10 @@ enum ClaudeHooksInstaller {
         var changed = false
         for event in events {
             var groups = hooks[event] as? [[String: Any]] ?? []
-            guard !groups.contains(where: isOurs) else { continue }
+            let expected = event == "PermissionRequest" ? permissionCommand : command
+            // Déjà à jour ? Sinon on remplace notre ancienne version (les autres hooks ne bougent pas).
+            if groups.contains(where: { isOurs($0) && commandOf($0) == expected }) { continue }
+            groups.removeAll(where: isOurs)
             var handler: [String: Any] = ["type": "command", "command": command]
             if event == "PermissionRequest" {
                 handler = ["type": "command", "command": permissionCommand, "timeout": permissionTimeout]
@@ -77,6 +83,10 @@ enum ClaudeHooksInstaller {
         }
         root["hooks"] = hooks.isEmpty ? nil : hooks
         try writeSettings(root)
+    }
+
+    private static func commandOf(_ group: [String: Any]) -> String? {
+        (group["hooks"] as? [[String: Any]])?.first?["command"] as? String
     }
 
     private static func isOurs(_ group: [String: Any]) -> Bool {

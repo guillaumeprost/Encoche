@@ -15,6 +15,8 @@ struct ClaudeCodeSession: Identifiable, Equatable {
     var state: State
     var detail: String?
     var updatedAt: Date
+    /// Processus Claude Code (envoyé par les hooks) : sert à retrouver son app.
+    var pid: pid_t?
 
     var projectName: String {
         let name = URL(fileURLWithPath: cwd).lastPathComponent
@@ -128,6 +130,12 @@ final class ClaudeCodeMonitor {
         hooksInstalled = ClaudeHooksInstaller.isInstalled
     }
 
+    /// Ramène au premier plan l'app où tourne la session (terminal, éditeur, app Claude…).
+    func focus(_ sessionID: String) {
+        guard let pid = sessions.first(where: { $0.id == sessionID })?.pid else { return }
+        ProcessOwner.activateApp(of: pid)
+    }
+
     func dismiss(_ session: ClaudeCodeSession) {
         resolvePermissions(of: session.id)
         sessions.removeAll { $0.id == session.id }
@@ -162,6 +170,8 @@ final class ClaudeCodeMonitor {
     typealias Decision = PendingPermission.Decision
 
     private func handlePermission(_ event: [String: Any], reply: HookReply) {
+        currentPID = event["_claude_pid"] as? pid_t
+        defer { currentPID = nil }
         guard let sessionID = event["session_id"] as? String else {
             reply.send(nil)
             return
@@ -261,7 +271,12 @@ final class ClaudeCodeMonitor {
         URL(fileURLWithPath: cwd).standardizedFileURL == ClaudeAsk.workingDirectory.standardizedFileURL
     }
 
+    /// PID de l'événement en cours de traitement (lu par `upsert`).
+    @ObservationIgnored private var currentPID: pid_t?
+
     private func handle(_ event: [String: Any]) {
+        currentPID = event["_claude_pid"] as? pid_t
+        defer { currentPID = nil }
         guard let id = event["session_id"] as? String,
               let name = event["hook_event_name"] as? String else { return }
         let cwd = event["cwd"] as? String ?? ""
@@ -303,7 +318,8 @@ final class ClaudeCodeMonitor {
                 icon: .symbol("hand.raised.fill", .claude),
                 source: "Claude Code",
                 title: "\(project) t'attend",
-                body: message.isEmpty ? nil : message
+                body: message.isEmpty ? nil : message,
+                action: .run { [weak self] in self?.focus(id) }
             ))
         case "Stop":
             upsert(id, cwd: cwd) { $0.state = .done; $0.detail = nil }
@@ -312,7 +328,8 @@ final class ClaudeCodeMonitor {
                 icon: .symbol("checkmark", .green),
                 source: "Claude Code",
                 title: "Tâche terminée",
-                body: project
+                body: project,
+                action: .run { [weak self] in self?.focus(id) }
             ))
         default:
             return
@@ -323,6 +340,7 @@ final class ClaudeCodeMonitor {
         var session = sessions.first { $0.id == id }
             ?? ClaudeCodeSession(id: id, cwd: cwd, state: .idle, detail: nil, updatedAt: Date())
         if !cwd.isEmpty { session.cwd = cwd }
+        if let pid = currentPID { session.pid = pid }
         change(&session)
         session.updatedAt = Date()
         if let index = sessions.firstIndex(where: { $0.id == id }) {

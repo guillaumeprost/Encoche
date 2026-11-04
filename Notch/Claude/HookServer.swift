@@ -98,8 +98,8 @@ final class HookServer {
                 var buffer = buffer
                 if let data { buffer.append(data) }
 
-                if let (path, body) = Self.parse(buffer) {
-                    self.dispatch(path: path, body: body, connection: connection)
+                if let (path, headers, body) = Self.parse(buffer) {
+                    self.dispatch(path: path, headers: headers, body: body, connection: connection)
                 } else if isComplete || error != nil || buffer.count > 1_000_000 {
                     connection.cancel()
                 } else {
@@ -109,9 +109,10 @@ final class HookServer {
         }
     }
 
-    private func dispatch(path: String, body: Data, connection: NWConnection) {
-        let json = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any]
+    private func dispatch(path: String, headers: [String: String], body: Data, connection: NWConnection) {
+        var json = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any]
         let reply = HookReply(connection: connection)
+        if let pid = headers[Self.pidHeader.lowercased()].flatMap(Int32.init) { json?["_claude_pid"] = pid }
 
         guard let json else {
             reply.send(nil)
@@ -127,18 +128,27 @@ final class HookServer {
     }
 
     /// Chemin et corps si la requête HTTP est complète (en-têtes + Content-Length octets).
-    private static func parse(_ buffer: Data) -> (String, Data)? {
+    /// En-tête ajouté par nos hooks : PID du processus Claude Code (pour retrouver son app).
+    nonisolated static let pidHeader = "X-Claude-PID"
+
+    private static func parse(_ buffer: Data) -> (String, [String: String], Data)? {
         guard let headerEnd = buffer.range(of: Data("\r\n\r\n".utf8)) else { return nil }
         let headers = String(decoding: buffer[..<headerEnd.lowerBound], as: UTF8.self)
         let requestLine = headers.split(separator: "\r\n").first.map(String.init) ?? ""
         let parts = requestLine.split(separator: " ")
-        guard parts.count >= 2, parts[0] == "POST" else { return ("", Data()) }
+        guard parts.count >= 2, parts[0] == "POST" else { return ("", [:], Data()) }
+
+        var fields: [String: String] = [:]
+        for line in headers.split(separator: "\r\n").dropFirst() {
+            guard let colon = line.firstIndex(of: ":") else { continue }
+            fields[line[..<colon].lowercased()] = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+        }
 
         let length = headers
             .split(separator: "\r\n")
             .first { $0.lowercased().hasPrefix("content-length:") }
             .flatMap { Int($0.split(separator: ":")[1].trimmingCharacters(in: .whitespaces)) } ?? 0
         let body = buffer[headerEnd.upperBound...]
-        return body.count >= length ? (String(parts[1]), Data(body.prefix(length))) : nil
+        return body.count >= length ? (String(parts[1]), fields, Data(body.prefix(length))) : nil
     }
 }

@@ -35,7 +35,7 @@ private struct AskPanel: View {
             }
             .contextMenu {
                 if !ask.askedQuestion.isEmpty {
-                    Button("Effacer la réponse") { ask.reset() }
+                    Button("Nouvelle conversation") { ask.reset() }
                 }
             }
         } else {
@@ -75,6 +75,19 @@ private struct AskPanel: View {
             ScrollViewReader { proxy in
                 ScrollView(.vertical) {
                     VStack(alignment: .leading, spacing: 4) {
+                        // Échanges précédents de la conversation, en plus discret.
+                        ForEach(ask.history) { exchange in
+                            Text(exchange.question)
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundStyle(.primary.opacity(0.4))
+                                .lineLimit(1)
+                            Text(markdown(exchange.answer))
+                                .font(.system(size: 12))
+                                .foregroundStyle(.primary.opacity(0.6))
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.bottom, 6)
+                        }
                         Text(ask.askedQuestion)
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(.primary.opacity(0.5))
@@ -93,6 +106,20 @@ private struct AskPanel: View {
                 }
                 .scrollIndicators(.never)
                 .onChange(of: ask.answer) { proxy.scrollTo("end", anchor: .bottom) }
+            }
+            .overlay(alignment: .topTrailing) {
+                if !ask.history.isEmpty || !ask.answer.isEmpty {
+                    Button { ask.reset() } label: {
+                        Label("Nouvelle", systemImage: "square.and.pencil")
+                            .font(.system(size: 10, weight: .medium))
+                            .padding(.horizontal, 7)
+                            .frame(height: 18)
+                            .background(Capsule().fill(.primary.opacity(0.1)))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+                    .help("Nouvelle conversation")
+                }
             }
         }
     }
@@ -208,6 +235,7 @@ private struct SessionsPanel: View {
                     VStack(spacing: 4) {
                         ForEach(monitor.sortedSessions) { session in
                             SessionRow(session: session)
+                                .onTapGesture { monitor.focus(session.id) }
                                 .contextMenu {
                                     Button("Masquer") { monitor.dismiss(session) }
                                 }

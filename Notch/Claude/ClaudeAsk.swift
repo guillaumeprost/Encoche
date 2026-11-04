@@ -32,7 +32,15 @@ final class ClaudeAsk {
         "/usr/local/bin/claude",
     ]
 
+    struct Exchange: Identifiable {
+        let id = UUID()
+        let question: String
+        let answer: String
+    }
+
     var question = ""
+    /// Échanges précédents de la conversation en cours (le dernier est `askedQuestion` / `answer`).
+    private(set) var history: [Exchange] = []
     private(set) var askedQuestion = ""
     private(set) var answer = ""
     private(set) var isStreaming = false
@@ -44,6 +52,8 @@ final class ClaudeAsk {
         .map { URL(fileURLWithPath: NSString(string: $0).expandingTildeInPath) }
         .first { FileManager.default.isExecutableFile(atPath: $0.path) }
 
+    /// Session Claude Code de la conversation : reprise à chaque question pour garder le fil.
+    private var sessionID: String?
     private var process: Process?
     private var task: Task<Void, Never>?
 
@@ -54,6 +64,10 @@ final class ClaudeAsk {
         guard !text.isEmpty, let cliURL else { return }
 
         cancel()
+        // L'échange précédent (terminé) rejoint l'historique de la conversation.
+        if !askedQuestion.isEmpty, !answer.isEmpty {
+            history.append(Exchange(question: askedQuestion, answer: answer))
+        }
         askedQuestion = text
         question = ""
         answer = ""
@@ -76,8 +90,11 @@ final class ClaudeAsk {
         isStreaming = false
     }
 
+    /// Nouvelle conversation : on oublie le fil.
     func reset() {
         cancel()
+        sessionID = nil
+        history = []
         askedQuestion = ""
         answer = ""
         errorMessage = nil
@@ -94,9 +111,8 @@ final class ClaudeAsk {
             "--verbose",
             "--include-partial-messages",
             "--tools", "",
-            "--no-session-persistence",
             "--system-prompt", Self.systemPrompt,
-        ]
+        ] + (sessionID.map { ["--resume", $0] } ?? [])
         // Une app lancée depuis le Finder n'a qu'un PATH minimal.
         var environment = ProcessInfo.processInfo.environment
         environment["PATH"] = [cli.deletingLastPathComponent().path, "/opt/homebrew/bin", "/usr/local/bin",
@@ -130,6 +146,7 @@ final class ClaudeAsk {
     }
 
     private func handle(_ event: [String: Any]) {
+        if let id = event["session_id"] as? String { sessionID = id }
         switch event["type"] as? String {
         case "stream_event":
             guard let inner = event["event"] as? [String: Any],
@@ -143,6 +160,8 @@ final class ClaudeAsk {
             let result = event["result"] as? String ?? ""
             if event["is_error"] as? Bool == true {
                 answer = ""
+                // Conversation impossible à reprendre : la prochaine question repart de zéro.
+                sessionID = nil
                 let status = event["api_error_status"] as? Int
                 needsLogin = status == 401 || result.localizedCaseInsensitiveContains("authenticat")
                 errorMessage = needsLogin
