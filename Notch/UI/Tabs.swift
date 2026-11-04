@@ -2,13 +2,17 @@ import SwiftUI
 
 enum NotchTab: String, CaseIterable {
     case home
+    case shelf
     case clipboard
+    case notifications
     case claude
 
     var symbol: String {
         switch self {
         case .home: "music.note.house"
+        case .shelf: "tray.full"
         case .clipboard: "doc.on.clipboard"
+        case .notifications: "bell"
         case .claude: "sparkle"
         }
     }
@@ -16,7 +20,9 @@ enum NotchTab: String, CaseIterable {
     var label: String {
         switch self {
         case .home: "Accueil"
+        case .shelf: "Étagère"
         case .clipboard: "Presse-papier"
+        case .notifications: "Notifications"
         case .claude: "Claude"
         }
     }
@@ -28,6 +34,8 @@ struct TopBar: View {
     @Environment(AppSettings.self) private var settings
     @Environment(ClipboardController.self) private var clipboard
     @Environment(ClaudeCodeMonitor.self) private var claudeCode
+    @Environment(AlertCenter.self) private var alerts
+    @Environment(ShelfController.self) private var shelf
 
     var body: some View {
         HStack(spacing: 4) {
@@ -36,6 +44,8 @@ struct TopBar: View {
                     .overlay(alignment: .topTrailing) {
                         if tab == .claude, claudeCode.waitingCount > 0 {
                             Circle().fill(Color.claude).frame(width: 6, height: 6).offset(x: -3, y: 2)
+                        } else if tab == .notifications, alerts.unreadCount > 0, settings.tab != .notifications {
+                            Circle().fill(.red).frame(width: 6, height: 6).offset(x: -3, y: 2)
                         }
                     }
             }
@@ -43,6 +53,20 @@ struct TopBar: View {
             if settings.tab == .clipboard, !clipboard.items.isEmpty {
                 IconButton(symbol: "trash", help: "Vider l'historique (les épinglés sont conservés)") {
                     withAnimation(.snappy) { clipboard.clearUnpinned() }
+                }
+                .transition(.opacity)
+            }
+            if settings.tab == .shelf, !shelf.items.isEmpty {
+                IconButton(symbol: "airplayaudio", help: "Tout envoyer par AirDrop") { shelf.airDrop(shelf.items) }
+                    .transition(.opacity)
+                IconButton(symbol: "trash", help: "Vider l'étagère (les fichiers ne sont pas supprimés)") {
+                    withAnimation(.snappy) { shelf.removeAll() }
+                }
+                .transition(.opacity)
+            }
+            if settings.tab == .notifications, !alerts.history.isEmpty {
+                IconButton(symbol: "trash", help: "Effacer l'historique") {
+                    withAnimation(.snappy) { alerts.clearHistory() }
                 }
                 .transition(.opacity)
             }

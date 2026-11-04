@@ -20,6 +20,8 @@ final class NotchWindowController {
     /// Une app est en plein écran sur cet écran : l'encoche se range avec la barre de menus.
     private var isFullScreen = false
     private var pendingRetract: Task<Void, Never>?
+    /// Un glisser parti de l'encoche (fichier sorti de l'étagère) : elle reste ouverte jusqu'au lâcher.
+    private var dragStartedInside = false
 
     init(screen: NSScreen, services: AppServices) {
         music = services.music
@@ -104,14 +106,16 @@ final class NotchWindowController {
     // MARK: - Survol
 
     private func installMonitors() {
-        let mask: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged]
-        if let global = NSEvent.addGlobalMonitorForEvents(matching: mask, handler: { [weak self] _ in
-            MainActor.assumeIsolated { self?.handleMouse() }
+        let mask: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .leftMouseDown, .leftMouseUp]
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: mask, handler: { [weak self] event in
+            let type = event.type
+            MainActor.assumeIsolated { self?.handle(type) }
         }) {
             monitors.append(global)
         }
         if let local = NSEvent.addLocalMonitorForEvents(matching: mask, handler: { [weak self] event in
-            MainActor.assumeIsolated { self?.handleMouse() }
+            let type = event.type
+            MainActor.assumeIsolated { self?.handle(type) }
             return event
         }) {
             monitors.append(local)
@@ -128,6 +132,44 @@ final class NotchWindowController {
                           width: size.width, height: size.height)
         // Un peu de tolérance quand c'est replié, pour attraper la souris facilement.
         return viewModel.isOpen ? rect.insetBy(dx: -4, dy: -4) : rect.insetBy(dx: -8, dy: -2)
+    }
+
+    private func handle(_ type: NSEvent.EventType) {
+        switch type {
+        case .leftMouseDown:
+            dragStartedInside = viewModel.isOpen && hotRect().contains(NSEvent.mouseLocation)
+        case .leftMouseUp:
+            dragStartedInside = false
+        default:
+            break
+        }
+        handleMouse()
+    }
+
+    /// Un fichier vient d'être pris (Finder, bureau, une app…) : l'encoche s'ouvre tout de suite
+    /// avec les zones de dépôt, sans attendre que le curseur l'atteigne.
+    func beginFileDrag() {
+        guard !dragStartedInside else { return }
+        pendingToggle?.cancel()
+        pendingToggle = nil
+        pendingRetract?.cancel()
+        pendingRetract = nil
+        viewModel.isRetracted = false
+        viewModel.isDraggingFile = true
+        setOpen(true)
+    }
+
+    /// Fichier lâché (déposé ou non) : on retire les zones, et on referme si le curseur est ailleurs.
+    func endFileDrag() {
+        guard viewModel.isDraggingFile else { return }
+        // Laisse le dépôt se terminer avant de retirer les zones.
+        Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(250))
+            guard let self else { return }
+            self.viewModel.isDraggingFile = false
+            if !self.hotRect().contains(NSEvent.mouseLocation) { self.setOpen(false) }
+            if self.isFullScreen, !self.viewModel.isOpen { self.viewModel.isRetracted = true }
+        }
     }
 
     private func handleMouse() {
@@ -148,7 +190,12 @@ final class NotchWindowController {
 
         if isFullScreen, !handleFullScreenReveal(mouse) { return }
 
-        let inside = hotRect().contains(NSEvent.mouseLocation) || (viewModel.isOpen && viewModel.holdOpen)
+        // Reste ouverte pendant une saisie, ou tant qu'un glisser parti de l'encoche n'est pas lâché
+        // (sinon le fichier qu'on sort de l'étagère disparaîtrait en plein mouvement).
+        let inside = hotRect().contains(mouse)
+            || (viewModel.isOpen && viewModel.holdOpen)
+            || (viewModel.isOpen && dragStartedInside)
+            || viewModel.isDraggingFile
         if inside == viewModel.isOpen {
             pendingToggle?.cancel()
             pendingToggle = nil

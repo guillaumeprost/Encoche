@@ -49,12 +49,22 @@ final class AlertCenter {
     private static let maxAge: TimeInterval = 60
 
     private(set) var current: NotchAlert?
+    /// Notifications reçues, plus récentes d'abord. En mémoire seulement : rien n'est écrit sur le disque.
+    private(set) var history: [NotchAlert] = []
+    private(set) var unreadCount = 0
+    private static let historyLimit = 100
     private var queue: [NotchAlert] = []
     /// Écrans dont la notification est survolée (une encoche par écran).
     private var hoveringSources: Set<ObjectIdentifier> = []
     private var dismissTask: Task<Void, Never>?
 
     func post(_ alert: NotchAlert) {
+        // Les demandes qui attendent une réponse n'ont pas leur place dans l'historique.
+        if !alert.isPersistent {
+            history.insert(alert, at: 0)
+            if history.count > Self.historyLimit { history.removeLast(history.count - Self.historyLimit) }
+            unreadCount += 1
+        }
         queue.append(alert)
         if current == nil { showNext() }
     }
@@ -71,9 +81,28 @@ final class AlertCenter {
         }
     }
 
+    func markAllRead() {
+        unreadCount = 0
+    }
+
+    func clearHistory() {
+        history.removeAll()
+        unreadCount = 0
+    }
+
+    func removeFromHistory(_ alert: NotchAlert) {
+        history.removeAll { $0.id == alert.id }
+    }
+
     /// Clic sur la notification : on exécute son action et on la retire.
     func activate() {
         guard let alert = current, !alert.isPersistent else { return }
+        perform(alert)
+        dismiss()
+    }
+
+    /// Exécute l'action d'une notification (aussi depuis l'historique).
+    func perform(_ alert: NotchAlert) {
         switch alert.action {
         case .openApp(let bundleID):
             if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
@@ -86,7 +115,6 @@ final class AlertCenter {
         case nil:
             break
         }
-        dismiss()
     }
 
     /// Clic sur un bouton de la notification.

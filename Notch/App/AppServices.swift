@@ -8,6 +8,8 @@ struct AppServices {
     let music: MusicController
     let calendar: CalendarController
     let clipboard: ClipboardController
+    let shelf: ShelfController
+    let screenshots: ScreenshotWatcher
     let claudeCode: ClaudeCodeMonitor
     let ask: ClaudeAsk
     let launchAtLogin: LaunchAtLogin
@@ -19,6 +21,8 @@ struct AppServices {
         music = MusicController()
         calendar = CalendarController()
         clipboard = ClipboardController()
+        shelf = ShelfController()
+        screenshots = ScreenshotWatcher()
         claudeCode = ClaudeCodeMonitor()
         claudeCode.alerts = alerts
         ask = ClaudeAsk()
@@ -35,6 +39,8 @@ extension View {
             .environment(services.music)
             .environment(services.calendar)
             .environment(services.clipboard)
+            .environment(services.shelf)
+            .environment(services.screenshots)
             .environment(services.claudeCode)
             .environment(services.ask)
             .environment(services.launchAtLogin)

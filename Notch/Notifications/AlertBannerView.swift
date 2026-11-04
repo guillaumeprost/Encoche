@@ -21,7 +21,7 @@ struct AlertBannerView: View {
 
     private var content: some View {
         HStack(alignment: .center, spacing: 11) {
-            icon
+            AlertIcon(icon: alert.icon)
                 .frame(width: 34, height: 34)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -45,32 +45,6 @@ struct AlertBannerView: View {
         }
         .foregroundStyle(.primary)
         .contentShape(Rectangle())
-    }
-
-    @ViewBuilder
-    private var icon: some View {
-        switch alert.icon {
-        case .app(let bundleID):
-            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
-                Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
-                    .resizable()
-                    .interpolation(.high)
-            } else {
-                symbol("bell.fill", .gray)
-            }
-        case .symbol(let name, let color):
-            symbol(name, color)
-        }
-    }
-
-    private func symbol(_ name: String, _ color: Color) -> some View {
-        RoundedRectangle(cornerRadius: 9, style: .continuous)
-            .fill(color.gradient)
-            .overlay {
-                Image(systemName: name)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
-            }
     }
 }
 
@@ -96,5 +70,35 @@ private struct AlertButtonView: View {
         .buttonStyle(.plain)
         .glassEffect(.regular.tint(.primary.opacity(hovering ? 0.12 : 0.04)).interactive(), in: Capsule())
         .onHover { hovering = $0 }
+    }
+}
+
+/// Icône d'une notification : celle de l'app, ou un symbole sur une pastille colorée.
+struct AlertIcon: View {
+    let icon: NotchAlert.Icon
+
+    var body: some View {
+        switch icon {
+        case .app(let bundleID):
+            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
+                Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
+                    .resizable()
+                    .interpolation(.high)
+            } else {
+                symbol("bell.fill", .gray)
+            }
+        case .symbol(let name, let color):
+            symbol(name, color)
+        }
+    }
+
+    private func symbol(_ name: String, _ color: Color) -> some View {
+        RoundedRectangle(cornerRadius: 9, style: .continuous)
+            .fill(color.gradient)
+            .overlay {
+                Image(systemName: name)
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(.white)
+            }
     }
 }

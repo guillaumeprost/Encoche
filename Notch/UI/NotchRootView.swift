@@ -31,16 +31,23 @@ struct NotchRootView: View {
                         .padding(.horizontal, 18 + vm.topRadius)
 
                     ZStack {
-                        switch settings.tab {
-                        case .home: HomeTab().transition(tabTransition)
-                        case .clipboard: ClipboardView().transition(tabTransition)
-                        case .claude: ClaudeTab().transition(tabTransition)
+                        if vm.isDraggingFile {
+                            DropZonesView().transition(tabTransition)
+                        } else {
+                            switch settings.tab {
+                            case .home: HomeTab().transition(tabTransition)
+                            case .shelf: ShelfView().transition(tabTransition)
+                            case .clipboard: ClipboardView().transition(tabTransition)
+                            case .notifications: NotificationHistoryView().transition(tabTransition)
+                            case .claude: ClaudeTab().transition(tabTransition)
+                            }
                         }
                     }
                     .padding(.top, 8)
                     .padding(.bottom, 18)
                     .padding(.horizontal, 24 + vm.topRadius)
                     .animation(.snappy(duration: 0.25), value: settings.tab)
+                    .animation(.snappy(duration: 0.25), value: vm.isDraggingFile)
                 }
                 .transition(.asymmetric(
                     insertion: .opacity.combined(with: .scale(scale: 0.92, anchor: .top))
