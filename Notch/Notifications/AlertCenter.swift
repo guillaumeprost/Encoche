@@ -24,7 +24,7 @@ struct NotchAlert: Identifiable {
         let action: @MainActor () -> Void
     }
 
-    let id = UUID()
+    var id = UUID()
     let icon: Icon
     /// Nom de l'app ou du module d'origine.
     let source: String
@@ -58,12 +58,17 @@ final class AlertCenter {
     private var hoveringSources: Set<ObjectIdentifier> = []
     private var dismissTask: Task<Void, Never>?
 
+    init() {
+        history = HistoryStore.load()
+    }
+
     func post(_ alert: NotchAlert) {
         // Les demandes qui attendent une réponse n'ont pas leur place dans l'historique.
         if !alert.isPersistent {
             history.insert(alert, at: 0)
             if history.count > Self.historyLimit { history.removeLast(history.count - Self.historyLimit) }
             unreadCount += 1
+            HistoryStore.save(history)
         }
         queue.append(alert)
         if current == nil { showNext() }
@@ -93,10 +98,12 @@ final class AlertCenter {
     func clearHistory() {
         history.removeAll()
         unreadCount = 0
+        HistoryStore.save(history)
     }
 
     func removeFromHistory(_ alert: NotchAlert) {
         history.removeAll { $0.id == alert.id }
+        HistoryStore.save(history)
     }
 
     /// Clic sur la notification : on exécute son action et on la retire.
@@ -160,6 +167,69 @@ final class AlertCenter {
             try? await Task.sleep(for: duration)
             guard !Task.isCancelled else { return }
             self?.dismiss()
+        }
+    }
+}
+
+// MARK: - Persistance de l'historique
+
+/// Historique des notifications enregistré dans Application Support, pour le retrouver
+/// après un redémarrage. Les actions internes (ex. ramener une session Claude) ne sont pas
+/// enregistrables : seules l'ouverture d'une app ou d'une URL survivent.
+private enum HistoryStore {
+    private struct Stored: Codable {
+        var id: UUID
+        var appBundleID: String?
+        var symbol: String?
+        var colorName: String?
+        var source: String
+        var title: String
+        var body: String?
+        var date: Date
+        var openURL: URL?
+    }
+
+    private static let colors: [String: Color] = [
+        "claude": .claude, "green": .green, "red": .red, "blue": .blue, "gray": .gray, "orange": .orange,
+    ]
+
+    private static var url: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Notch", isDirectory: true)
+        try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
+        return base.appendingPathComponent("notifications.json")
+    }
+
+    static func save(_ alerts: [NotchAlert]) {
+        let stored = alerts.map { alert -> Stored in
+            var item = Stored(id: alert.id, source: alert.source, title: alert.title, body: alert.body, date: alert.date)
+            switch alert.icon {
+            case .app(let bundleID): item.appBundleID = bundleID
+            case .symbol(let name, let color):
+                item.symbol = name
+                item.colorName = colors.first { $0.value == color }?.key
+            }
+            switch alert.action {
+            case .openApp(let bundleID): item.appBundleID = item.appBundleID ?? bundleID
+            case .openURL(let url): item.openURL = url
+            default: break
+            }
+            return item
+        }
+        guard let data = try? JSONEncoder().encode(stored) else { return }
+        try? data.write(to: url, options: .atomic)
+    }
+
+    static func load() -> [NotchAlert] {
+        guard let data = try? Data(contentsOf: url),
+              let stored = try? JSONDecoder().decode([Stored].self, from: data) else { return [] }
+        return stored.map { item in
+            let icon: NotchAlert.Icon = item.appBundleID.map { .app(bundleID: $0) }
+                ?? .symbol(item.symbol ?? "bell.fill", item.colorName.flatMap { colors[$0] } ?? .gray)
+            let action: NotchAlert.Action? = item.openURL.map { .openURL($0) }
+                ?? item.appBundleID.map { .openApp(bundleID: $0) }
+            return NotchAlert(id: item.id, icon: icon, source: item.source, title: item.title,
+                              body: item.body, date: item.date, action: action)
         }
     }
 }
