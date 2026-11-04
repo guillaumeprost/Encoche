@@ -11,7 +11,10 @@ struct NotchRootView: View {
     private let tabTransition = AnyTransition.opacity.combined(with: .scale(scale: 0.97))
 
     var body: some View {
-        let size = vm.shapeSize(showsActivity: showsActivity)
+        let size = vm.shapeSize(
+            showsActivity: showsActivity,
+            extraHeight: settings.tab == .home ? NotchViewModel.homeExtraHeight : 0
+        )
         let shape = NotchShape(topRadius: vm.topRadius, bottomRadius: vm.bottomRadius)
 
         ZStack(alignment: .top) {
@@ -68,6 +71,7 @@ struct NotchRootView: View {
         .animation(.easeInOut(duration: 0.25), value: vm.isRetracted)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .animation(spring, value: vm.isOpen)
+        .animation(spring, value: settings.tab)
         .animation(spring, value: showsActivity)
         .animation(spring, value: claudeCode.needsAttention)
         .preferredColorScheme(.dark)

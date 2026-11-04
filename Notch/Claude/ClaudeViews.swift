@@ -26,17 +26,13 @@ struct ClaudeTab: View {
 
 private struct AskPanel: View {
     @Environment(ClaudeAsk.self) private var ask
-    @Environment(NotchViewModel.self) private var vm
-    @FocusState private var focused: Bool
 
     var body: some View {
         if ask.cliURL != nil {
             VStack(alignment: .leading, spacing: 8) {
-                inputField
+                ClaudeAskField()
                 responseArea
             }
-            .onChange(of: focused) { vm.holdOpen = focused }
-            .onDisappear { vm.holdOpen = false }
             .contextMenu {
                 if !ask.askedQuestion.isEmpty {
                     Button("Effacer la réponse") { ask.reset() }
@@ -53,37 +49,6 @@ private struct AskPanel: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         }
-    }
-
-    private var inputField: some View {
-        @Bindable var ask = ask
-        return HStack(spacing: 8) {
-            Image(systemName: "sparkle")
-                .foregroundStyle(Color.claude)
-            TextField("Demande à Claude…", text: $ask.question)
-                .textFieldStyle(.plain)
-                .font(.system(size: 13))
-                .focused($focused)
-                .onSubmit { ask.send() }
-                .onExitCommand { focused = false }
-            if ask.isStreaming {
-                Button { ask.cancel() } label: {
-                    Image(systemName: "stop.circle.fill").font(.system(size: 15))
-                }
-                .buttonStyle(.plain)
-                .help("Arrêter")
-            } else if !ask.question.isEmpty {
-                Button { ask.send() } label: {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 15))
-                        .foregroundStyle(Color.claude)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 12)
-        .frame(height: 32)
-        .glassEffect(.regular.tint(.white.opacity(0.05)).interactive(), in: Capsule())
     }
 
     @ViewBuilder
@@ -154,6 +119,55 @@ private struct ThinkingDots: View {
             }
             .padding(.vertical, 4)
         }
+    }
+}
+
+/// Champ de question à Claude, utilisé dans l'onglet Claude et sur l'accueil.
+/// Garde l'encoche ouverte tant qu'il a le focus.
+struct ClaudeAskField: View {
+    @Environment(ClaudeAsk.self) private var ask
+    @Environment(NotchViewModel.self) private var vm
+    @FocusState private var focused: Bool
+    /// Appelé après l'envoi d'une question (l'accueil bascule alors sur l'onglet Claude).
+    var onSend: () -> Void = {}
+
+    var body: some View {
+        @Bindable var ask = ask
+        HStack(spacing: 8) {
+            Image(systemName: "sparkle")
+                .foregroundStyle(Color.claude)
+            TextField("Demande à Claude…", text: $ask.question)
+                .textFieldStyle(.plain)
+                .font(.system(size: 13))
+                .focused($focused)
+                .onSubmit(send)
+                .onExitCommand { focused = false }
+            if ask.isStreaming {
+                Button { ask.cancel() } label: {
+                    Image(systemName: "stop.circle.fill").font(.system(size: 15))
+                }
+                .buttonStyle(.plain)
+                .help("Arrêter")
+            } else if !ask.question.isEmpty {
+                Button(action: send) {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 15))
+                        .foregroundStyle(Color.claude)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 32)
+        .glassEffect(.regular.tint(.white.opacity(0.05)).interactive(), in: Capsule())
+        .onChange(of: focused) { vm.holdOpen = focused }
+        .onDisappear { vm.holdOpen = false }
+    }
+
+    private func send() {
+        guard !ask.question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        ask.send()
+        onSend()
     }
 }
 

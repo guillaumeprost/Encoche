@@ -11,6 +11,7 @@ final class NotchWindowController {
     private let music: MusicController
     private let calendar: CalendarController
     private let claudeCode: ClaudeCodeMonitor
+    private let settings: AppSettings
     private let panel: NotchPanel
     private var monitors: [Any] = []
     private var pendingToggle: Task<Void, Never>?
@@ -23,6 +24,7 @@ final class NotchWindowController {
         music = services.music
         calendar = services.calendar
         claudeCode = services.claudeCode
+        settings = services.settings
         panel = NotchPanel(contentRect: NSRect(origin: .zero, size: Self.panelSize))
 
         let root = NotchRootView()
@@ -116,7 +118,10 @@ final class NotchWindowController {
 
     /// Zone active en coordonnées écran globales (origine en bas à gauche de l'écran principal).
     private func hotRect() -> NSRect {
-        let size = viewModel.shapeSize(showsActivity: claudeCode.needsAttention || music.showsActivity)
+        let size = viewModel.shapeSize(
+            showsActivity: claudeCode.needsAttention || music.showsActivity,
+            extraHeight: settings.tab == .home ? NotchViewModel.homeExtraHeight : 0
+        )
         let rect = NSRect(x: screenFrame.midX - size.width / 2, y: screenFrame.maxY - size.height,
                           width: size.width, height: size.height)
         // Un peu de tolérance quand c'est replié, pour attraper la souris facilement.

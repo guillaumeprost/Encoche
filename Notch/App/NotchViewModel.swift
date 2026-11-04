@@ -15,6 +15,8 @@ final class NotchViewModel {
 
     static let expandedBodyWidth: CGFloat = 640
     static let expandedContentHeight: CGFloat = 136
+    /// Hauteur en plus pour l'accueil, qui porte le champ Claude sous la musique et le calendrier.
+    static let homeExtraHeight: CGFloat = 42
 
     var topRadius: CGFloat { isOpen ? 12 : 6 }
     var bottomRadius: CGFloat { isOpen ? 26 : 9 }
@@ -23,12 +25,12 @@ final class NotchViewModel {
     var activitySlotWidth: CGFloat { notchSize.height + 8 }
 
     /// Taille totale de la forme, évasements du haut compris.
-    func shapeSize(showsActivity: Bool) -> CGSize {
+    func shapeSize(showsActivity: Bool, extraHeight: CGFloat = 0) -> CGSize {
         let bodyWidth: CGFloat
         let height: CGFloat
         if isOpen {
             bodyWidth = Self.expandedBodyWidth
-            height = notchSize.height + Self.expandedContentHeight
+            height = notchSize.height + Self.expandedContentHeight + extraHeight
         } else if showsActivity {
             bodyWidth = notchSize.width + 2 * activitySlotWidth
             height = notchSize.height

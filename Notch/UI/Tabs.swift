@@ -96,17 +96,26 @@ private struct IconButton: View {
     }
 }
 
-/// Onglet d'accueil : lecteur à gauche, calendrier à droite.
+/// Onglet d'accueil : lecteur à gauche, calendrier à droite, et une question à Claude en dessous.
 struct HomeTab: View {
+    @Environment(AppSettings.self) private var settings
+    @Environment(ClaudeAsk.self) private var ask
+
     var body: some View {
-        HStack(spacing: 20) {
-            ExpandedMusicView()
-                .frame(width: 330)
-            Rectangle()
-                .fill(.white.opacity(0.12))
-                .frame(width: 1)
-                .padding(.vertical, 4)
-            CalendarView()
+        VStack(spacing: 10) {
+            HStack(spacing: 20) {
+                ExpandedMusicView()
+                    .frame(width: 330)
+                Rectangle()
+                    .fill(.white.opacity(0.12))
+                    .frame(width: 1)
+                    .padding(.vertical, 4)
+                CalendarView()
+            }
+            if ask.cliURL != nil {
+                // La réponse s'affiche dans l'onglet Claude.
+                ClaudeAskField { settings.tab = .claude }
+            }
         }
     }
 }
