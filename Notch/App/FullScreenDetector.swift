@@ -22,7 +22,7 @@ final class FullScreenDetector {
             }
         }
         // Filet de sécurité : entrée en plein écran sans changement d'app active, etc.
-        timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.check() }
         }
         check()

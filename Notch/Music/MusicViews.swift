@@ -194,13 +194,17 @@ struct AudioBars: View {
     private let phases: [Double] = [0, 1.3, 2.1, 0.7]
 
     var body: some View {
-        TimelineView(.animation(paused: !isPlaying)) { context in
+        // ~7 images/s lissées par une animation : même rendu qu'à 60 images/s, pour bien moins
+        // de calcul (l'égaliseur tourne en continu pendant la lecture).
+        // En pause : barres immobiles, aucune mise à jour.
+        TimelineView(.periodic(from: .now, by: isPlaying ? 0.15 : 3600)) { context in
             let t = context.date.timeIntervalSinceReferenceDate
             HStack(alignment: .center, spacing: 2) {
                 ForEach(0..<4, id: \.self) { i in
                     Capsule()
                         .fill(color)
                         .frame(width: 3, height: isPlaying ? 4 + 10 * abs(sin(t * speeds[i] / 2 + phases[i])) : 3)
+                        .animation(.easeInOut(duration: 0.15), value: t)
                 }
             }
             .frame(height: 14)

@@ -16,9 +16,9 @@ final class PrivacyMonitor {
 
     init() {
         // Les deux API ont des écouteurs, mais leur liste d'appareils change (casque, webcam
-        // branchée…) : une lecture toutes les 2 s est plus simple et reste très légère.
+        // branchée…) : une lecture toutes les 3 s est plus simple et reste très légère.
         refresh()
-        timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refresh() }
         }
     }

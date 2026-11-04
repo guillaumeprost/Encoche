@@ -28,8 +28,9 @@ final class BannerSuppressor {
     private var timer: Timer?
 
     func start() {
-        // Le Centre de notifications peut redémarrer : on surveille et on se rattache.
-        timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+        // L'observateur d'accessibilité réagit à chaque bannière ; ce minuteur ne sert qu'à se
+        // rattacher si le Centre de notifications redémarre, et de filet de sécurité.
+        timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
         }
         tick()
