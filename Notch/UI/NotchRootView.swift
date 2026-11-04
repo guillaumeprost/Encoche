@@ -6,11 +6,8 @@ struct NotchRootView: View {
     @Environment(MusicController.self) private var music
     @Environment(HUDCenter.self) private var hud
     @Environment(PrivacyMonitor.self) private var privacy
-    @Environment(VolumeController.self) private var volume
     @Environment(ClaudeCodeMonitor.self) private var claudeCode
-    @Environment(LaunchAtLogin.self) private var launchAtLogin
     @Environment(AlertCenter.self) private var alerts
-    @Environment(SystemNotificationWatcher.self) private var systemNotifications
     /// Apparence du Mac (clair / sombre).
     @Environment(\.colorScheme) private var systemColorScheme
 
@@ -100,32 +97,7 @@ struct NotchRootView: View {
         .clipShape(shape)
         .shadow(color: .black.opacity(vm.isOpen || vm.showsAlert ? 0.35 : 0), radius: 18, y: 8)
         .contextMenu {
-            Toggle("Liquid Glass (encoche ouverte)", isOn: Binding(get: { settings.useGlass }, set: { settings.useGlass = $0 }))
-            if launchAtLogin.isInstalledCopy {
-                Toggle("Ouvrir au démarrage", isOn: Binding(get: { launchAtLogin.isEnabled }, set: { launchAtLogin.set($0) }))
-            }
-            Toggle("Notifications macOS", isOn: Binding(
-                get: { settings.mirrorSystemNotifications },
-                set: { settings.mirrorSystemNotifications = $0 }
-            ))
-            if systemNotifications.access == .denied {
-                Button("Autoriser les notifications macOS…") { systemNotifications.openPrivacySettings() }
-            }
-            Toggle("Masquer les bannières macOS", isOn: Binding(
-                get: { settings.hideSystemBanners },
-                set: { settings.hideSystemBanners = $0 }
-            ))
-            .disabled(!settings.mirrorSystemNotifications)
-            Toggle("Remplacer les indicateurs volume / luminosité", isOn: Binding(
-                get: { settings.replaceSystemVolumeHUD },
-                set: {
-                    settings.replaceSystemVolumeHUD = $0
-                    volume.setReplacesSystemHUD($0)
-                }
-            ))
-            if settings.replaceSystemVolumeHUD, !volume.isReplacingSystemHUD {
-                Button("Autoriser l'accessibilité (touches volume / luminosité)…") { volume.requestAccessibility() }
-            }
+            Button("Réglages…") { settings.openSettings() }
             Divider()
             Button("Quitter Notch") { NSApp.terminate(nil) }
         }

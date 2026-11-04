@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private static var shared: AppDelegate?
 
     private var screenManager: NotchScreenManager?
+    private var settingsWindow: SettingsWindowController?
 
     static func main() {
         let app = NSApplication.shared
@@ -17,6 +18,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        screenManager = NotchScreenManager(services: AppServices())
+        let services = AppServices()
+        let settingsWindow = SettingsWindowController(services: services)
+        services.settings.openSettings = { settingsWindow.show() }
+        self.settingsWindow = settingsWindow
+        screenManager = NotchScreenManager(services: services)
     }
 }

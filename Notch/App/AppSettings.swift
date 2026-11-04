@@ -26,6 +26,9 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(replaceSystemVolumeHUD, forKey: "replaceSystemVolumeHUD") }
     }
 
+    /// Ouvre la fenêtre de réglages (branché par l'app au lancement).
+    @ObservationIgnored var openSettings: () -> Void = {}
+
     /// Dernier onglet ouvert, retrouvé à la prochaine ouverture.
     var tab: NotchTab = UserDefaults.standard.string(forKey: "tab").flatMap(NotchTab.init) ?? .home {
         didSet { UserDefaults.standard.set(tab.rawValue, forKey: "tab") }
