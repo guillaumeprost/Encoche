@@ -1,7 +1,7 @@
 import AppKit
 import Observation
 
-/// Étagère : des fichiers gardés sous la main dans l'encoche.
+/// Étagère : des fichiers gardés sous la main dans l'encoche (ajoutés depuis les captures).
 ///
 /// On garde des références (pas de copie) : un fichier déplacé ou supprimé
 /// disparaît de l'étagère au prochain chargement.
@@ -52,26 +52,5 @@ final class ShelfController {
 
     private func save() {
         UserDefaults.standard.set(items.map(\.path), forKey: Self.storeKey)
-    }
-}
-
-extension NSItemProvider {
-    /// Charge les URL de fichiers d'un dépôt (glisser-déposer depuis le Finder, le bureau…).
-    @MainActor
-    static func loadFileURLs(from providers: [NSItemProvider], completion: @escaping @MainActor ([URL]) -> Void) {
-        var urls: [URL] = []
-        let group = DispatchGroup()
-        for provider in providers where provider.canLoadObject(ofClass: URL.self) {
-            group.enter()
-            _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                DispatchQueue.main.async {
-                    if let url, url.isFileURL { urls.append(url) }
-                    group.leave()
-                }
-            }
-        }
-        group.notify(queue: .main) {
-            MainActor.assumeIsolated { completion(urls) }
-        }
     }
 }

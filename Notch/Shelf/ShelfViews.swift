@@ -1,67 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-// MARK: - Zones de dépôt (pendant un glisser de fichier)
-
-/// Affichées à la place du contenu quand un fichier est glissé sur l'encoche ouverte.
-struct DropZonesView: View {
-    @Environment(ShelfController.self) private var shelf
-    @Environment(AppSettings.self) private var settings
-
-    var body: some View {
-        HStack(spacing: 12) {
-            DropZone(symbol: "tray.and.arrow.down.fill", title: "Étagère", subtitle: "Garder sous la main") { urls in
-                shelf.add(urls)
-                settings.tab = .shelf
-            }
-            DropZone(symbol: "airplayaudio", title: "AirDrop", subtitle: "Envoyer à un appareil", tint: .blue) { urls in
-                shelf.airDrop(urls)
-            }
-        }
-    }
-}
-
-private struct DropZone: View {
-    let symbol: String
-    let title: String
-    let subtitle: String
-    var tint: Color = .accentColor
-    let onDrop: ([URL]) -> Void
-    @State private var isTargeted = false
-
-    var body: some View {
-        VStack(spacing: 6) {
-            Image(systemName: symbol)
-                .font(.system(size: 24, weight: .semibold))
-                .foregroundStyle(isTargeted ? tint : .secondary)
-                .symbolEffect(.bounce, value: isTargeted)
-            Text(title)
-                .font(.system(size: 13, weight: .semibold))
-            Text(subtitle)
-                .font(.system(size: 10.5))
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(tint.opacity(isTargeted ? 0.2 : 0.06))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(style: StrokeStyle(lineWidth: 1.5, dash: [6, 4]))
-                .foregroundStyle(isTargeted ? tint : .secondary.opacity(0.5))
-        )
-        .scaleEffect(isTargeted ? 1.03 : 1)
-        .animation(.snappy(duration: 0.2), value: isTargeted)
-        .onDrop(of: [.fileURL], isTargeted: $isTargeted) { providers in
-            NSItemProvider.loadFileURLs(from: providers) { urls in
-                if !urls.isEmpty { onDrop(urls) }
-            }
-            return true
-        }
-    }
-}
-
 // MARK: - Onglet Étagère
 
 struct ShelfView: View {
@@ -90,20 +29,16 @@ struct ShelfView: View {
         }
         .scrollIndicators(.never)
         .scrollClipDisabled()
-        .onDrop(of: [.fileURL], isTargeted: nil) { providers in
-            NSItemProvider.loadFileURLs(from: providers) { shelf.add($0) }
-            return true
-        }
     }
 }
 
-/// Étagère vide : rappelle qu'on peut y déposer des fichiers.
+/// Étagère vide : explique comment y garder une capture.
 private struct DropHintTile: View {
     var body: some View {
         VStack(spacing: 6) {
-            Image(systemName: "tray.and.arrow.down")
+            Image(systemName: "tray")
                 .font(.system(size: 20))
-            Text("Glisse un fichier ici")
+            Text("Clic droit sur une capture → Garder")
                 .font(.system(size: 10.5))
                 .multilineTextAlignment(.center)
         }

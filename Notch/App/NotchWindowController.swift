@@ -146,32 +146,6 @@ final class NotchWindowController {
         handleMouse()
     }
 
-    /// Un fichier vient d'être pris (Finder, bureau, une app…) : l'encoche s'ouvre tout de suite
-    /// avec les zones de dépôt, sans attendre que le curseur l'atteigne.
-    func beginFileDrag() {
-        guard !dragStartedInside else { return }
-        pendingToggle?.cancel()
-        pendingToggle = nil
-        pendingRetract?.cancel()
-        pendingRetract = nil
-        viewModel.isRetracted = false
-        viewModel.isDraggingFile = true
-        setOpen(true)
-    }
-
-    /// Fichier lâché (déposé ou non) : on retire les zones, et on referme si le curseur est ailleurs.
-    func endFileDrag() {
-        guard viewModel.isDraggingFile else { return }
-        // Laisse le dépôt se terminer avant de retirer les zones.
-        Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(250))
-            guard let self else { return }
-            self.viewModel.isDraggingFile = false
-            if !self.hotRect().contains(NSEvent.mouseLocation) { self.setOpen(false) }
-            if self.isFullScreen, !self.viewModel.isOpen { self.viewModel.isRetracted = true }
-        }
-    }
-
     private func handleMouse() {
         let mouse = NSEvent.mouseLocation
 
@@ -195,7 +169,6 @@ final class NotchWindowController {
         let inside = hotRect().contains(mouse)
             || (viewModel.isOpen && viewModel.holdOpen)
             || (viewModel.isOpen && dragStartedInside)
-            || viewModel.isDraggingFile
         if inside == viewModel.isOpen {
             pendingToggle?.cancel()
             pendingToggle = nil

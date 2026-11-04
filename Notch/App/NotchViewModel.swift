@@ -16,8 +16,6 @@ final class NotchViewModel {
     var showsAlert = false
     /// La notification affichée porte des boutons (demande de permission).
     var alertHasButtons = false
-    /// Un fichier est en train d'être glissé au-dessus de l'encoche ouverte : zones de dépôt.
-    var isDraggingFile = false
 
     static let expandedBodyWidth: CGFloat = 640
     static let expandedContentHeight: CGFloat = 136

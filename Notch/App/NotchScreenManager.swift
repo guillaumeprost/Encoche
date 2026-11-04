@@ -8,7 +8,6 @@ final class NotchScreenManager {
     private var controllers: [CGDirectDisplayID: NotchWindowController] = [:]
     private var fullScreenDisplays: Set<CGDirectDisplayID> = []
     private var detector: FullScreenDetector?
-    private var dragWatcher: FileDragWatcher?
 
     init(services: AppServices) {
         self.services = services
@@ -20,12 +19,6 @@ final class NotchScreenManager {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.syncScreens() }
         }
-
-        // Un fichier pris n'importe où : toutes les encoches s'ouvrent pour le recevoir.
-        dragWatcher = FileDragWatcher(
-            onStart: { [weak self] in self?.controllers.values.forEach { $0.beginFileDrag() } },
-            onEnd: { [weak self] in self?.controllers.values.forEach { $0.endFileDrag() } }
-        )
 
         detector = FullScreenDetector { [weak self] displays in
             self?.fullScreenDisplays = displays
