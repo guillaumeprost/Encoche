@@ -170,8 +170,8 @@ struct NotchRootView: View {
             stops: [
                 .init(color: .black, location: 0),
                 .init(color: .black, location: solid),
-                .init(color: .black.opacity(0.78), location: min(solid + 0.25, 1)),
-                .init(color: .black.opacity(0.42), location: 1),
+                .init(color: .black.opacity(0.6), location: min(solid + 0.2, 1)),
+                .init(color: .black.opacity(0.12), location: 1),
             ],
             startPoint: .top,
             endPoint: .bottom
@@ -195,7 +195,7 @@ struct NotchRootView: View {
             // du Mac (elle s'y fond), puis de plus en plus transparent vers le bas.
             ZStack {
                 Color.clear
-                    .glassEffect(.regular.tint(.black.opacity(0.45)), in: shape)
+                    .glassEffect(.regular.tint(.black.opacity(0.25)), in: shape)
                 shape.fill(darkGlassGradient)
             }
             .opacity(darkGlassActive ? 1 : 0)
