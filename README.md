@@ -103,6 +103,7 @@ Pendant le développement :
 
 ```bash
 ./scripts/run.sh          # compile en Debug et relance l'app
+./scripts/test.sh         # tests unitaires de la logique (NotchTests)
 ./scripts/release.sh      # version universelle zippée dans dist/, pour une Release GitHub
 ```
 
@@ -132,6 +133,7 @@ swift scripts/make-icon.swift
 | `Notch/LockScreen` | Écran de verrouillage |
 | `Notch/Timer` | Minuteur et Pomodoro |
 | `Notch/Settings` | Fenêtre de réglages |
+| `NotchTests` | Tests unitaires (Swift Testing) |
 | `Vendor/MediaRemoteAdapter` | Accès au « À l'écoute » de macOS (projet open source) |
 
 Le code s'appelle encore `Notch` en interne (dossiers, cibles, identifiant `com.guillaumeprost.notch`). Garder l'identifiant permet à macOS de conserver les autorisations déjà accordées.

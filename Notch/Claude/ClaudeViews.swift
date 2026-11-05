@@ -35,7 +35,7 @@ struct ClaudeTab: View {
                     .fill(.primary.opacity(0.12))
                     .frame(width: 1)
                     .padding(.vertical, 4)
-                switch ClaudeTabField.resolve(ask.target, default: selectedSession, in: monitor) {
+                switch ClaudeTabField.resolve(ask.target, default: selectedSession, among: monitor.sessions) {
                 case .session(let session): SessionConversation(session: session)
                 case .newConversation: NewConversationHint()
                 case .quickQuestion: AskPanel()
@@ -94,10 +94,10 @@ struct ClaudeTabField: View {
     }
 
     static func resolve(_ target: ClaudeAsk.Target?, default session: ClaudeCodeSession?,
-                        in monitor: ClaudeCodeMonitor) -> Resolved {
+                        among sessions: [ClaudeCodeSession]) -> Resolved {
         switch target {
         case .session(let id):
-            if let chosen = monitor.sessions.first(where: { $0.id == id }) { return .session(chosen) }
+            if let chosen = sessions.first(where: { $0.id == id }) { return .session(chosen) }
         case .newConversation: return .newConversation
         case .quickQuestion: return .quickQuestion
         case nil: break
@@ -105,7 +105,7 @@ struct ClaudeTabField: View {
         return session.map { .session($0) } ?? .newConversation
     }
 
-    private var resolved: Resolved { Self.resolve(target, default: defaultSession, in: monitor) }
+    private var resolved: Resolved { Self.resolve(target, default: defaultSession, among: monitor.sessions) }
 
     var body: some View {
         @Bindable var ask = ask
@@ -205,10 +205,7 @@ struct ClaudeTabField: View {
             .frame(height: 24)
             .background(Capsule().fill(Color.claude.opacity(0.16)))
         }
-        .menuStyle(.button)
-        .buttonStyle(.plain)
-        .menuIndicator(.hidden)
-        .fixedSize()
+        .plainMenu()
         .help("Choisir la conversation")
     }
 

@@ -15,6 +15,11 @@ enum AppleScriptRunner {
     /// Renvoie le résultat, ou `nil` en cas d'erreur ou si l'app ne répond pas à temps.
     @discardableResult
     static func run(_ source: String, cached: Bool = true) async -> NSAppleEventDescriptor? {
+        await runReportingError(source, cached: cached).result
+    }
+
+    /// Comme `run`, en renvoyant aussi le message d'erreur (permission refusée par l'app…).
+    static func runReportingError(_ source: String, cached: Bool = false) async -> (result: NSAppleEventDescriptor?, error: String?) {
         await withCheckedContinuation { continuation in
             queue.async {
                 continuation.resume(returning: execute(source, cached: cached))
@@ -22,14 +27,19 @@ enum AppleScriptRunner {
         }
     }
 
+    /// Texte prêt à être placé entre guillemets dans un script.
+    nonisolated static func escape(_ text: String) -> String {
+        text.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+    }
+
     /// `cached: false` pour les scripts à usage unique (texte variable) : ils ne s'accumulent pas.
-    private static func execute(_ source: String, cached useCache: Bool) -> NSAppleEventDescriptor? {
+    private static func execute(_ source: String, cached useCache: Bool) -> (result: NSAppleEventDescriptor?, error: String?) {
         let script: NSAppleScript
         if let cached = cache[source] {
             script = cached
         } else {
             let wrapped = "with timeout of \(timeoutSeconds) seconds\n\(source)\nend timeout"
-            guard let compiled = NSAppleScript(source: wrapped) else { return nil }
+            guard let compiled = NSAppleScript(source: wrapped) else { return (nil, "Script invalide") }
             if useCache { cache[source] = compiled }
             script = compiled
         }
@@ -38,8 +48,8 @@ enum AppleScriptRunner {
         let result = script.executeAndReturnError(&error)
         if let error {
             NSLog("[Encoche] AppleScript error: \(error)")
-            return nil
+            return (nil, error[NSAppleScript.errorMessage] as? String ?? "Erreur AppleScript")
         }
-        return result
+        return (result, nil)
     }
 }

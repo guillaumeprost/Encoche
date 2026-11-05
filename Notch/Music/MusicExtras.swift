@@ -326,7 +326,7 @@ final class MusicExtras {
     }
 
     /// Paroles LRC : « [01:23.45] texte ». Sans horodatage, une ligne par ligne.
-    private nonisolated static func parse(_ text: String, synced: Bool) -> [LyricLine] {
+    nonisolated static func parse(_ text: String, synced: Bool) -> [LyricLine] {
         var lines: [LyricLine] = []
         for raw in text.split(separator: "\n", omittingEmptySubsequences: false) {
             var line = String(raw)

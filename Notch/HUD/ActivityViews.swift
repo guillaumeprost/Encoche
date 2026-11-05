@@ -27,14 +27,12 @@ enum LiveActivity: Hashable {
 
 /// Deuxième activité, dans une petite bulle à droite de l'encoche (comme sur iPhone).
 struct ActivityBubble: View {
-    @Environment(ClaudeCodeMonitor.self) private var claudeCode
     @Environment(PrivacyMonitor.self) private var privacy
     @Environment(DownloadMonitor.self) private var downloads
     @Environment(MusicController.self) private var music
     @Environment(CalendarController.self) private var calendar
     @Environment(TimerController.self) private var timer
     @Environment(FocusMonitor.self) private var focus
-    @Environment(CallMonitor.self) private var calls
     let activity: LiveActivity
 
     var body: some View {
@@ -155,7 +153,7 @@ struct ProgressRing: View {
     }
 }
 
-/// Claude Code travaille : son logo à gauche, l'avancement de son plan à droite.
+/// Claude Code travaille : son personnage qui trottine à gauche, l'avancement de son plan à droite.
 struct CollapsedClaudeWorkingView: View {
     @Environment(ClaudeCodeMonitor.self) private var monitor
     let slotWidth: CGFloat
@@ -307,7 +305,7 @@ struct CollapsedTimerView: View {
                     }
                     .frame(width: 19, height: 19)
                 } trailing: {
-                    Text(finalMinute ? "\(seconds)" : String(format: "%d:%02d", seconds / 60, seconds % 60))
+                    Text(finalMinute ? "\(seconds)" : Clock.text(seconds))
                         .font(.system(size: finalMinute ? 13 : 11.5, weight: .bold).monospacedDigit())
                         .foregroundStyle(timer.isPaused ? Color.white.opacity(0.45) : tint)
                         .contentTransition(.numericText(countsDown: true))

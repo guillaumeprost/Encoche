@@ -26,10 +26,7 @@ struct TimerMenu: View {
         } label: {
             label
         }
-        .menuStyle(.button)
-        .buttonStyle(.plain)
-        .menuIndicator(.hidden)
-        .fixedSize()
+        .plainMenu()
         .onHover { hovering = $0 }
         .help(timer.isActive ? "\(timer.kind.label) : cliquer pour mettre en pause ou arrêter" : "Minuteur")
     }
@@ -47,7 +44,7 @@ struct TimerMenu: View {
                         }
                     }
                     .frame(width: 12, height: 12)
-                    Text(String(format: "%d:%02d", remaining / 60, remaining % 60))
+                    Text(Clock.text(remaining))
                         .font(.system(size: 11, weight: .semibold).monospacedDigit())
                         .contentTransition(.numericText())
                 }

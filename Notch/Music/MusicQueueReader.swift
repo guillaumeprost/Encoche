@@ -25,19 +25,23 @@ enum MusicQueueReader {
 
     nonisolated static func read() -> Result {
         guard AXIsProcessTrusted(), let window = musicWindow() else { return .unavailable }
-        guard let container = find(in: window, where: { identifier($0) == "headerContainer" }),
-              let table = find(in: container, where: { role($0) == "AXTable" }) else { return .panelClosed }
+        guard let container = find(in: window, where: { AX.string($0, kAXIdentifierAttribute) == "headerContainer" }),
+              let table = find(in: container, where: { AX.role($0) == "AXTable" }) else { return .panelClosed }
+        let rows = AX.elements(table, kAXRowsAttribute)
+        // Lecture paresseuse, depuis la fin : les lignes hors de l'écran sont lentes à lire.
+        return .entries(upcoming(fromLastRows: rows.reversed().lazy.map { texts(in: $0) }))
+    }
 
-        // Les morceaux à venir sont à la fin, sous des titres de section (« À suivre »,
-        // « Poursuivre la lecture ») ; au-dessus, c'est l'historique. On remonte depuis la fin :
-        // les lignes hors de l'écran sont lentes à lire, on s'arrête donc au plus tôt.
-        let rows = (attribute(table, kAXRowsAttribute) as? [AXUIElement]) ?? children(table)
+    /// Morceaux à venir, d'après les textes des lignes de la table lus depuis la fin.
+    ///
+    /// Les morceaux à venir sont à la fin, sous des titres de section (« À suivre »,
+    /// « Poursuivre la lecture ») ; au-dessus, c'est l'historique. On s'arrête au plus tôt.
+    nonisolated static func upcoming<Rows: Sequence>(fromLastRows rows: Rows) -> [Entry] where Rows.Element == [String] {
         var upcoming: [[String]] = []
         var pending: [[String]] = []
         var foundSection = false
         var readSinceSection = 0
-        for (count, row) in rows.reversed().enumerated() {
-            let content = texts(in: row)
+        for (count, content) in rows.enumerated() {
             if content.count == 1 {
                 if historyHeaders.contains(content[0]) { break }
                 // Les lignes lues depuis la fin appartiennent à cette section.
@@ -53,66 +57,38 @@ enum MusicQueueReader {
             if foundSection, readSinceSection > 25 { break }
             if !foundSection, count > 60 { break }
         }
-        let entries = upcoming.compactMap { row -> Entry? in
+        return upcoming.compactMap { row -> Entry? in
             // Les lignes à un seul texte sont des titres de section.
             guard row.count >= 2 else { return nil }
             let artist = row[1].components(separatedBy: " — ").first ?? row[1]
             return Entry(title: row[0], artist: artist)
         }
-        return .entries(entries)
     }
 
     /// Ouvre le panneau de file d'attente dans Musique (bouton du mini-lecteur).
     nonisolated static func showPanel() {
         guard let window = musicWindow(),
-              let button = find(in: window, where: { identifier($0) == "Music.miniPlayer.queueButton" }) else { return }
-        AXUIElementPerformAction(button, kAXPressAction as CFString)
+              let button = find(in: window, where: { AX.string($0, kAXIdentifierAttribute) == "Music.miniPlayer.queueButton" }) else { return }
+        AX.press(button)
     }
 
     // MARK: - Accessibilité
 
     private nonisolated static func musicWindow() -> AXUIElement? {
         guard let app = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.Music").first else { return nil }
-        let element = AXUIElementCreateApplication(app.processIdentifier)
-        return (attribute(element, kAXWindowsAttribute) as? [AXUIElement])?.first
+        return AX.elements(AX.app(app.processIdentifier), kAXWindowsAttribute).first
     }
 
-    private nonisolated static func attribute(_ element: AXUIElement, _ name: String) -> AnyObject? {
-        var value: AnyObject?
-        AXUIElementCopyAttributeValue(element, name as CFString, &value)
-        return value
+    /// Les listes (barre latérale, playlists…) ont des centaines de lignes : on n'y descend pas.
+    private nonisolated static func find(in element: AXUIElement, where match: (AXUIElement) -> Bool) -> AXUIElement? {
+        AX.first(in: element, maxDepth: 12, skipping: ["AXOutline", "AXTable", "AXList", "AXRow"], where: match)
     }
 
-    private nonisolated static func children(_ element: AXUIElement) -> [AXUIElement] {
-        attribute(element, kAXChildrenAttribute) as? [AXUIElement] ?? []
-    }
-
-    private nonisolated static func role(_ element: AXUIElement) -> String? {
-        attribute(element, kAXRoleAttribute) as? String
-    }
-
-    private nonisolated static func identifier(_ element: AXUIElement) -> String? {
-        attribute(element, kAXIdentifierAttribute) as? String
-    }
-
-    private nonisolated static func find(in element: AXUIElement, where match: (AXUIElement) -> Bool, depth: Int = 0) -> AXUIElement? {
-        if match(element) { return element }
-        // Les listes (barre latérale, playlists…) ont des centaines de lignes : on n'y descend pas.
-        guard depth < 12, !["AXOutline", "AXTable", "AXList", "AXRow"].contains(role(element) ?? "") || depth == 0 else { return nil }
-        for child in children(element) {
-            if let found = find(in: child, where: match, depth: depth + 1) { return found }
+    /// Textes d'une ligne de la table : titre, puis « artiste — album ».
+    private nonisolated static func texts(in row: AXUIElement) -> [String] {
+        AX.collect(in: row, maxDepth: 4) { AX.role($0) == "AXStaticText" }.compactMap { text in
+            let value = AX.string(text, kAXValueAttribute) ?? AX.string(text, kAXDescriptionAttribute) ?? ""
+            return value.isEmpty ? nil : value
         }
-        return nil
-    }
-
-    private nonisolated static func texts(in element: AXUIElement, depth: Int = 0) -> [String] {
-        var out: [String] = []
-        if role(element) == "AXStaticText",
-           let value = attribute(element, kAXValueAttribute) as? String ?? attribute(element, kAXDescriptionAttribute) as? String,
-           !value.isEmpty {
-            out.append(value)
-        }
-        if depth < 4 { for child in children(element) { out += texts(in: child, depth: depth + 1) } }
-        return out
     }
 }

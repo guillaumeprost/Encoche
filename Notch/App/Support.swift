@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 
 extension NSScreen {
     /// L'écran a une encoche physique (MacBook récents).
@@ -56,5 +57,20 @@ enum ProcessRunner {
                 continuation.resume(returning: Output(data: data, status: process.terminationStatus))
             }
         }
+    }
+}
+
+/// Durées affichées en « minutes:secondes » (minuteur, appel, morceau…).
+enum Clock {
+    nonisolated static func text(_ seconds: Int) -> String {
+        let seconds = max(seconds, 0)
+        return String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
+}
+
+extension View {
+    /// Menu présenté comme un simple bouton (sans flèche ni fond), à sa taille.
+    func plainMenu() -> some View {
+        menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
     }
 }

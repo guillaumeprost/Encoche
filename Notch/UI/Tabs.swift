@@ -56,7 +56,7 @@ struct TopBar: View {
                 // De chaque côté, les boutons restent dans la place laissée par les onglets.
                 let sideSpace = max((geometry.size.width - tabsWidth) / 2 - 8, 0)
                 HStack(spacing: 4) {
-                    // Minuteur et Concentration à gauche.
+                    // Minuteur, Sidecar et Concentration à gauche.
                     StatusChips()
                         .frame(maxWidth: sideSpace, alignment: .leading)
                     Spacer()
@@ -70,26 +70,25 @@ struct TopBar: View {
         .animation(.snappy(duration: 0.2), value: settings.tab)
     }
 
+    /// Avec une encoche physique, les onglets sont répartis en deux moitiés de part et d'autre.
+    private static let tabsPerSide = (NotchTab.allCases.count + 1) / 2
+    private static let sideWidth = CGFloat(tabsPerSide) * (TabButton.width + 4)
+
     /// Largeur occupée au centre par les onglets (et l'encoche physique).
     private var tabsWidth: CGFloat {
-        let count = CGFloat(NotchTab.allCases.count)
-        guard vm.hasPhysicalNotch else { return count * (TabButton.width + 4) }
-        let half = CGFloat((NotchTab.allCases.count + 1) / 2)
-        return 2 * half * (TabButton.width + 4) + vm.notchSize.width + 16
+        guard vm.hasPhysicalNotch else { return CGFloat(NotchTab.allCases.count) * (TabButton.width + 4) }
+        return 2 * Self.sideWidth + vm.notchSize.width + 16
     }
 
     @ViewBuilder
     private var tabs: some View {
         if vm.hasPhysicalNotch {
-            let tabs = NotchTab.allCases
-            let half = (tabs.count + 1) / 2
-            let sideWidth = CGFloat(half) * (TabButton.width + 4)
             HStack(spacing: 0) {
-                tabRow(Array(tabs.prefix(half)))
-                    .frame(width: sideWidth, alignment: .trailing)
+                tabRow(Array(NotchTab.allCases.prefix(Self.tabsPerSide)))
+                    .frame(width: Self.sideWidth, alignment: .trailing)
                 Color.clear.frame(width: vm.notchSize.width + 16)
-                tabRow(Array(tabs.dropFirst(half)))
-                    .frame(width: sideWidth, alignment: .leading)
+                tabRow(Array(NotchTab.allCases.dropFirst(Self.tabsPerSide)))
+                    .frame(width: Self.sideWidth, alignment: .leading)
             }
         } else {
             tabRow(NotchTab.allCases)

@@ -66,7 +66,7 @@ final class FocusMonitor {
     /// Symbole utilisable sur Mac : certains modes portent un symbole propre à l'iPhone
     /// (« person.lanyardcard.fill » pour Travail), qui s'afficherait vide. On essaie une variante
     /// sans « person. », sinon la lune.
-    private static func macSymbol(for name: String?) -> String {
+    nonisolated static func macSymbol(for name: String?) -> String {
         guard let name else { return "moon.fill" }
         let candidates = [name, name.replacingOccurrences(of: "person.", with: "")]
         return candidates.first { NSImage(systemSymbolName: $0, accessibilityDescription: nil) != nil } ?? "moon.fill"

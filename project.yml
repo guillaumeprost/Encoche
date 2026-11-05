@@ -70,3 +70,21 @@ targets:
         DEVELOPMENT_TEAM: ""
         ENABLE_HARDENED_RUNTIME: NO
         ENABLE_APP_SANDBOX: NO
+    scheme:
+      testTargets: [NotchTests]
+  # Tests unitaires de la logique (sans interface) : ./scripts/test.sh
+  NotchTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources: [NotchTests]
+    dependencies:
+      - target: Notch
+    settings:
+      base:
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Encoche.app/Contents/MacOS/Encoche"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.guillaumeprost.notch.tests
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "Notch Local Signing"
+        DEVELOPMENT_TEAM: ""

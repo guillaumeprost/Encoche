@@ -72,7 +72,7 @@ private struct LockTimerCard: View {
                         Text(timer.kind.label + (timer.isPaused ? " · en pause" : ""))
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(.white.opacity(0.75))
-                        Text(String(format: "%d:%02d", seconds / 60, seconds % 60))
+                        Text(Clock.text(seconds))
                             .font(.system(size: 30, weight: .bold).monospacedDigit())
                             .foregroundStyle(tint)
                             .contentTransition(.numericText(countsDown: true))

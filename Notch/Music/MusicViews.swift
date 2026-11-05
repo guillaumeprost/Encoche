@@ -130,7 +130,7 @@ private struct ProgressBar: View {
 
     private func format(_ seconds: Double) -> String {
         let s = Int(seconds.rounded(.down))
-        return String(format: "%d:%02d", s / 60, s % 60)
+        return Clock.text(s)
     }
 }
 
@@ -422,7 +422,7 @@ private struct QueueRow: View {
                 }
                 Spacer(minLength: 4)
                 if item.duration > 0 {
-                    Text(String(format: "%d:%02d", Int(item.duration) / 60, Int(item.duration) % 60))
+                    Text(Clock.text(Int(item.duration)))
                         .font(.system(size: 10.5, weight: .medium).monospacedDigit())
                         .foregroundStyle(.primary.opacity(0.4))
                 }

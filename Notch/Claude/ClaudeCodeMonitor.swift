@@ -59,6 +59,8 @@ struct ClaudeCodeSession: Identifiable, Equatable {
 
     /// Nom du projet : le dossier de travail de la session.
     static func projectName(for cwd: String) -> String {
+        // Un chemin vide désignerait le dossier courant de l'app.
+        guard !cwd.isEmpty else { return "Claude Code" }
         let name = URL(fileURLWithPath: cwd).lastPathComponent
         return name.isEmpty ? "Claude Code" : name
     }
@@ -214,7 +216,8 @@ final class ClaudeCodeMonitor {
         ProcessOwner.activateApp(of: pid)
     }
 
-    /// Envoie un message à la session (tapé dans son terminal, ou collé dans son app).
+    /// Envoie un message à la session : tapé dans son terminal, écrit dans sa conversation de
+    /// l'app Claude (ou, pour un choix, clic sur son bouton), sinon collé dans son app.
     func reply(_ text: String, to sessionID: String, asChoice: Bool = false) async -> ClaudeReply.Outcome {
         guard let session = sessions.first(where: { $0.id == sessionID }) else { return .failed("Session introuvable") }
         guard session.state != .inactive, let pid = session.pid else { return .failed("Session fermée") }
@@ -238,19 +241,16 @@ final class ClaudeCodeMonitor {
         case .deny:
             output = ["behavior": "deny", "message": "Refusé depuis Encoche."]
         case .answer(let label):
-            if let pid = sessions.first(where: { $0.id == permission.sessionID })?.pid, ClaudeReply.isInClaudeApp(pid) {
+            let session = sessions.first { $0.id == permission.sessionID }
+            if let pid = session?.pid, ClaudeReply.isInClaudeApp(pid) {
                 // App Claude : elle affiche sa propre question ; on la laisse faire et on clique
                 // sur la réponse choisie dans l'app.
                 output = nil
-                let title = sessions.first { $0.id == permission.sessionID }?.title
+                let title = session?.title
                 Task { _ = await ClaudeReply.send(label, toProcess: pid, sessionTitle: title, asChoice: true) }
             } else {
                 // Terminal : comme dans le SDK, la question reçoit sa réponse dans « answers ».
-                var input = permission.input
-                if let question = (input["questions"] as? [[String: Any]])?.first?["question"] as? String {
-                    input["answers"] = [question: label]
-                }
-                output = ["behavior": "allow", "updatedInput": input]
+                output = ["behavior": "allow", "updatedInput": Self.answeredInput(permission.input, label: label)]
             }
         case .terminal:
             output = nil
@@ -341,12 +341,7 @@ final class ClaudeCodeMonitor {
     /// Notification d'une question de Claude à une seule réponse : la question et ses choix.
     /// Plusieurs questions ou choix multiples : on laisse la réponse au terminal.
     private func questionAlert(for permission: PendingPermission) -> NotchAlert? {
-        guard let questions = permission.input["questions"] as? [[String: Any]], questions.count == 1,
-              let question = questions.first, question["multiSelect"] as? Bool != true,
-              let text = question["question"] as? String,
-              let options = question["options"] as? [[String: Any]] else { return nil }
-        let labels = options.compactMap { $0["label"] as? String }.prefix(4)
-        guard !labels.isEmpty else { return nil }
+        guard let (text, labels) = Self.singleQuestion(in: permission.input) else { return nil }
 
         var alert = NotchAlert(
             icon: .symbol("questionmark.bubble.fill", .claude),
@@ -368,6 +363,25 @@ final class ClaudeCodeMonitor {
         }
         alert.buttons = buttons
         return alert
+    }
+
+    /// Question à une seule réponse d'« AskUserQuestion » : son texte et ses choix (4 au plus).
+    nonisolated static func singleQuestion(in input: [String: Any]) -> (text: String, options: [String])? {
+        guard let questions = input["questions"] as? [[String: Any]], questions.count == 1,
+              let question = questions.first, question["multiSelect"] as? Bool != true,
+              let text = question["question"] as? String,
+              let options = question["options"] as? [[String: Any]] else { return nil }
+        let labels = Array(options.compactMap { $0["label"] as? String }.prefix(4))
+        return labels.isEmpty ? nil : (text, labels)
+    }
+
+    /// Paramètres d'« AskUserQuestion » complétés par la réponse choisie (comme dans le SDK).
+    nonisolated static func answeredInput(_ input: [String: Any], label: String) -> [String: Any] {
+        var input = input
+        if let question = (input["questions"] as? [[String: Any]])?.first?["question"] as? String {
+            input["answers"] = [question: label]
+        }
+        return input
     }
 
     private func remove(_ permission: PendingPermission) {
@@ -518,19 +532,12 @@ final class ClaudeCodeMonitor {
         sessions[index].updatedAt = Date()
     }
 
-    /// Relit le titre de la session et la dernière réponse de Claude dans la transcription.
     /// Notification de fin de tâche, avec le début de la réponse de Claude.
     private func announceDone(_ id: String, reply: String?) {
-        Task {
-            var reply = reply
-            if let path = sessions.first(where: { $0.id == id })?.transcriptPath {
-                let info = await ClaudeTranscript.read(path: path)
-                update(id) { session in
-                    if let title = info.title { session.title = title }
-                    if let message = info.lastMessage { session.lastMessage = message }
-                }
-                if reply == nil { reply = info.lastMessage }
-            }
+        Task { [weak self] in
+            guard let self else { return }
+            let info = await loadTranscript(of: id)
+            let reply = reply ?? info?.lastMessage
             let session = sessions.first { $0.id == id }
             var alert = NotchAlert(
                 icon: .symbol("checkmark", .green),
@@ -586,7 +593,7 @@ final class ClaudeCodeMonitor {
     }
 
     /// Réponse de Claude en texte simple sur une ligne (sans titres, listes ni gras Markdown).
-    private static func plainSummary(_ text: String) -> String {
+    nonisolated static func plainSummary(_ text: String) -> String {
         let cleaned = text
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "#>-*• ")) }
@@ -598,15 +605,21 @@ final class ClaudeCodeMonitor {
     }
 
     private func readTranscript(of id: String) {
-        guard let path = sessions.first(where: { $0.id == id })?.transcriptPath else { return }
-        Task {
-            let info = await ClaudeTranscript.read(path: path)
-            update(id) { session in
-                if let title = info.title { session.title = title }
-                if session.prompt == nil { session.prompt = info.lastPrompt }
-                if let message = info.lastMessage, session.state != .working { session.lastMessage = message }
-            }
+        Task { await loadTranscript(of: id) }
+    }
+
+    /// Relit le titre de la session, sa dernière demande et la dernière réponse de Claude dans
+    /// la transcription, et les range dans la session.
+    @discardableResult
+    private func loadTranscript(of id: String) async -> ClaudeTranscript.Info? {
+        guard let path = sessions.first(where: { $0.id == id })?.transcriptPath else { return nil }
+        let info = await ClaudeTranscript.read(path: path)
+        update(id) { session in
+            if let title = info.title { session.title = title }
+            if session.prompt == nil { session.prompt = info.lastPrompt }
+            if let message = info.lastMessage, session.state != .working { session.lastMessage = message }
         }
+        return info
     }
 
     /// Une session muette depuis longtemps est sans doute fermée : elle devient inactive.

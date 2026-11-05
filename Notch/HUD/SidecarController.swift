@@ -96,10 +96,7 @@ struct SidecarButton: View {
                             }
                         }
                     } label: { label }
-                    .menuStyle(.button)
-                    .buttonStyle(.plain)
-                    .menuIndicator(.hidden)
-                    .fixedSize()
+                    .plainMenu()
                 }
             }
         }

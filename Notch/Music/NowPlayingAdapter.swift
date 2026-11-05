@@ -112,16 +112,15 @@ final class NowPlayingAdapter: @unchecked Sendable {
         }
     }
 
-    private static func parse(_ payload: [String: Any]) -> Info? {
+    static func parse(_ payload: [String: Any], now: Date = Date()) -> Info? {
         guard let title = payload["title"] as? String, !title.isEmpty,
               let bundleID = payload["parentApplicationBundleIdentifier"] as? String
                 ?? payload["bundleIdentifier"] as? String else { return nil }
         let playing = payload["playing"] as? Bool ?? false
         var elapsed = payload["elapsedTime"] as? Double ?? 0
         // La position est donnée à un instant : on l'avance jusqu'à maintenant.
-        if playing, let stamp = payload["timestamp"] as? String,
-           let date = ISO8601DateFormatter().date(from: stamp) {
-            elapsed += Date().timeIntervalSince(date)
+        if playing, let stamp = payload["timestamp"] as? String, let date = Self.date(from: stamp) {
+            elapsed += now.timeIntervalSince(date)
         }
         return Info(
             bundleID: bundleID,
@@ -133,6 +132,14 @@ final class NowPlayingAdapter: @unchecked Sendable {
             elapsed: elapsed,
             artwork: (payload["artworkData"] as? String).flatMap { Data(base64Encoded: $0) }
         )
+    }
+
+    /// Date ISO 8601, avec ou sans fractions de seconde.
+    private static func date(from text: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        if let date = formatter.date(from: text) { return date }
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: text)
     }
 
     /// Commande ponctuelle (lecture, morceau suivant, position).

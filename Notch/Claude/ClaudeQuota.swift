@@ -55,7 +55,7 @@ final class ClaudeQuota {
         return (limit(root["five_hour"]), limit(root["seven_day"]))
     }
 
-    private nonisolated static func limit(_ value: Any?) -> Limit? {
+    nonisolated static func limit(_ value: Any?) -> Limit? {
         guard let entry = value as? [String: Any] else { return nil }
         let percent = (entry["utilization"] as? Double) ?? (entry["used_percentage"] as? Double)
         guard let percent else { return nil }

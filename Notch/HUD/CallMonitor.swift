@@ -145,7 +145,7 @@ struct CollapsedCallView: View {
         switch calls.state {
         case .ongoing(_, let since):
             let seconds = Int(date.timeIntervalSince(since))
-            return String(format: "%d:%02d", seconds / 60, seconds % 60)
+            return Clock.text(seconds)
         case .ringing:
             return "Appel"
         case .idle:

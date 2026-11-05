@@ -49,7 +49,7 @@ final class ClaudeUsage {
     }
 
     /// « 12,3 M », « 845 k ».
-    static func format(_ tokens: Int) -> String {
+    nonisolated static func format(_ tokens: Int) -> String {
         switch tokens {
         case 1_000_000...: return String(format: "%.1f M", Double(tokens) / 1_000_000).replacingOccurrences(of: ".", with: ",")
         case 1_000...: return "\(tokens / 1_000) k"
@@ -62,7 +62,8 @@ final class ClaudeUsage {
     /// Lecture des fichiers hors du fil principal, en gardant où on s'est arrêté dans chacun.
     private actor Scanner {
         private var offsets: [String: UInt64] = [:]
-        private var seenMessages: Set<String> = []
+        /// Réponses déjà comptées, avec leur jour (oubliées avec les jours trop anciens).
+        private var seenMessages: [String: Date] = [:]
         private var days: [Date: Totals] = [:]
         private let isoFormatter: ISO8601DateFormatter = {
             let formatter = ISO8601DateFormatter()
@@ -77,9 +78,11 @@ final class ClaudeUsage {
             let keys: [URLResourceKey] = [.contentModificationDateKey, .fileSizeKey]
             guard let files = fm.enumerator(at: root, includingPropertiesForKeys: keys) else { return days }
 
+            var seenPaths: Set<String> = []
             for case let url as URL in files where url.pathExtension == "jsonl" {
                 guard let values = try? url.resourceValues(forKeys: Set(keys)),
                       (values.contentModificationDate ?? .distantPast) >= since else { continue }
+                seenPaths.insert(url.path)
                 let size = UInt64(values.fileSize ?? 0)
                 let offset = offsets[url.path] ?? 0
                 guard size > offset else { continue }
@@ -88,6 +91,8 @@ final class ClaudeUsage {
             // On ne garde que la dernière semaine.
             let oldest = Calendar.current.startOfDay(for: since)
             days = days.filter { $0.key >= oldest }
+            seenMessages = seenMessages.filter { $0.value >= oldest }
+            offsets = offsets.filter { seenPaths.contains($0.key) }
             return days
         }
 
@@ -110,9 +115,9 @@ final class ClaudeUsage {
                       let date = isoFormatter.date(from: stamp) else { continue }
                 // Une réponse est écrite sur plusieurs lignes : on ne la compte qu'une fois.
                 let id = (message["id"] as? String ?? "") + (entry["requestId"] as? String ?? "")
-                guard !id.isEmpty, seenMessages.insert(id).inserted else { continue }
-
                 let day = Calendar.current.startOfDay(for: date)
+                guard !id.isEmpty, seenMessages.updateValue(day, forKey: id) == nil else { continue }
+
                 var totals = days[day] ?? Totals()
                 totals.input += usage["input_tokens"] as? Int ?? 0
                 totals.output += usage["output_tokens"] as? Int ?? 0

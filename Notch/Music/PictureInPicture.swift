@@ -46,7 +46,7 @@ enum PictureInPicture {
     """
 
     private static func runScript(in bundleID: String, browserName: String) async -> Outcome {
-        let code = javascript.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+        let code = AppleScriptRunner.escape(javascript)
         // L'onglet où joue la vidéo : YouTube en priorité, sinon l'onglet actif.
         let source: String
         if bundleID == safari {
@@ -74,17 +74,14 @@ enum PictureInPicture {
             end tell
             """
         }
-        let result = await Task.detached { () -> (String?, String?) in
-            var error: NSDictionary?
-            let output = NSAppleScript(source: source)?.executeAndReturnError(&error)
-            return (output?.stringValue, error?[NSAppleScript.errorMessage] as? String)
-        }.value
-        if let message = result.1 {
+        // Par la file des scripts d'Encoche : délai maximal, et jamais en même temps qu'un autre.
+        let (result, error) = await AppleScriptRunner.runReportingError(source)
+        if let error {
             // « You must enable 'Allow JavaScript from Apple Events'… »
-            if message.localizedCaseInsensitiveContains("JavaScript") { return .needsJavaScriptPermission(browser: browserName) }
+            if error.localizedCaseInsensitiveContains("JavaScript") { return .needsJavaScriptPermission(browser: browserName) }
             return .failed
         }
-        return result.0 == "none" ? .failed : .done
+        return result?.stringValue == "none" ? .failed : .done
     }
 
     // MARK: - Menu du bouton son de Safari
@@ -93,61 +90,32 @@ enum PictureInPicture {
     private static func pressSafariMenuItem() -> Bool {
         guard AXIsProcessTrusted(),
               let safariApp = NSRunningApplication.runningApplications(withBundleIdentifier: safari).first else { return false }
-        let app = AXUIElementCreateApplication(safariApp.processIdentifier)
-        let windows = attribute(app, kAXWindowsAttribute) as? [AXUIElement] ?? []
-        guard let button = windows.lazy.compactMap({ findAudioButton(in: $0) }).first else { return false }
+        let app = AX.app(safariApp.processIdentifier)
+        // Le bouton est dans la barre d'outils : on ne descend pas dans les pages web.
+        guard let button = AX.elements(app, kAXWindowsAttribute).lazy.compactMap({ window in
+            AX.first(in: window, maxDepth: 7, skipping: ["AXWebArea"]) { element in
+                guard AX.role(element) == "AXButton", let text = AX.string(element, kAXDescriptionAttribute) else { return false }
+                return ["son de cet onglet", "audio in this tab", "mute this tab"].contains { text.localizedCaseInsensitiveContains($0) }
+            }
+        }).first else { return false }
 
         AXUIElementPerformAction(button, "AXShowMenu" as CFString)
         // Le menu met un instant à s'ouvrir.
         for _ in 0..<10 {
             Thread.sleep(forTimeInterval: 0.05)
-            let roots = children(button) + children(app)
-            if let item = roots.lazy.compactMap({ findPictureInPictureItem(in: $0) }).first {
-                AXUIElementPerformAction(item, kAXPressAction as CFString)
-                return true
+            let roots = AX.children(button) + AX.children(app)
+            if let item = roots.lazy.compactMap({ root in
+                AX.first(in: root, maxDepth: 4) { element in
+                    guard AX.role(element) == "AXMenuItem", let title = AX.string(element, kAXTitleAttribute) else { return false }
+                    return title.localizedCaseInsensitiveContains("image dans l") || title.localizedCaseInsensitiveContains("picture in picture")
+                }
+            }).first {
+                return AX.press(item)
             }
         }
         // Pas d'entrée « Image dans l'image » : on referme le menu.
         CGEvent(keyboardEventSource: nil, virtualKey: 53, keyDown: true)?.postToPid(safariApp.processIdentifier)
         CGEvent(keyboardEventSource: nil, virtualKey: 53, keyDown: false)?.postToPid(safariApp.processIdentifier)
         return false
-    }
-
-    private static func findAudioButton(in element: AXUIElement, depth: Int = 0) -> AXUIElement? {
-        let role = attribute(element, kAXRoleAttribute) as? String
-        if role == "AXWebArea" { return nil }
-        if role == "AXButton", let text = attribute(element, kAXDescriptionAttribute) as? String,
-           text.localizedCaseInsensitiveContains("son de cet onglet") || text.localizedCaseInsensitiveContains("audio in this tab")
-            || text.localizedCaseInsensitiveContains("mute this tab") {
-            return element
-        }
-        guard depth < 7 else { return nil }
-        for child in children(element) {
-            if let found = findAudioButton(in: child, depth: depth + 1) { return found }
-        }
-        return nil
-    }
-
-    private static func findPictureInPictureItem(in element: AXUIElement, depth: Int = 0) -> AXUIElement? {
-        if attribute(element, kAXRoleAttribute) as? String == "AXMenuItem",
-           let title = attribute(element, kAXTitleAttribute) as? String,
-           title.localizedCaseInsensitiveContains("image dans l") || title.localizedCaseInsensitiveContains("picture in picture") {
-            return element
-        }
-        guard depth < 4 else { return nil }
-        for child in children(element) {
-            if let found = findPictureInPictureItem(in: child, depth: depth + 1) { return found }
-        }
-        return nil
-    }
-
-    private static func attribute(_ element: AXUIElement, _ name: String) -> AnyObject? {
-        var value: AnyObject?
-        AXUIElementCopyAttributeValue(element, name as CFString, &value)
-        return value
-    }
-
-    private static func children(_ element: AXUIElement) -> [AXUIElement] {
-        attribute(element, kAXChildrenAttribute) as? [AXUIElement] ?? []
     }
 }
