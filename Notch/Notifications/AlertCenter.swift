@@ -64,7 +64,27 @@ final class AlertCenter {
         history = HistoryStore.load()
     }
 
+    /// Apps dont les notifications relayées sont ignorées jusqu'à une date (doublons).
+    private var mutedApps: [String: Date] = [:]
+
+    /// Ignore un moment les notifications relayées d'une app, et retire celles qui viennent
+    /// d'arriver : Encoche affiche déjà la même information (ex. fin de tâche de Claude).
+    func muteRelayedNotifications(from bundleID: String, for seconds: TimeInterval = 20) {
+        mutedApps[bundleID] = Date().addingTimeInterval(seconds)
+        let recent = Date().addingTimeInterval(-seconds)
+        let isDuplicate: (NotchAlert) -> Bool = { alert in
+            if case .app(let id) = alert.icon { return id == bundleID && alert.date > recent }
+            return false
+        }
+        queue.removeAll(where: isDuplicate)
+        let before = history.count
+        history.removeAll(where: isDuplicate)
+        if history.count != before { HistoryStore.save(history) }
+        if let current, isDuplicate(current) { dismiss() }
+    }
+
     func post(_ alert: NotchAlert) {
+        if case .app(let bundleID) = alert.icon, let until = mutedApps[bundleID], until > Date() { return }
         // Les demandes qui attendent une réponse n'ont pas leur place dans l'historique.
         if !alert.isPersistent {
             history.insert(alert, at: 0)

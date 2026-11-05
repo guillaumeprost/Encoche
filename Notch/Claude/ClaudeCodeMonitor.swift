@@ -307,7 +307,7 @@ final class ClaudeCodeMonitor {
         // Question à choix : un bouton par réponse.
         if tool == "AskUserQuestion", let alert = questionAlert(for: permission) {
             permission.alertID = alert.id
-            alerts?.post(alert)
+            postClaudeAlert(alert)
             return
         }
 
@@ -335,7 +335,7 @@ final class ClaudeCodeMonitor {
         })
         alert.buttons = buttons
         permission.alertID = alert.id
-        alerts?.post(alert)
+        postClaudeAlert(alert)
     }
 
     /// Notification d'une question de Claude à une seule réponse : la question et ses choix.
@@ -474,11 +474,11 @@ final class ClaudeCodeMonitor {
             if type == "idle_prompt" || message.localizedCaseInsensitiveContains("waiting for your input") {
                 return
             }
-            // Déjà signalée (demande de permission en cours) : pas de doublon.
-            guard previousState != .waiting else { return }
+            // Déjà signalée (demande de permission en cours, ou fin de tâche à l'instant) : pas de doublon.
+            guard previousState != .waiting, previousState != .done else { return }
             upsert(id, cwd: cwd) { $0.state = .waiting; $0.detail = message.isEmpty ? nil : message }
             let project = sessions.first { $0.id == id }?.projectName ?? "Claude Code"
-            alerts?.post(NotchAlert(
+            postClaudeAlert(NotchAlert(
                 icon: .symbol("hand.raised.fill", .claude),
                 source: "Claude Code",
                 title: "\(project) t'attend",
@@ -557,8 +557,15 @@ final class ClaudeCodeMonitor {
                 }
                 alert.buttons = buttons
             }
-            alerts?.post(alert)
+            postClaudeAlert(alert)
         }
+    }
+
+    /// Une seule notification par événement : celles de l'app Claude (relayées comme toutes les
+    /// notifications du Mac) disent la même chose, on les ignore un moment.
+    private func postClaudeAlert(_ alert: NotchAlert) {
+        alerts?.muteRelayedNotifications(from: ClaudeReply.claudeAppID)
+        alerts?.post(alert)
     }
 
     /// Envoie la réponse choisie dans la notification à la session.
