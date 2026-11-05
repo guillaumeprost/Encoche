@@ -349,25 +349,23 @@ private struct MonthDayCell: View {
     @State private var hovering = false
 
     var body: some View {
-        ZStack {
-            if isSelected {
-                Circle().fill(isToday ? Color.red : Color.primary.opacity(0.85))
-                    .frame(width: 22, height: 22)
-            } else if hovering {
-                Circle().fill(.primary.opacity(0.12)).frame(width: 22, height: 22)
+        // Le point a sa propre place sous le chiffre : il ne touche jamais une pastille.
+        VStack(spacing: 2) {
+            ZStack {
+                if isSelected {
+                    Circle().fill(isToday ? Color.red : Color.primary.opacity(0.85))
+                } else if hovering {
+                    Circle().fill(.primary.opacity(0.12))
+                }
+                Text(day.formatted(.dateTime.day()))
+                    .font(.system(size: 12, weight: isToday || isSelected ? .bold : .medium).monospacedDigit())
+                    .foregroundStyle(numberColor)
             }
-            Text(day.formatted(.dateTime.day()))
-                .font(.system(size: 12, weight: isToday || isSelected ? .bold : .medium).monospacedDigit())
-                .foregroundStyle(numberColor)
-        }
-        .frame(height: 23)
-        .overlay(alignment: .bottom) {
-            if isBusy && !isSelected {
-                Circle()
-                    .fill(isToday ? Color.red : .primary.opacity(inMonth ? 0.55 : 0.25))
-                    .frame(width: 3.5, height: 3.5)
-                    .offset(y: 1)
-            }
+            .frame(width: 20, height: 20)
+            Circle()
+                .fill(isToday ? Color.red : .primary.opacity(inMonth ? 0.55 : 0.25))
+                .frame(width: 3.5, height: 3.5)
+                .opacity(isBusy ? 1 : 0)
         }
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
