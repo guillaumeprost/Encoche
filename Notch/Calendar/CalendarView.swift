@@ -39,8 +39,7 @@ private struct WeekStrip: View {
                 DayCell(
                     day: day,
                     isSelected: Calendar.current.isDate(day, inSameDayAs: calendar.selectedDay),
-                    isToday: Calendar.current.isDateInToday(day),
-                    isBusy: calendar.busyDays.contains(day)
+                    isToday: Calendar.current.isDateInToday(day)
                 )
                 .onTapGesture { calendar.select(day) }
             }
@@ -53,7 +52,6 @@ private struct DayCell: View {
     let day: Date
     let isSelected: Bool
     let isToday: Bool
-    let isBusy: Bool
     @State private var hovering = false
 
     var body: some View {
@@ -72,9 +70,6 @@ private struct DayCell: View {
                         Circle().fill(.primary.opacity(0.12))
                     }
                 }
-            Circle()
-                .fill(.primary.opacity(isBusy ? 0.5 : 0))
-                .frame(width: 3, height: 3)
         }
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
@@ -311,8 +306,7 @@ private struct MonthGrid: View {
                         day: day,
                         inMonth: Calendar.current.isDate(day, equalTo: calendar.displayedMonth, toGranularity: .month),
                         isSelected: Calendar.current.isDate(day, inSameDayAs: calendar.selectedDay),
-                        isToday: Calendar.current.isDateInToday(day),
-                        isBusy: calendar.busyDays.contains(day)
+                        isToday: Calendar.current.isDateInToday(day)
                     )
                     .onTapGesture { calendar.select(day) }
                 }
@@ -345,28 +339,21 @@ private struct MonthDayCell: View {
     let inMonth: Bool
     let isSelected: Bool
     let isToday: Bool
-    let isBusy: Bool
     @State private var hovering = false
 
     var body: some View {
-        // Le point a sa propre place sous le chiffre : il ne touche jamais une pastille.
-        VStack(spacing: 2) {
-            ZStack {
-                if isSelected {
-                    Circle().fill(isToday ? Color.red : Color.primary.opacity(0.85))
-                } else if hovering {
-                    Circle().fill(.primary.opacity(0.12))
-                }
-                Text(day.formatted(.dateTime.day()))
-                    .font(.system(size: 12, weight: isToday || isSelected ? .bold : .medium).monospacedDigit())
-                    .foregroundStyle(numberColor)
+        ZStack {
+            if isSelected {
+                Circle().fill(isToday ? Color.red : Color.primary.opacity(0.85))
+            } else if hovering {
+                Circle().fill(.primary.opacity(0.12))
             }
-            .frame(width: 20, height: 20)
-            Circle()
-                .fill(isToday ? Color.red : .primary.opacity(inMonth ? 0.55 : 0.25))
-                .frame(width: 3.5, height: 3.5)
-                .opacity(isBusy ? 1 : 0)
+            Text(day.formatted(.dateTime.day()))
+                .font(.system(size: 12, weight: isToday || isSelected ? .bold : .medium).monospacedDigit())
+                .foregroundStyle(numberColor)
         }
+        .frame(width: 22, height: 22)
+        .padding(.vertical, 1)
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
