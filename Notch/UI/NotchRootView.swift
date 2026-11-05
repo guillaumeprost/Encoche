@@ -108,7 +108,6 @@ struct NotchRootView: View {
         .environment(\.colorScheme, glassActive ? systemColorScheme : .dark)
         .frame(width: size.width, height: size.height, alignment: .top)
         .clipShape(shape)
-        .shadow(color: .black.opacity(vm.isOpen || vm.showsAlert ? 0.35 : 0), radius: 18, y: 8)
         .contextMenu {
             Button("Réglages…") { settings.openSettings() }
             Divider()
