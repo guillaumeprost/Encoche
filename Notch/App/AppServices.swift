@@ -20,6 +20,7 @@ struct AppServices {
     let musicExtras: MusicExtras
     let volume: VolumeController
     let calendar: CalendarController
+    let reminders: RemindersController
     let clipboard: ClipboardController
     let shelf: ShelfController
     let screenshots: ScreenshotWatcher
@@ -59,6 +60,7 @@ struct AppServices {
         musicExtras = MusicExtras(music: music)
         volume = VolumeController()
         calendar = CalendarController()
+        reminders = RemindersController()
         clipboard = ClipboardController()
         shelf = ShelfController()
         screenshots = ScreenshotWatcher()
@@ -130,6 +132,7 @@ extension View {
             .environment(services.musicExtras)
             .environment(services.volume)
             .environment(services.calendar)
+            .environment(services.reminders)
             .environment(services.clipboard)
             .environment(services.shelf)
             .environment(services.screenshots)

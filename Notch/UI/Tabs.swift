@@ -3,6 +3,7 @@ import SwiftUI
 enum NotchTab: String, CaseIterable {
     case home
     case calendar
+    case reminders
     case music
     case house
     case shelf
@@ -14,6 +15,7 @@ enum NotchTab: String, CaseIterable {
         switch self {
         case .home: "music.note.house"
         case .calendar: "calendar"
+        case .reminders: "checklist"
         case .music: "music.note"
         case .house: "square.2.layers.3d"
         case .shelf: "tray.full"
@@ -27,6 +29,7 @@ enum NotchTab: String, CaseIterable {
         switch self {
         case .home: "Accueil"
         case .calendar: "Calendrier"
+        case .reminders: "Rappels"
         case .music: "Musique"
         case .house: "Raccourcis"
         case .shelf: "Étagère"
@@ -208,7 +211,8 @@ private struct IconButton: View {
     }
 }
 
-/// Onglet d'accueil : lecteur à gauche, calendrier à droite, et une question à Claude en dessous.
+/// Onglet d'accueil : lecteur à gauche, calendrier au milieu, rappels à droite, et une question à
+/// Claude en dessous.
 struct HomeTab: View {
     @Environment(AppSettings.self) private var settings
     @Environment(ClaudeAsk.self) private var ask
@@ -216,12 +220,12 @@ struct HomeTab: View {
         VStack(spacing: 10) {
             HStack(spacing: 20) {
                 ExpandedMusicView()
-                    .frame(width: 330)
-                Rectangle()
-                    .fill(.primary.opacity(0.12))
-                    .frame(width: 1)
-                    .padding(.vertical, 4)
+                    .frame(width: 310)
+                divider
                 CalendarView()
+                divider
+                RemindersColumn()
+                    .frame(width: 140)
             }
             // Même champ que l'onglet Claude. Par défaut, une nouvelle conversation dans Claude Chat ;
             // la réponse à une question rapide s'affiche dans l'onglet Claude.
@@ -231,5 +235,12 @@ struct HomeTab: View {
                 settings.tab = .claude
             }
         }
+    }
+
+    private var divider: some View {
+        Rectangle()
+            .fill(.primary.opacity(0.12))
+            .frame(width: 1)
+            .padding(.vertical, 4)
     }
 }
