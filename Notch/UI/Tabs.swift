@@ -116,7 +116,6 @@ struct TopBar: View {
                 ClaudeUsageLabel()
                     .transition(.opacity)
             }
-            TimerMenu()
             // Mini-lecteur, sauf là où le lecteur complet est déjà affiché.
             if music.track != nil, settings.tab != .music, settings.tab != .home {
                 MiniMusicControls()

@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// En haut à gauche de l'encoche ouverte : le mode Concentration actif et le minuteur en cours.
+/// En haut à gauche de l'encoche ouverte : le bouton minuteur, le minuteur en cours et le mode
+/// Concentration actif.
 /// Ils se réduisent à leur icône quand la place manque (encoche physique au milieu).
 struct StatusChips: View {
     @Environment(FocusMonitor.self) private var focus
@@ -17,6 +18,7 @@ struct StatusChips: View {
 
     private func chips(compact: Bool) -> some View {
         HStack(spacing: 6) {
+            TimerMenu()
             if let mode = focus.activeMode {
                 HStack(spacing: 4) {
                     Image(systemName: mode.symbol)
