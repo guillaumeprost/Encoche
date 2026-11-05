@@ -207,7 +207,9 @@ final class CalendarController {
         var all = store.events(matching: predicate)
 
         var busy = Set<Date>()
-        for event in all {
+        // Les événements « toute la journée » (indisponibilités, anniversaires…) ne comptent pas :
+        // ils marqueraient presque tous les jours.
+        for event in all where !event.isAllDay {
             var day = calendar.startOfDay(for: max(event.startDate, first))
             // Un événement sur plusieurs jours marque chacun de ses jours ; la fin est exclusive.
             while day < min(event.endDate, last) {
