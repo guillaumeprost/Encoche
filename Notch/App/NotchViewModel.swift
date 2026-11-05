@@ -24,6 +24,9 @@ final class NotchViewModel {
     var showsHUD = false
 
     static let expandedBodyWidth: CGFloat = 640
+    /// Largeur ouverte en plus de l'encoche physique : 8 onglets, minuteur et Concentration à
+    /// gauche, mini-lecteur et actions à droite.
+    static let sideSpaceAroundNotch: CGFloat = 520
     static let expandedContentHeight: CGFloat = 136
     /// Hauteur en plus pour l'accueil, qui porte le champ Claude sous la musique et le calendrier.
     static let homeExtraHeight: CGFloat = 42
@@ -59,7 +62,11 @@ final class NotchViewModel {
         let bodyWidth: CGFloat
         let height: CGFloat
         if isOpen {
-            bodyWidth = Self.expandedBodyWidth
+            // Avec une encoche physique, les onglets se répartissent de chaque côté de la caméra :
+            // un peu plus de largeur pour que les boutons de gauche et de droite tiennent à côté.
+            bodyWidth = hasPhysicalNotch
+                ? max(Self.expandedBodyWidth, notchSize.width + Self.sideSpaceAroundNotch)
+                : Self.expandedBodyWidth
             height = notchSize.height + Self.expandedContentHeight + extraHeight
         } else if showsAlert {
             bodyWidth = max(alertHasButtons ? 440 : Self.alertBodyWidth, notchSize.width + 2 * activitySlotWidth)
