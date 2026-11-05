@@ -39,10 +39,8 @@ struct ActivityBubble: View {
     private var content: some View {
         switch activity {
         case .claudeWaiting:
-            Image(systemName: "hand.raised.fill")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color.claude)
-                .symbolEffect(.pulse)
+            ClaudeMascot(mood: .waiting)
+                .frame(width: 23)
         case .privacy:
             Image(systemName: privacy.isCameraInUse ? "video.fill" : "mic.fill")
                 .font(.system(size: 12, weight: .semibold))
@@ -54,11 +52,8 @@ struct ActivityBubble: View {
             }
             .frame(width: 17, height: 17)
         case .claudeWorking:
-            ZStack {
-                ProgressRing(fraction: claudeCode.workingSession?.planFraction, tint: .claude)
-                Image(systemName: "sparkle").font(.system(size: 7, weight: .heavy)).foregroundStyle(Color.claude)
-            }
-            .frame(width: 17, height: 17)
+            ClaudeMascot(mood: .working)
+                .frame(width: 23)
         case .music:
             Artwork(image: music.artwork, cornerRadius: 11)
                 .frame(width: 22, height: 22)
@@ -125,10 +120,8 @@ struct CollapsedClaudeWorkingView: View {
     var body: some View {
         let session = monitor.workingSession
         CollapsedActivityLayout(slotWidth: slotWidth) {
-            Image(systemName: "sparkle")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(Color.claude)
-                .symbolEffect(.pulse)
+            ClaudeMascot(mood: .working)
+                .frame(width: 28)
         } trailing: {
             // Avancement du plan, ou anneau qui tourne sans plan.
             ProgressRing(fraction: session?.planFraction, tint: .claude)

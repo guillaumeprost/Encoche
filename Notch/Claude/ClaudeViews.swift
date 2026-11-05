@@ -716,10 +716,8 @@ struct CollapsedClaudeView: View {
 
     var body: some View {
         CollapsedActivityLayout(slotWidth: slotWidth) {
-            Image(systemName: "sparkle")
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(Color.claude)
-                .symbolEffect(.pulse, isActive: monitor.waitingCount > 0)
+            ClaudeMascot(mood: monitor.waitingCount > 0 ? .waiting : .idle)
+                .frame(width: 28)
         } trailing: {
             Group {
                 if monitor.waitingCount > 0 {

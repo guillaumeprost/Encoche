@@ -132,14 +132,22 @@ private struct TabButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: tab.symbol)
-                .font(.system(size: 12, weight: .semibold))
-                .frame(width: Self.width, height: 22)
-                .background(
-                    Capsule().fill(.primary.opacity(isSelected ? 0.2 : hovering ? 0.1 : 0))
-                )
-                .opacity(isSelected ? 1 : 0.6)
-                .contentShape(Capsule())
+            Group {
+                if tab == .claude {
+                    // Le petit personnage de Claude Code plutôt qu'un symbole.
+                    ClaudeMascot(mood: .idle, color: .primary)
+                        .frame(width: 17)
+                } else {
+                    Image(systemName: tab.symbol)
+                        .font(.system(size: 12, weight: .semibold))
+                }
+            }
+            .frame(width: Self.width, height: 22)
+            .background(
+                Capsule().fill(.primary.opacity(isSelected ? 0.2 : hovering ? 0.1 : 0))
+            )
+            .opacity(isSelected ? 1 : 0.6)
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .help(tab.label)
