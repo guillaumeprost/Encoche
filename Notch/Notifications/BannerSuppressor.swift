@@ -25,6 +25,24 @@ final class BannerSuppressor {
     var onUnreadBanner: ((_ app: String, _ title: String, _ body: String?) -> Void)?
     /// Faut-il fermer les bannières maintenant ? (relais actif et accès accordé)
     var isEnabled: () -> Bool = { false }
+    /// Alertes d'appel affichées (appel de l'iPhone sur le Mac), à chaque passage, même vide :
+    /// elles ne sont jamais fermées (ce serait refuser l'appel).
+    var onCallAlerts: (([CallAlert]) -> Void)?
+
+    /// Appel entrant affiché par macOS, avec ses boutons (actions d'accessibilité).
+    struct CallAlert {
+        let element: AXUIElement
+        let caller: String
+        let detail: String?
+        let answerAction: String?
+        let declineAction: String?
+    }
+
+    /// Libellés des boutons d'appel selon la langue du système.
+    private static let answerNames = ["Accepter", "Répondre", "Accept", "Answer"]
+    private static let declineNames = ["Refuser", "Decline"]
+    /// Apps qui affichent les appels de l'iPhone sur le Mac.
+    private static let callApps = ["FaceTime", "Téléphone", "Phone", "iPhone"]
 
     private var observer: AXObserver?
     private var observedPID: pid_t = 0
@@ -76,13 +94,18 @@ final class BannerSuppressor {
         observer = newObserver
     }
 
-    /// Ferme toutes les bannières affichées (pas la liste du Centre de notifications).
+    /// Ferme toutes les bannières affichées (pas la liste du Centre de notifications),
+    /// sauf les appels, signalés à part.
     func closeBanners() {
-        guard isEnabled(), observedPID != 0 else { return }
+        guard observedPID != 0 else { return }
         let app = AXUIElementCreateApplication(observedPID)
-        let banners = windows(of: app).flatMap { findBanners(in: $0, depth: 0) }
-        guard !banners.isEmpty else { return }
+        var banners = windows(of: app).flatMap { findBanners(in: $0, depth: 0) }
 
+        let calls = banners.compactMap(callAlert(of:))
+        onCallAlerts?(calls)
+        banners.removeAll { banner in calls.contains { CFEqual($0.element, banner) } }
+
+        guard isEnabled(), !banners.isEmpty else { return }
         beforeClosing?()
         for banner in banners {
             guard let action = closeAction(of: banner) else { continue }
@@ -124,6 +147,29 @@ final class BannerSuppressor {
             }
         }
         return (app, title, body)
+    }
+
+    /// Alerte d'appel : elle porte un bouton Accepter ou Refuser.
+    private func callAlert(of banner: AXUIElement) -> CallAlert? {
+        var names: CFArray?
+        AXUIElementCopyActionNames(banner, &names)
+        let actions = names as? [String] ?? []
+        func action(_ labels: [String]) -> String? {
+            actions.first { action in labels.contains { action.hasPrefix("Name:\($0)") } }
+        }
+        let answer = action(Self.answerNames)
+        let decline = action(Self.declineNames)
+        guard answer != nil || decline != nil else { return nil }
+        let content = content(of: banner)
+        // Les invitations de Calendrier ont aussi Accepter / Refuser : seuls les appels comptent.
+        guard Self.callApps.contains(where: { content.app.localizedCaseInsensitiveContains($0) }) else { return nil }
+        return CallAlert(
+            element: banner,
+            caller: content.title ?? content.body ?? "Appel",
+            detail: content.title == nil ? nil : content.body,
+            answerAction: answer,
+            declineAction: decline
+        )
     }
 
     private func closeAction(of banner: AXUIElement) -> String? {

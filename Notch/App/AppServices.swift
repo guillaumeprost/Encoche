@@ -12,6 +12,8 @@ struct AppServices {
     let downloads: DownloadMonitor
     let bluetooth: BluetoothMonitor
     let focus: FocusMonitor
+    let sidecar: SidecarController
+    let calls: CallMonitor
     let timer: TimerController
     let music: MusicController
     let musicExtras: MusicExtras
@@ -45,6 +47,10 @@ struct AppServices {
         bluetooth.isEnabled = { appSettings.showBluetoothActivity }
         bluetooth.start()
         focus = FocusMonitor()
+        sidecar = SidecarController()
+        calls = CallMonitor()
+        calls.alerts = alerts
+        calls.privacy = privacy
         timer = TimerController()
         music = MusicController()
         musicExtras = MusicExtras(music: music)
@@ -83,6 +89,8 @@ struct AppServices {
             settings.hideSystemBanners && settings.mirrorSystemNotifications && watcher.access == .granted
         }
         bannerSuppressor.beforeClosing = { watcher.pollNow() }
+        let callMonitor = calls
+        bannerSuppressor.onCallAlerts = { callMonitor.update($0) }
         let alertCenter = alerts
         bannerSuppressor.onUnreadBanner = { appName, title, body in
             guard !alertCenter.hasRecent(title: title) else { return }
@@ -111,6 +119,8 @@ extension View {
             .environment(services.downloads)
             .environment(services.bluetooth)
             .environment(services.focus)
+            .environment(services.sidecar)
+            .environment(services.calls)
             .environment(services.timer)
             .environment(services.music)
             .environment(services.musicExtras)

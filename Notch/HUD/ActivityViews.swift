@@ -2,16 +2,17 @@ import SwiftUI
 
 /// Activités en direct autour de l'encoche repliée, par ordre de priorité.
 enum LiveActivity: Hashable {
-    case claudeWaiting, privacy, meeting, timer, download, claudeWorking, music, focus
+    case call, claudeWaiting, privacy, meeting, timer, download, claudeWorking, music, focus
 
     /// Activités en cours, la plus importante d'abord.
     @MainActor
     static func active(
         settings: AppSettings, claudeCode: ClaudeCodeMonitor, privacy: PrivacyMonitor,
         downloads: DownloadMonitor, music: MusicController,
-        calendar: CalendarController, timer: TimerController, focus: FocusMonitor
+        calendar: CalendarController, timer: TimerController, focus: FocusMonitor, calls: CallMonitor
     ) -> [LiveActivity] {
         var list: [LiveActivity] = []
+        if calls.isActive { list.append(.call) }
         if claudeCode.needsAttention { list.append(.claudeWaiting) }
         if privacy.isActive { list.append(.privacy) }
         if settings.showMeetingActivity, calendar.upcomingMeeting != nil { list.append(.meeting) }
@@ -33,6 +34,7 @@ struct ActivityBubble: View {
     @Environment(CalendarController.self) private var calendar
     @Environment(TimerController.self) private var timer
     @Environment(FocusMonitor.self) private var focus
+    @Environment(CallMonitor.self) private var calls
     let activity: LiveActivity
 
     var body: some View {
@@ -45,6 +47,10 @@ struct ActivityBubble: View {
     @ViewBuilder
     private var content: some View {
         switch activity {
+        case .call:
+            Image(systemName: "phone.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.green)
         case .claudeWaiting:
             ClaudeMascot(mood: .waiting)
                 .frame(width: 23)

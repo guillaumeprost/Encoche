@@ -13,6 +13,7 @@ struct NotchRootView: View {
     @Environment(CalendarController.self) private var calendar
     @Environment(TimerController.self) private var timer
     @Environment(FocusMonitor.self) private var focus
+    @Environment(CallMonitor.self) private var calls
     @Environment(ClaudeCodeMonitor.self) private var claudeCode
     @Environment(AlertCenter.self) private var alerts
     /// Apparence du Mac (clair / sombre).
@@ -187,7 +188,7 @@ struct NotchRootView: View {
     private var activities: [LiveActivity] {
         LiveActivity.active(
             settings: settings, claudeCode: claudeCode, privacy: privacy, downloads: downloads, music: music,
-            calendar: calendar, timer: timer, focus: focus
+            calendar: calendar, timer: timer, focus: focus, calls: calls
         )
     }
 
@@ -199,6 +200,7 @@ struct NotchRootView: View {
         switch activity {
         case .claudeWaiting: CollapsedClaudeView(slotWidth: vm.activitySlotWidth)
         case .privacy: CollapsedPrivacyView(slotWidth: vm.activitySlotWidth)
+        case .call: CollapsedCallView(slotWidth: vm.activitySlotWidth)
         case .meeting: CollapsedMeetingView(slotWidth: vm.activitySlotWidth)
         case .timer: CollapsedTimerView(slotWidth: vm.activitySlotWidth)
         case .focus: CollapsedFocusView(slotWidth: vm.activitySlotWidth)

@@ -15,6 +15,7 @@ final class NotchWindowController {
     private let downloads: DownloadMonitor
     private let timer: TimerController
     private let focus: FocusMonitor
+    private let calls: CallMonitor
     private let settings: AppSettings
     private let alerts: AlertCenter
     private let panel: NotchPanel
@@ -38,6 +39,7 @@ final class NotchWindowController {
         downloads = services.downloads
         timer = services.timer
         focus = services.focus
+        calls = services.calls
         settings = services.settings
         alerts = services.alerts
         panel = NotchPanel(contentRect: NSRect(origin: .zero, size: Self.panelSize))
@@ -129,7 +131,7 @@ final class NotchWindowController {
         let size = viewModel.shapeSize(
             showsActivity: !LiveActivity.active(
                 settings: settings, claudeCode: claudeCode, privacy: privacy, downloads: downloads, music: music,
-                calendar: calendar, timer: timer, focus: focus
+                calendar: calendar, timer: timer, focus: focus, calls: calls
             ).isEmpty,
             extraHeight: NotchViewModel.extraHeight(for: settings.tab)
         )

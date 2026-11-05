@@ -19,6 +19,7 @@ struct StatusChips: View {
     private func chips(compact: Bool) -> some View {
         HStack(spacing: 6) {
             TimerMenu()
+            SidecarButton()
             if let mode = focus.activeMode {
                 HStack(spacing: 4) {
                     Image(systemName: mode.symbol)
