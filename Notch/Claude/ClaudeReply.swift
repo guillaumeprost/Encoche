@@ -29,7 +29,11 @@ enum ClaudeReply {
             .replacingOccurrences(of: "\n", with: " ")
             .trimmingCharacters(in: .whitespaces)
         guard !message.isEmpty else { return .failed("Message vide") }
-        guard let app = ProcessOwner.app(of: pid) else { return .failed("Session introuvable") }
+        guard let app = ProcessOwner.app(of: pid) else {
+            ReplyLog.write(" no app for pid \(pid)")
+            return .failed("Session introuvable")
+        }
+        ReplyLog.write(" app \(app.bundleIdentifier ?? "?"), title \(sessionTitle ?? "nil"), choice \(asChoice)")
         let appName = app.localizedName ?? "l'app"
         let tty = ProcessOwner.ttyPath(of: pid)
 
@@ -96,6 +100,7 @@ enum ClaudeReply {
             guard app.activate() else { return .failed("Impossible d'ouvrir \(appName)") }
             try? await Task.sleep(for: .milliseconds(500))
             let ready = await Task.detached { focusComposer(inAppWith: appPID, conversation: sessionTitle) }.value
+            ReplyLog.write(" composer ready \(ready), frontmost \(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "?")")
             try? await Task.sleep(for: .milliseconds(150))
             await paste(message, thenReturn: ready)
             return ready ? .sent(app: appName) : .pasted(app: appName)
@@ -173,28 +178,51 @@ enum ClaudeReply {
         AXUIElementSetAttributeValue(app, "AXManualAccessibility" as CFString, kCFBooleanTrue)
 
         for attempt in 0..<10 {
-            guard let window = axChildren(app, kAXWindowsAttribute).first ?? axElement(app, kAXFocusedWindowAttribute),
-                  let webArea = first(in: window, where: { axString($0, kAXRoleAttribute) == "AXWebArea" }) else {
+            guard let window = axChildren(app, kAXWindowsAttribute).first ?? axElement(app, kAXFocusedWindowAttribute) else {
+                ReplyLog.write("attempt \(attempt), no window yet")
                 Thread.sleep(forTimeInterval: 0.2)
                 continue
             }
-            // Titre de la page : « Titre de la session - Claude Code ».
-            let shown = axString(webArea, kAXTitleAttribute) ?? axString(webArea, kAXDescriptionAttribute) ?? ""
-            if shown == title || shown.hasPrefix(title + " - ") {
-                guard let composer = first(in: webArea, where: {
-                    axString($0, kAXRoleAttribute) == "AXTextArea"
-                }) else { return false }
-                return AXUIElementSetAttributeValue(composer, kAXFocusedAttribute as CFString, kCFBooleanTrue) == .success
+            // La fenêtre contient plusieurs zones web : on prend celle de la conversation, reconnue
+            // à son titre (« Titre - Claude Code ») ou, à défaut, à son en-tête.
+            var webAreas: [AXUIElement] = []
+            collect(in: window, into: &webAreas) { axString($0, kAXRoleAttribute) == "AXWebArea" }
+            let conversation = webAreas.first { area in
+                let shown = axString(area, kAXTitleAttribute) ?? axString(area, kAXDescriptionAttribute) ?? ""
+                return shown == title || shown.hasPrefix(title + " - ")
+            } ?? webAreas.first { area in
+                first(in: area, where: { axString($0, kAXRoleAttribute) == "AXHeading" && axString($0, kAXTitleAttribute) == title }) != nil
+            }
+            ReplyLog.write("attempt \(attempt), \(webAreas.count) web areas, conversation found \(conversation != nil)")
+
+            if let conversation {
+                guard let composer = first(in: conversation, where: { axString($0, kAXRoleAttribute) == "AXTextArea" }) else {
+                    ReplyLog.write("no message field found")
+                    return false
+                }
+                let status = AXUIElementSetAttributeValue(composer, kAXFocusedAttribute as CFString, kCFBooleanTrue)
+                ReplyLog.write("focus status \(status.rawValue)")
+                return status == .success
             }
             // Autre conversation affichée : on clique une fois sur celle de la session.
-            if attempt == 0, let entry = first(in: window, where: {
+            if attempt == 1, let entry = first(in: window, where: {
                 axString($0, kAXRoleAttribute) == "AXButton" && axString($0, kAXTitleAttribute) == title
             }) {
+                ReplyLog.write("opening the session from the sidebar")
                 AXUIElementPerformAction(entry, kAXPressAction as CFString)
             }
             Thread.sleep(forTimeInterval: 0.3)
         }
         return false
+    }
+
+    private nonisolated static func collect(in element: AXUIElement, into results: inout [AXUIElement],
+                                            depth: Int = 0, where match: (AXUIElement) -> Bool) {
+        if match(element) { results.append(element) }
+        guard depth < 40 else { return }
+        for child in axChildren(element, kAXChildrenAttribute) {
+            collect(in: child, into: &results, depth: depth + 1, where: match)
+        }
     }
 
     private nonisolated static func first(in element: AXUIElement, where match: (AXUIElement) -> Bool,
@@ -295,5 +323,21 @@ enum ClaudeReply {
 
     private static func escaped(_ text: String) -> String {
         text.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
+    }
+}
+
+/// Journal de diagnostic de l'envoi des réponses (sans le texte des messages), dans le dossier
+/// de données d'Encoche : `reply.log`.
+enum ReplyLog {
+    nonisolated static func write(_ line: String) {
+        let url = URL.appSupport.appendingPathComponent("reply.log")
+        let entry = "\(Date().formatted(date: .omitted, time: .standard)) \(line)\n"
+        if let handle = try? FileHandle(forWritingTo: url) {
+            handle.seekToEndOfFile()
+            handle.write(Data(entry.utf8))
+            try? handle.close()
+        } else {
+            try? Data(entry.utf8).write(to: url)
+        }
     }
 }
