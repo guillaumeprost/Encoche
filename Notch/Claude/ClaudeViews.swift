@@ -10,16 +10,23 @@ extension Color {
 struct ClaudeTab: View {
     @Environment(ClaudeCodeMonitor.self) private var monitor
 
+    @Environment(ClaudeAsk.self) private var ask
+
+    /// Sessions Claude Code à gauche, discussion à droite, champ de question sur toute la largeur en bas.
     var body: some View {
-        HStack(spacing: 20) {
-            AskPanel()
-            Rectangle()
-                .fill(.primary.opacity(0.12))
-                .frame(width: 1)
-                .padding(.vertical, 4)
-            SessionsPanel()
-                // Plus de place quand une session a des choses à montrer.
-                .frame(width: monitor.sessions.isEmpty ? 220 : 340)
+        VStack(spacing: 10) {
+            HStack(spacing: 20) {
+                SessionsPanel()
+                    .frame(width: 290)
+                Rectangle()
+                    .fill(.primary.opacity(0.12))
+                    .frame(width: 1)
+                    .padding(.vertical, 4)
+                AskPanel()
+            }
+            if ask.cliURL != nil {
+                ClaudeAskField()
+            }
         }
         .foregroundStyle(.primary)
     }
@@ -32,10 +39,7 @@ private struct AskPanel: View {
 
     var body: some View {
         if ask.cliURL != nil {
-            VStack(alignment: .leading, spacing: 8) {
-                ClaudeAskField()
-                responseArea
-            }
+            responseArea
             .contextMenu {
                 if !ask.askedQuestion.isEmpty {
                     Button("Nouvelle conversation") { ask.reset() }
@@ -69,11 +73,19 @@ private struct AskPanel: View {
             }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         } else if ask.askedQuestion.isEmpty {
-            Text("Entrée pour envoyer · Échap pour quitter le champ")
-                .font(.system(size: 11))
-                .foregroundStyle(.primary.opacity(0.4))
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .padding(.leading, 4)
+            VStack(spacing: 6) {
+                Image(systemName: "sparkle")
+                    .font(.system(size: 20))
+                    .foregroundStyle(Color.claude.opacity(0.7))
+                Text("Pose une question à Claude dans le champ ci-dessous")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.primary.opacity(0.5))
+                    .multilineTextAlignment(.center)
+                Text("Entrée pour envoyer · Échap pour quitter le champ")
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(.primary.opacity(0.35))
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
             ScrollViewReader { proxy in
                 ScrollView(.vertical) {
