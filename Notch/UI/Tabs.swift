@@ -15,7 +15,7 @@ enum NotchTab: String, CaseIterable {
         case .home: "music.note.house"
         case .calendar: "calendar"
         case .music: "music.note"
-        case .house: "homekit"
+        case .house: "square.2.layers.3d"
         case .shelf: "tray.full"
         case .clipboard: "doc.on.clipboard"
         case .notifications: "bell"
@@ -28,7 +28,7 @@ enum NotchTab: String, CaseIterable {
         case .home: "Accueil"
         case .calendar: "Calendrier"
         case .music: "Musique"
-        case .house: "Maison"
+        case .house: "Raccourcis"
         case .shelf: "Étagère"
         case .clipboard: "Presse-papier"
         case .notifications: "Notifications"
@@ -153,7 +153,13 @@ private struct TabButton: View {
     let tab: NotchTab
     let isSelected: Bool
     let action: () -> Void
+    @Environment(MusicController.self) private var music
     @State private var hovering = false
+
+    /// Une vidéo du navigateur (YouTube…) : un bouton lecture plutôt qu'une note de musique.
+    private var symbol: String {
+        tab == .music && music.isPlayingVideo ? "play.rectangle" : tab.symbol
+    }
 
     var body: some View {
         Button(action: action) {
@@ -163,8 +169,9 @@ private struct TabButton: View {
                     ClaudeMascot(mood: .idle, color: .primary)
                         .frame(width: 17)
                 } else {
-                    Image(systemName: tab.symbol)
+                    Image(systemName: symbol)
                         .font(.system(size: 12, weight: .semibold))
+                        .contentTransition(.symbolEffect(.replace))
                 }
             }
             .frame(width: Self.width, height: 22)

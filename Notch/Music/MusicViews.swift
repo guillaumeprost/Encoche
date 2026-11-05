@@ -528,7 +528,7 @@ private struct VideoPlayerView: View {
                     }
                     HStack {
                         Controls()
-                        if PictureInPicture.isSupported(music.externalPlayer) {
+                        if music.isPlayingVideo {
                             pipButton
                         }
                     }

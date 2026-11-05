@@ -32,6 +32,9 @@ final class MusicController {
     private(set) var source: Source?
     /// App d'un autre lecteur (navigateur pour YouTube…), suivie par le « À l'écoute » de macOS.
     private(set) var externalPlayer: String?
+
+    /// La lecture vient d'une vidéo dans le navigateur (YouTube…), pas d'une app de musique.
+    var isPlayingVideo: Bool { PictureInPicture.isSupported(externalPlayer) }
     private(set) var track: Track?
     private(set) var isPlaying = false
     private(set) var artwork: NSImage?

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Onglet Maison : une tuile par raccourci du dossier « Encoche » de l'app Raccourcis.
+/// Onglet Raccourcis : une tuile par raccourci du dossier « Encoche » de l'app Raccourcis.
 struct HomeControlView: View {
     @Environment(HomeShortcuts.self) private var home
 
@@ -30,12 +30,12 @@ struct HomeControlView: View {
 
     private var emptyState: some View {
         VStack(spacing: 8) {
-            Image(systemName: "homekit")
+            Image(systemName: "square.2.layers.3d")
                 .font(.system(size: 22))
                 .foregroundStyle(.primary.opacity(0.5))
             Text(home.hasFolder
-                 ? "Ajoute des raccourcis Maison dans le dossier « \(HomeShortcuts.folderName) » de Raccourcis"
-                 : "Crée un dossier « \(HomeShortcuts.folderName) » dans Raccourcis et mets-y tes raccourcis Maison")
+                 ? "Ajoute des raccourcis dans le dossier « \(HomeShortcuts.folderName) » de Raccourcis"
+                 : "Crée un dossier « \(HomeShortcuts.folderName) » dans Raccourcis et mets-y tes raccourcis")
                 .font(.system(size: 12))
                 .foregroundStyle(.primary.opacity(0.6))
                 .multilineTextAlignment(.center)

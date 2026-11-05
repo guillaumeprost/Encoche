@@ -19,7 +19,7 @@ Encoche vit dans l'encoche de l'écran. Noire en haut pour se fondre avec celle 
 - **Accueil** : le morceau en cours avec ses commandes, l'agenda du jour, et un champ pour poser une question à Claude.
 - **Calendrier** : le mois à gauche, l'agenda du jour choisi à droite, avec les boutons pour rejoindre les visios.
 - **Musique** : le lecteur (Musique, Spotify, et aussi YouTube dans le navigateur, Deezer, Podcasts…), et au choix les **paroles synchronisées** (la ligne chantée est mise en avant, un clic y saute) ou la **file d'attente** de Musique.
-- **Maison** : une tuile par raccourci du dossier « Encoche » de l'app Raccourcis (allumer une lampe, lancer une scène…).
+- **Raccourcis** : une tuile par raccourci du dossier « Encoche » de l'app Raccourcis (allumer une lampe, lancer une scène…).
 - **Étagère** : les dernières captures d'écran, à glisser où tu veux.
 - **Presse-papier** : l'historique de ce que tu as copié. Les mots de passe des gestionnaires sont ignorés.
 - **Notifications** : l'historique des notifications, conservé d'un redémarrage à l'autre.
@@ -124,7 +124,7 @@ swift scripts/make-icon.swift
 | `Notch/Music` | Musique et Spotify, paroles, file d'attente |
 | `Notch/Calendar` | Calendrier et rappels de réunion |
 | `Notch/Clipboard` | Historique du presse-papier |
-| `Notch/Home` | Onglet Maison (raccourcis) |
+| `Notch/Home` | Onglet Raccourcis |
 | `Notch/Shelf` | Étagère et captures d'écran |
 | `Notch/Notifications` | Notifications macOS, bannières, historique |
 | `Notch/Claude` | Questions à Claude, sessions Claude Code, réponses, hooks |
