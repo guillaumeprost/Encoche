@@ -238,12 +238,19 @@ final class ClaudeCodeMonitor {
         case .deny:
             output = ["behavior": "deny", "message": "Refusé depuis Encoche."]
         case .answer(let label):
-            // Comme dans le SDK : la question reçoit sa réponse dans « answers ».
-            var input = permission.input
-            if let question = (input["questions"] as? [[String: Any]])?.first?["question"] as? String {
-                input["answers"] = [question: label]
+            if let pid = sessions.first(where: { $0.id == permission.sessionID })?.pid, ClaudeReply.isInClaudeApp(pid) {
+                // App Claude : elle affiche sa propre question ; on la laisse faire et on clique
+                // sur la réponse choisie dans l'app.
+                output = nil
+                Task { _ = await ClaudeReply.send(label, toProcess: pid) }
+            } else {
+                // Terminal : comme dans le SDK, la question reçoit sa réponse dans « answers ».
+                var input = permission.input
+                if let question = (input["questions"] as? [[String: Any]])?.first?["question"] as? String {
+                    input["answers"] = [question: label]
+                }
+                output = ["behavior": "allow", "updatedInput": input]
             }
-            output = ["behavior": "allow", "updatedInput": input]
         case .terminal:
             output = nil
         }
