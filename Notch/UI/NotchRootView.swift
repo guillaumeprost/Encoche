@@ -53,23 +53,9 @@ struct NotchRootView: View {
                         .animation(spring.delay(0.06)),
                     removal: .opacity.animation(.easeOut(duration: 0.12))
                 ))
-            } else if vm.showsAlert, let alert = alerts.current {
-                VStack(spacing: 0) {
-                    Color.clear.frame(height: vm.notchSize.height)
-                    AlertBannerView(alert: alert)
-                        .padding(.horizontal, 16 + vm.topRadius)
-                        .padding(.top, 6)
-                        .padding(.bottom, 12)
-                        .frame(maxHeight: .infinity)
-                }
-                .onTapGesture { alerts.activate() }
-                .id(alert.id)
-                .transition(.asymmetric(
-                    insertion: .opacity.combined(with: .scale(scale: 0.9, anchor: .top)).animation(spring.delay(0.08)),
-                    removal: .opacity.animation(.easeOut(duration: 0.12))
-                ))
             } else {
-                // L'activité en cours reste affichée quand un indicateur (volume…) s'ajoute dessous.
+                // L'activité en cours reste affichée en haut quand une notification ou un
+                // indicateur (volume…) s'ajoute dessous, comme la Dynamic Island.
                 VStack(spacing: 0) {
                     ZStack {
                         if let primary = activities.first {
@@ -79,8 +65,24 @@ struct NotchRootView: View {
                                 .transition(.opacity)
                         }
                     }
-                    .frame(height: vm.showsHUD ? vm.notchSize.height : vm.activityHeight)
-                    if vm.showsHUD, let kind = hud.current {
+                    // Les icônes restent de part et d'autre de l'encoche, même sous une notification plus large.
+                    .frame(width: vm.notchSize.width + 2 * vm.activitySlotWidth + 2 * vm.topRadius)
+                    .frame(height: vm.showsHUD || vm.showsAlert ? vm.notchSize.height : vm.activityHeight)
+
+                    if vm.showsAlert, let alert = alerts.current {
+                        AlertBannerView(alert: alert)
+                            .padding(.horizontal, 16 + vm.topRadius)
+                            .padding(.top, 6)
+                            .padding(.bottom, 12)
+                            .frame(maxHeight: .infinity)
+                            .contentShape(Rectangle())
+                            .onTapGesture { alerts.activate() }
+                            .id(alert.id)
+                            .transition(.asymmetric(
+                                insertion: .opacity.combined(with: .scale(scale: 0.9, anchor: .top)).animation(spring.delay(0.08)),
+                                removal: .opacity.animation(.easeOut(duration: 0.12))
+                            ))
+                    } else if vm.showsHUD, let kind = hud.current {
                         HUDView(kind: kind)
                             .padding(.horizontal, 14 + vm.topRadius)
                             .frame(height: NotchViewModel.hudHeight)
