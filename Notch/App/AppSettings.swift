@@ -69,6 +69,23 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(showBluetoothActivity, forKey: "showBluetoothActivity") }
     }
 
+    /// Écran de verrouillage : cadenas dans l'encoche et lecteur de musique.
+    var showOnLockScreen: Bool = UserDefaults.standard.object(forKey: "showOnLockScreen") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(showOnLockScreen, forKey: "showOnLockScreen") }
+    }
+
+    var lockScreenMusic: Bool = UserDefaults.standard.object(forKey: "lockScreenMusic") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(lockScreenMusic, forKey: "lockScreenMusic") }
+    }
+
+    var lockSound: LockSound = UserDefaults.standard.string(forKey: "lockSound").flatMap(LockSound.init) ?? .none {
+        didSet { UserDefaults.standard.set(lockSound.rawValue, forKey: "lockSound") }
+    }
+
+    var unlockSound: LockSound = UserDefaults.standard.string(forKey: "unlockSound").flatMap(LockSound.init) ?? .none {
+        didSet { UserDefaults.standard.set(unlockSound.rawValue, forKey: "unlockSound") }
+    }
+
     /// Ouvre la fenêtre de réglages (branché par l'app au lancement).
     @ObservationIgnored var openSettings: () -> Void = {}
 

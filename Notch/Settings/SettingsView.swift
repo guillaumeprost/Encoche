@@ -76,6 +76,24 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Toggle("Afficher sur l'écran de verrouillage", isOn: $settings.showOnLockScreen)
+                    Toggle("Lecteur de musique", isOn: $settings.lockScreenMusic)
+                        .disabled(!settings.showOnLockScreen)
+                    Picker("Son de verrouillage", selection: $settings.lockSound) {
+                        ForEach(LockSound.allCases) { Text($0.label).tag($0) }
+                    }
+                    Picker("Son de déverrouillage", selection: $settings.unlockSound) {
+                        ForEach(LockSound.allCases) { Text($0.label).tag($0) }
+                    }
+                } header: {
+                    Text("Écran de verrouillage")
+                } footer: {
+                    Text("Un cadenas dans l'encoche et la musique en cours quand le Mac est verrouillé.")
+                }
+                .onChange(of: settings.lockSound) { settings.lockSound.play() }
+                .onChange(of: settings.unlockSound) { settings.unlockSound.play() }
+
+                Section {
                     Toggle("Claude Code au travail", isOn: $settings.showClaudeActivity)
                     Toggle("Téléchargements", isOn: $settings.showDownloadActivity)
                     Toggle("Appareils Bluetooth (AirPods…)", isOn: $settings.showBluetoothActivity)
