@@ -47,6 +47,9 @@ final class NotchViewModel {
 
     /// Largeur d'une case latérale de la « live activity » repliée.
     var activitySlotWidth: CGFloat { notchSize.height + 8 }
+    /// Une activité en direct agrandit un peu l'encoche vers le bas, pour qu'on la remarque.
+    static let activityExtraHeight: CGFloat = 7
+    var activityHeight: CGFloat { notchSize.height + Self.activityExtraHeight }
 
     /// Taille totale de la forme, évasements du haut compris.
     func shapeSize(showsActivity: Bool, extraHeight: CGFloat = 0) -> CGSize {
@@ -63,7 +66,7 @@ final class NotchViewModel {
             height = notchSize.height + Self.hudHeight
         } else if showsActivity {
             bodyWidth = notchSize.width + 2 * activitySlotWidth
-            height = notchSize.height
+            height = activityHeight
         } else {
             bodyWidth = notchSize.width
             height = notchSize.height

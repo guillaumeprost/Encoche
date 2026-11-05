@@ -76,30 +76,11 @@ struct NotchRootView: View {
                         .padding(.bottom, 2)
                 }
                 .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
-            } else if claudeCode.needsAttention {
-                CollapsedClaudeView(slotWidth: vm.activitySlotWidth)
+            } else if let primary = activities.first {
+                activityView(primary)
                     .padding(.horizontal, vm.topRadius)
-                    .frame(height: vm.notchSize.height)
-                    .transition(.opacity)
-            } else if privacy.isActive {
-                CollapsedPrivacyView(slotWidth: vm.activitySlotWidth)
-                    .padding(.horizontal, vm.topRadius)
-                    .frame(height: vm.notchSize.height)
-                    .transition(.opacity)
-            } else if showsDownload {
-                CollapsedDownloadView(slotWidth: vm.activitySlotWidth)
-                    .padding(.horizontal, vm.topRadius)
-                    .frame(height: vm.notchSize.height)
-                    .transition(.opacity)
-            } else if showsClaudeWorking {
-                CollapsedClaudeWorkingView(slotWidth: vm.activitySlotWidth)
-                    .padding(.horizontal, vm.topRadius)
-                    .frame(height: vm.notchSize.height)
-                    .transition(.opacity)
-            } else if music.showsActivity {
-                CollapsedMusicView(slotWidth: vm.activitySlotWidth)
-                    .padding(.horizontal, vm.topRadius)
-                    .frame(height: vm.notchSize.height)
+                    .frame(height: vm.activityHeight)
+                    .id(primary)
                     .transition(.opacity)
             }
         }
@@ -108,6 +89,17 @@ struct NotchRootView: View {
         .environment(\.colorScheme, glassActive ? systemColorScheme : .dark)
         .frame(width: size.width, height: size.height, alignment: .top)
         .clipShape(shape)
+        // Une deuxième activité en même temps : petite bulle à droite, comme sur iPhone.
+        .overlay(alignment: .topTrailing) {
+            if showsBubble, let second = activities.dropFirst().first {
+                ActivityBubble(activity: second)
+                    .frame(width: vm.activityHeight, height: vm.activityHeight)
+                    .offset(x: vm.activityHeight + 6)
+                    .id(second)
+                    .transition(.scale(scale: 0.4, anchor: .leading).combined(with: .opacity))
+            }
+        }
+        .animation(spring, value: activities)
         .contextMenu {
             Button("Réglages…") { settings.openSettings() }
             Divider()
@@ -139,12 +131,25 @@ struct NotchRootView: View {
 
     /// Une « live activity » occupe les côtés de l'encoche repliée, par priorité : Claude Code qui
     /// t'attend, caméra ou micro, téléchargement, Claude Code au travail, puis la musique.
-    private var showsActivity: Bool {
-        claudeCode.needsAttention || privacy.isActive || showsDownload || showsClaudeWorking || music.showsActivity
+    private var showsActivity: Bool { !activities.isEmpty }
+
+    private var activities: [LiveActivity] {
+        LiveActivity.active(settings: settings, claudeCode: claudeCode, privacy: privacy, downloads: downloads, music: music)
     }
 
-    private var showsDownload: Bool { settings.showDownloadActivity && downloads.showsActivity }
-    private var showsClaudeWorking: Bool { settings.showClaudeActivity && claudeCode.workingSession != nil }
+    /// La bulle n'accompagne que l'encoche repliée, sans notification ni indicateur.
+    private var showsBubble: Bool { !vm.isOpen && !vm.showsAlert && !vm.showsHUD && !vm.isRetracted }
+
+    @ViewBuilder
+    private func activityView(_ activity: LiveActivity) -> some View {
+        switch activity {
+        case .claudeWaiting: CollapsedClaudeView(slotWidth: vm.activitySlotWidth)
+        case .privacy: CollapsedPrivacyView(slotWidth: vm.activitySlotWidth)
+        case .download: CollapsedDownloadView(slotWidth: vm.activitySlotWidth)
+        case .claudeWorking: CollapsedClaudeWorkingView(slotWidth: vm.activitySlotWidth)
+        case .music: CollapsedMusicView(slotWidth: vm.activitySlotWidth)
+        }
+    }
 
     /// Teinte du verre d'après le réglage « Liquid Glass » de macOS : couleur de fond de
     /// l'apparence courante (clair ou sombre), plus ou moins opaque.

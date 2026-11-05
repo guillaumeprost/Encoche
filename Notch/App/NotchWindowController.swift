@@ -12,6 +12,7 @@ final class NotchWindowController {
     private let calendar: CalendarController
     private let claudeCode: ClaudeCodeMonitor
     private let privacy: PrivacyMonitor
+    private let downloads: DownloadMonitor
     private let settings: AppSettings
     private let alerts: AlertCenter
     private let panel: NotchPanel
@@ -29,6 +30,7 @@ final class NotchWindowController {
         calendar = services.calendar
         claudeCode = services.claudeCode
         privacy = services.privacy
+        downloads = services.downloads
         settings = services.settings
         alerts = services.alerts
         panel = NotchPanel(contentRect: NSRect(origin: .zero, size: Self.panelSize))
@@ -129,7 +131,9 @@ final class NotchWindowController {
     /// Zone active en coordonnées écran globales (origine en bas à gauche de l'écran principal).
     private func hotRect() -> NSRect {
         let size = viewModel.shapeSize(
-            showsActivity: claudeCode.needsAttention || privacy.isActive || music.showsActivity,
+            showsActivity: !LiveActivity.active(
+                settings: settings, claudeCode: claudeCode, privacy: privacy, downloads: downloads, music: music
+            ).isEmpty,
             extraHeight: NotchViewModel.extraHeight(for: settings.tab)
         )
         let rect = NSRect(x: screenFrame.midX - size.width / 2, y: screenFrame.maxY - size.height,

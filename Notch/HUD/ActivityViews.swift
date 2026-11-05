@@ -1,5 +1,76 @@
 import SwiftUI
 
+/// Activités en direct autour de l'encoche repliée, par ordre de priorité.
+enum LiveActivity: Hashable {
+    case claudeWaiting, privacy, download, claudeWorking, music
+
+    /// Activités en cours, la plus importante d'abord.
+    @MainActor
+    static func active(
+        settings: AppSettings, claudeCode: ClaudeCodeMonitor, privacy: PrivacyMonitor,
+        downloads: DownloadMonitor, music: MusicController
+    ) -> [LiveActivity] {
+        var list: [LiveActivity] = []
+        if claudeCode.needsAttention { list.append(.claudeWaiting) }
+        if privacy.isActive { list.append(.privacy) }
+        if settings.showDownloadActivity, downloads.showsActivity { list.append(.download) }
+        if settings.showClaudeActivity, claudeCode.workingSession != nil { list.append(.claudeWorking) }
+        if music.showsActivity { list.append(.music) }
+        return list
+    }
+}
+
+/// Deuxième activité, dans une petite bulle à droite de l'encoche (comme sur iPhone).
+struct ActivityBubble: View {
+    @Environment(ClaudeCodeMonitor.self) private var claudeCode
+    @Environment(PrivacyMonitor.self) private var privacy
+    @Environment(DownloadMonitor.self) private var downloads
+    @Environment(MusicController.self) private var music
+    let activity: LiveActivity
+
+    var body: some View {
+        ZStack {
+            Circle().fill(.black)
+            content
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch activity {
+        case .claudeWaiting:
+            Image(systemName: "hand.raised.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.claude)
+                .symbolEffect(.pulse)
+        case .privacy:
+            Image(systemName: privacy.isCameraInUse ? "video.fill" : "mic.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(privacy.isCameraInUse ? .green : .orange)
+        case .download:
+            ZStack {
+                ProgressRing(fraction: downloads.fraction, tint: .blue)
+                Image(systemName: "arrow.down").font(.system(size: 7, weight: .heavy)).foregroundStyle(.blue)
+            }
+            .frame(width: 17, height: 17)
+        case .claudeWorking:
+            let progress = claudeCode.workingSession?.planProgress
+            ZStack {
+                ProgressRing(
+                    fraction: progress.flatMap { $0.total > 0 ? Double($0.done) / Double($0.total) : nil },
+                    tint: .claude
+                )
+                Image(systemName: "sparkle").font(.system(size: 7, weight: .heavy)).foregroundStyle(Color.claude)
+            }
+            .frame(width: 17, height: 17)
+        case .music:
+            Artwork(image: music.artwork, cornerRadius: 11)
+                .frame(width: 22, height: 22)
+                .clipShape(Circle())
+        }
+    }
+}
+
 /// Anneau de progression des activités en direct.
 struct ProgressRing: View {
     /// Entre 0 et 1, ou `nil` pour un anneau qui tourne (durée inconnue).
