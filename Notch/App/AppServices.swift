@@ -13,6 +13,7 @@ struct AppServices {
     let bluetooth: BluetoothMonitor
     let focus: FocusMonitor
     let sidecar: SidecarController
+    let meeting: MeetingController
     let calls: CallMonitor
     let timer: TimerController
     let music: MusicController
@@ -48,6 +49,8 @@ struct AppServices {
         bluetooth.start()
         focus = FocusMonitor()
         sidecar = SidecarController()
+        meeting = MeetingController()
+        meeting.privacy = privacy
         calls = CallMonitor()
         calls.alerts = alerts
         calls.privacy = privacy
@@ -120,6 +123,7 @@ extension View {
             .environment(services.bluetooth)
             .environment(services.focus)
             .environment(services.sidecar)
+            .environment(services.meeting)
             .environment(services.calls)
             .environment(services.timer)
             .environment(services.music)

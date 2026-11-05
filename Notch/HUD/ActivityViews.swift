@@ -28,6 +28,7 @@ enum LiveActivity: Hashable {
 /// Deuxième activité, dans une petite bulle à droite de l'encoche (comme sur iPhone).
 struct ActivityBubble: View {
     @Environment(PrivacyMonitor.self) private var privacy
+    @Environment(MeetingController.self) private var meeting
     @Environment(DownloadMonitor.self) private var downloads
     @Environment(MusicController.self) private var music
     @Environment(CalendarController.self) private var calendar
@@ -53,9 +54,9 @@ struct ActivityBubble: View {
             ClaudeMascot(mood: .waiting)
                 .frame(width: 19)
         case .privacy:
-            Image(systemName: privacy.isCameraInUse ? "video.fill" : "mic.fill")
+            Image(systemName: meeting.isMuted ? "mic.slash.fill" : privacy.isCameraInUse ? "video.fill" : "mic.fill")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(privacy.isCameraInUse ? .green : .orange)
+                .foregroundStyle(meeting.isMuted ? .red : privacy.isCameraInUse ? .green : .orange)
         case .download:
             ZStack {
                 ProgressRing(fraction: downloads.fraction, tint: .blue)

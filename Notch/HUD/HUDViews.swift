@@ -75,21 +75,29 @@ struct BrightnessHUDView: View {
 /// Caméra ou micro utilisés : icône à gauche de l'encoche, point lumineux à droite.
 struct CollapsedPrivacyView: View {
     @Environment(PrivacyMonitor.self) private var privacy
+    @Environment(MeetingController.self) private var meeting
     let slotWidth: CGFloat
 
-    private var color: Color { privacy.isCameraInUse ? .green : .orange }
+    /// Rouge quand le micro est coupé depuis l'encoche, vert pour la caméra, orange pour le micro.
+    private var color: Color { meeting.isMuted ? .red : privacy.isCameraInUse ? .green : .orange }
+
+    private var symbol: String {
+        if meeting.isMuted { return "mic.slash.fill" }
+        return privacy.isCameraInUse ? "video.fill" : "mic.fill"
+    }
 
     var body: some View {
         CollapsedActivityLayout(slotWidth: slotWidth) {
-            Image(systemName: privacy.isCameraInUse ? "video.fill" : "mic.fill")
+            Image(systemName: symbol)
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(color)
+                .contentTransition(.symbolEffect(.replace))
         } trailing: {
             Circle()
                 .fill(color)
                 .frame(width: 7, height: 7)
                 .shadow(color: color.opacity(0.8), radius: 4)
         }
-        .help(privacy.isCameraInUse ? "Caméra en cours d'utilisation" : "Micro en cours d'utilisation")
+        .help(meeting.isMuted ? "Micro coupé" : privacy.isCameraInUse ? "Caméra en cours d'utilisation" : "Micro en cours d'utilisation")
     }
 }
