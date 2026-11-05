@@ -64,6 +64,12 @@ struct AppServices {
         calendar.startMeetingReminders()
         volume.setReplacesSystemHUD(settings.replaceSystemVolumeHUD)
         ask = ClaudeAsk()
+        ask.alerts = alerts
+        // Un clic sur la réponse : l'encoche s'ouvrira sur l'onglet Claude, en question rapide.
+        ask.openAnswer = { [weak ask] in
+            appSettings.tab = .claude
+            ask?.quickMode = true
+        }
         claudeUsage = ClaudeUsage()
         claudeQuota = ClaudeQuota()
         launchAtLogin = LaunchAtLogin()

@@ -1,13 +1,12 @@
 import Foundation
 import Observation
-import Security
 import SwiftUI
 
 /// Quotas de l'abonnement Claude (5 heures et semaine), comme dans l'app Claude et Claude Code.
 ///
 /// Anthropic les fournit à partir de la connexion de Claude Code, rangée dans le trousseau
-/// (« Claude Code-credentials »). Encoche la lit (macOS demande l'autorisation la première fois)
-/// et l'envoie seulement à `api.anthropic.com`. Rien n'est enregistré ni affiché.
+/// (« Claude Code-credentials »). Encoche la lit comme Claude Code, avec l'outil `security`, et
+/// l'envoie seulement à `api.anthropic.com`. Rien n'est enregistré ni affiché.
 /// Ce service n'est pas documenté publiquement : en cas d'échec, l'anneau disparaît.
 @Observable
 @MainActor
@@ -42,7 +41,7 @@ final class ClaudeQuota {
     // MARK: - Lecture
 
     private nonisolated static func fetch() async -> (fiveHour: Limit?, week: Limit?)? {
-        guard let token = await Task.detached(priority: .utility, operation: { accessToken() }).value else { return nil }
+        guard let token = await accessToken() else { return nil }
         var request = URLRequest(url: URL(string: "https://api.anthropic.com/api/oauth/usage")!, timeoutInterval: 10)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("oauth-2025-04-20", forHTTPHeaderField: "anthropic-beta")
@@ -71,31 +70,17 @@ final class ClaudeQuota {
         return Limit(used: min(max(percent / 100, 0), 1), resetsAt: resetsAt)
     }
 
-    /// Jeton de la connexion de Claude Code, lu dans le trousseau.
-    private nonisolated static func accessToken() -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "Claude Code-credentials",
-            kSecAttrAccount as String: NSUserName(),
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne,
-        ]
-        var item: CFTypeRef?
-        var status = SecItemCopyMatching(query as CFDictionary, &item)
-        if status == errSecItemNotFound {
-            // Selon les versions, le compte n'est pas le nom d'utilisateur : on cherche par service seul.
-            var byService = query
-            byService.removeValue(forKey: kSecAttrAccount as String)
-            status = SecItemCopyMatching(byService as CFDictionary, &item)
-        }
-        guard status == errSecSuccess, let data = item as? Data else {
-            NSLog("[Encoche] Claude credentials not readable from the keychain (status \(status))")
-            return nil
-        }
-        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+    /// Jeton de la connexion de Claude Code, lu dans le trousseau avec l'outil `security`.
+    /// C'est lui qu'utilise Claude Code : il y a déjà accès, et macOS ne redemande donc pas
+    /// d'autorisation quand Claude Code renouvelle sa connexion (ce qui réécrit l'élément).
+    private nonisolated static func accessToken() async -> String? {
+        guard let output = await ProcessRunner.run(
+            "/usr/bin/security", ["find-generic-password", "-s", "Claude Code-credentials", "-w"]
+        ), output.status == 0,
+              let root = try? JSONSerialization.jsonObject(with: Data(output.text.trimmingCharacters(in: .whitespacesAndNewlines).utf8)) as? [String: Any],
               let oauth = root["claudeAiOauth"] as? [String: Any],
               let token = oauth["accessToken"] as? String else {
-            NSLog("[Encoche] Claude credentials have an unexpected format")
+            NSLog("[Encoche] Claude credentials not readable")
             return nil
         }
         return token

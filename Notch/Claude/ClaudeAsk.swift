@@ -58,6 +58,9 @@ final class ClaudeAsk {
     private var sessionID: String?
     private var process: Process?
     private var task: Task<Void, Never>?
+    /// Pour annoncer la réponse (l'encoche a pu se refermer pendant qu'elle arrivait).
+    @ObservationIgnored var alerts: AlertCenter?
+    @ObservationIgnored var openAnswer: () -> Void = {}
 
     // MARK: - Questions
 
@@ -80,8 +83,23 @@ final class ClaudeAsk {
         task = Task { [weak self] in
             await self?.run(text, cli: cliURL)
             // Une question annulée a été remplacée : ne pas toucher à l'état de la suivante.
-            if !Task.isCancelled { self?.isStreaming = false }
+            guard !Task.isCancelled, let self else { return }
+            self.isStreaming = false
+            self.announceAnswer()
         }
+    }
+
+    /// Notification avec le début de la réponse ; un clic montre l'onglet Claude.
+    private func announceAnswer() {
+        guard errorMessage == nil, !answer.isEmpty else { return }
+        let plain = answer.replacingOccurrences(of: "\n", with: " ").replacingOccurrences(of: "**", with: "")
+        alerts?.post(NotchAlert(
+            icon: .symbol("sparkle", .claude),
+            source: "Claude",
+            title: "Claude a répondu · \(askedQuestion)",
+            body: plain.count > 300 ? String(plain.prefix(300)) + "…" : plain,
+            action: .run { [weak self] in self?.openAnswer() }
+        ))
     }
 
     func cancel() {
