@@ -24,7 +24,7 @@ enum ClaudeHooksInstaller {
     private static let toolEvents: Set<String> = ["PreToolUse", "PostToolUse", "PermissionRequest"]
 
     static let marker = "127.0.0.1:\(HookServer.port)\(HookServer.path)"
-    /// `$PPID` = processus Claude Code qui lance le hook : Notch remonte jusqu'à son app.
+    /// `$PPID` = processus Claude Code qui lance le hook : Encoche remonte jusqu'à son app.
     private static let pidHeader = "-H \"\(HookServer.pidHeader): $PPID\""
 
     static let command =

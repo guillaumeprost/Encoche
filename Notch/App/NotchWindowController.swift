@@ -86,20 +86,9 @@ final class NotchWindowController {
         // Le premier écran de la liste est l'écran principal choisi dans Réglages Système.
         viewModel.isPrimaryScreen = screen == NSScreen.screens.first
 
-        if screen.safeAreaInsets.top > 0,
-           let left = screen.auxiliaryTopLeftArea,
-           let right = screen.auxiliaryTopRightArea {
-            viewModel.notchSize = CGSize(
-                width: screen.frame.width - left.width - right.width,
-                height: screen.safeAreaInsets.top
-            )
-            viewModel.hasPhysicalNotch = true
-        } else {
-            // Écran sans encoche : on en simule une, à la hauteur de la barre de menus.
-            let menuBarHeight = screen.frame.maxY - screen.visibleFrame.maxY
-            viewModel.notchSize = CGSize(width: 190, height: menuBarHeight > 0 ? menuBarHeight : 24)
-            viewModel.hasPhysicalNotch = false
-        }
+        // Écran sans encoche : on en simule une, à la hauteur de la barre de menus.
+        viewModel.notchSize = screen.notchSize
+        viewModel.hasPhysicalNotch = screen.hasNotch
 
         let size = Self.panelSize
         panel.setFrame(

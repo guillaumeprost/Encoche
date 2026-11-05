@@ -25,11 +25,22 @@ enum ProcessOwner {
         return app.activate()
     }
 
+    /// Terminal du processus (`/dev/ttys003`), ou `nil` s'il n'en a pas (app Claude…).
+    static func ttyPath(of pid: pid_t) -> String? {
+        guard let device = info(of: pid)?.kp_eproc.e_tdev, device != -1,
+              let name = devname(device, S_IFCHR) else { return nil }
+        return "/dev/" + String(cString: name)
+    }
+
     private static func parent(of pid: pid_t) -> pid_t? {
+        info(of: pid)?.kp_eproc.e_ppid
+    }
+
+    private static func info(of pid: pid_t) -> kinfo_proc? {
         var info = kinfo_proc()
         var size = MemoryLayout<kinfo_proc>.stride
         var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]
         guard sysctl(&mib, u_int(mib.count), &info, &size, nil, 0) == 0, size > 0 else { return nil }
-        return info.kp_eproc.e_ppid
+        return info
     }
 }

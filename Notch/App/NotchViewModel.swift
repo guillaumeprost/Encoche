@@ -30,7 +30,7 @@ final class NotchViewModel {
     static let calendarExtraHeight: CGFloat = 96
     static let claudeExtraHeight: CGFloat = 110
 
-    /// Hauteur ajoutée à l'encoche ouverte selon l'onglet (accueil et calendrier sont plus hauts).
+    /// Hauteur ajoutée à l'encoche ouverte selon l'onglet (accueil, calendrier, musique et Claude).
     static func extraHeight(for tab: NotchTab) -> CGFloat {
         switch tab {
         case .home: return homeExtraHeight

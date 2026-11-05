@@ -12,8 +12,7 @@ final class ClaudeAsk {
     /// Dossier de travail des questions. Les hooks venant de ce dossier sont ignorés
     /// par `ClaudeCodeMonitor`, pour ne pas lister ces questions comme des sessions.
     static let workingDirectory: URL = {
-        let url = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Notch/ask", isDirectory: true)
+        let url = URL.appSupport.appendingPathComponent("ask", isDirectory: true)
         try? FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
     }()

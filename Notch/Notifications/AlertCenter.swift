@@ -197,12 +197,7 @@ private enum HistoryStore {
         "claude": .claude, "green": .green, "red": .red, "blue": .blue, "gray": .gray, "orange": .orange,
     ]
 
-    private static var url: URL {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Notch", isDirectory: true)
-        try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
-        return base.appendingPathComponent("notifications.json")
-    }
+    private static var url: URL { URL.appSupport.appendingPathComponent("notifications.json") }
 
     static func save(_ alerts: [NotchAlert]) {
         let stored = alerts.map { alert -> Stored in

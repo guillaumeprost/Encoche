@@ -28,6 +28,11 @@ final class BatteryMonitor {
 
     var symbol: String {
         if isCharging || isPluggedIn { return "battery.100percent.bolt" }
+        return Self.symbol(forLevel: level)
+    }
+
+    /// Symbole de batterie pour un niveau en pourcents (aussi pour les appareils Bluetooth).
+    static func symbol(forLevel level: Int) -> String {
         switch level {
         case ..<13: return "battery.0percent"
         case ..<38: return "battery.25percent"

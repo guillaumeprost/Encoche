@@ -85,9 +85,6 @@ final class VolumeController {
 
     @ObservationIgnored private let keys = VolumeKeyInterceptor()
     @ObservationIgnored var alerts: AlertCenter?
-    /// Les touches de volume sont interceptées (autorisation Accessibilité accordée).
-    var isReplacingSystemHUD: Bool { keys.isActive }
-
     /// Active ou non le remplacement de l'indicateur de macOS.
     func setReplacesSystemHUD(_ enabled: Bool) {
         guard enabled else {

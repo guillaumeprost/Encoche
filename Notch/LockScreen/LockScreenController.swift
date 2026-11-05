@@ -38,7 +38,7 @@ final class LockScreenController {
         guard settings.showOnLockScreen, let space = LockScreenSpace.shared, let screen = NSScreen.screens.first else { return }
         hideTask?.cancel()
         closeWindows()
-        notchSize = Self.notchSize(of: screen)
+        notchSize = screen.notchSize
         phase = .locked
 
         let notchWindow = makeWindow(
@@ -112,14 +112,7 @@ final class LockScreenController {
         windows.removeAll()
     }
 
-    private static func notchSize(of screen: NSScreen) -> CGSize {
-        if screen.safeAreaInsets.top > 0,
-           let left = screen.auxiliaryTopLeftArea, let right = screen.auxiliaryTopRightArea {
-            return CGSize(width: screen.frame.width - left.width - right.width, height: screen.safeAreaInsets.top)
-        }
-        let menuBarHeight = screen.frame.maxY - screen.visibleFrame.maxY
-        return CGSize(width: 190, height: menuBarHeight > 0 ? menuBarHeight : 24)
-    }
+
 }
 
 /// Sons proposés au verrouillage et au déverrouillage (sons système de macOS).

@@ -1,5 +1,4 @@
 import AppKit
-import Foundation
 import Observation
 
 /// File d'attente et paroles du morceau en cours, chargées à la demande (onglet Musique).
@@ -15,14 +14,21 @@ import Observation
 @MainActor
 final class MusicExtras {
     struct QueueItem: Identifiable, Equatable {
+        /// D'où vient le morceau, ce qui décide de ce que fait un clic.
+        enum Source: Equatable {
+            /// Lu dans la file d'attente de Musique.
+            case musicQueue
+            /// Morceau de la playlist en cours (bibliothèque), à cette position.
+            case playlist(index: Int)
+            /// Suite de l'album, d'après le catalogue d'Apple (page du morceau).
+            case catalog(URL?)
+        }
+
         let id: Int
-        /// Position dans la playlist de la bibliothèque (pour la lancer), ou 0.
-        let index: Int
+        let source: Source
         let title: String
         let artist: String
         let duration: Double
-        /// Page du morceau dans Apple Music (suite d'album).
-        var url: URL? = nil
     }
 
     struct LyricLine: Identifiable, Equatable {
@@ -67,24 +73,21 @@ final class MusicExtras {
 
     /// Lance un morceau de la file.
     func play(_ item: QueueItem) {
-        // Morceau lu dans la file de Musique : pas de moyen fiable de le lancer, on montre Musique.
-        if item.index < 0 {
+        switch item.source {
+        case .musicQueue:
+            // Pas de moyen fiable de lancer un morceau de la file : on montre Musique.
             music.open(.music)
-            return
-        }
-        if item.index == 0 {
-            // Morceau du catalogue : ouvert dans Musique.
-            if let url = item.url, let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Music") {
-                NSWorkspace.shared.open([url], withApplicationAt: app, configuration: NSWorkspace.OpenConfiguration())
+        case .catalog(let url):
+            guard let url, let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Music") else { return }
+            NSWorkspace.shared.open([url], withApplicationAt: app, configuration: NSWorkspace.OpenConfiguration())
+        case .playlist(let index):
+            guard music.source == .music else { return }
+            Task {
+                _ = await AppleScriptRunner.run(
+                    "tell application id \"com.apple.Music\" to play track \(index) of current playlist",
+                    cached: false
+                )
             }
-            return
-        }
-        guard music.source == .music else { return }
-        Task {
-            _ = await AppleScriptRunner.run(
-                "tell application id \"com.apple.Music\" to play track \(item.index) of current playlist",
-                cached: false
-            )
         }
     }
 
@@ -119,7 +122,7 @@ final class MusicExtras {
             switch result {
             case .entries(let entries):
                 queue = entries.enumerated().map { offset, entry in
-                    QueueItem(id: offset, index: -1, title: entry.title, artist: entry.artist, duration: 0)
+                    QueueItem(id: offset, source: .musicQueue, title: entry.title, artist: entry.artist, duration: 0)
                 }
                 queueTitle = nil
                 queueIsAlbum = false
@@ -159,10 +162,11 @@ final class MusicExtras {
             var items: [QueueItem] = []
             if result.numberOfItems >= 2 {
                 for position in 2...result.numberOfItems {
-                    guard let entry = result.atIndex(position), entry.numberOfItems >= 4 else { continue }
+                    guard let entry = result.atIndex(position), entry.numberOfItems >= 4,
+                          let index = entry.atIndex(1)?.int32Value, index > 0 else { continue }
                     items.append(QueueItem(
                         id: position,
-                        index: Int(entry.atIndex(1)?.int32Value ?? 0),
+                        source: .playlist(index: Int(index)),
                         title: entry.atIndex(2)?.stringValue ?? "",
                         artist: entry.atIndex(3)?.stringValue ?? "",
                         duration: entry.atIndex(4)?.doubleValue ?? 0
@@ -243,11 +247,10 @@ final class MusicExtras {
         return following.enumerated().map { offset, song in
             QueueItem(
                 id: offset,
-                index: 0,
+                source: .catalog(song.trackViewUrl.flatMap(URL.init(string:))),
                 title: song.trackName ?? "",
                 artist: song.artistName ?? "",
-                duration: (song.trackTimeMillis ?? 0) / 1000,
-                url: song.trackViewUrl.flatMap(URL.init(string:))
+                duration: (song.trackTimeMillis ?? 0) / 1000
             )
         }
     }

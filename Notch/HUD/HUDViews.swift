@@ -80,17 +80,15 @@ struct CollapsedPrivacyView: View {
     private var color: Color { privacy.isCameraInUse ? .green : .orange }
 
     var body: some View {
-        HStack(spacing: 0) {
+        CollapsedActivityLayout(slotWidth: slotWidth) {
             Image(systemName: privacy.isCameraInUse ? "video.fill" : "mic.fill")
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(color)
-                .frame(width: slotWidth)
-            Spacer(minLength: 0)
+        } trailing: {
             Circle()
                 .fill(color)
                 .frame(width: 7, height: 7)
                 .shadow(color: color.opacity(0.8), radius: 4)
-                .frame(width: slotWidth)
         }
         .help(privacy.isCameraInUse ? "Caméra en cours d'utilisation" : "Micro en cours d'utilisation")
     }

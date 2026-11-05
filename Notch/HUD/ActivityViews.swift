@@ -54,12 +54,8 @@ struct ActivityBubble: View {
             }
             .frame(width: 17, height: 17)
         case .claudeWorking:
-            let progress = claudeCode.workingSession?.planProgress
             ZStack {
-                ProgressRing(
-                    fraction: progress.flatMap { $0.total > 0 ? Double($0.done) / Double($0.total) : nil },
-                    tint: .claude
-                )
+                ProgressRing(fraction: claudeCode.workingSession?.planFraction, tint: .claude)
                 Image(systemName: "sparkle").font(.system(size: 7, weight: .heavy)).foregroundStyle(Color.claude)
             }
             .frame(width: 17, height: 17)
@@ -67,6 +63,27 @@ struct ActivityBubble: View {
             Artwork(image: music.artwork, cornerRadius: 11)
                 .frame(width: 22, height: 22)
                 .clipShape(Circle())
+        }
+    }
+}
+
+/// Disposition des activités repliées : un élément de chaque côté de l'encoche.
+struct CollapsedActivityLayout<Leading: View, Trailing: View>: View {
+    let slotWidth: CGFloat
+    let leading: Leading
+    let trailing: Trailing
+
+    init(slotWidth: CGFloat, @ViewBuilder leading: () -> Leading, @ViewBuilder trailing: () -> Trailing) {
+        self.slotWidth = slotWidth
+        self.leading = leading()
+        self.trailing = trailing()
+    }
+
+    var body: some View {
+        HStack(spacing: 0) {
+            leading.frame(width: slotWidth)
+            Spacer(minLength: 0)
+            trailing.frame(width: slotWidth)
         }
     }
 }
@@ -107,23 +124,15 @@ struct CollapsedClaudeWorkingView: View {
 
     var body: some View {
         let session = monitor.workingSession
-        let progress = session?.planProgress
-        HStack(spacing: 0) {
+        CollapsedActivityLayout(slotWidth: slotWidth) {
             Image(systemName: "sparkle")
                 .font(.system(size: 13, weight: .bold))
                 .foregroundStyle(Color.claude)
                 .symbolEffect(.pulse)
-                .frame(width: slotWidth)
-            Spacer(minLength: 0)
-            Group {
-                if let progress, progress.total > 0 {
-                    ProgressRing(fraction: Double(progress.done) / Double(progress.total), tint: .claude)
-                } else {
-                    ProgressRing(fraction: nil, tint: .claude)
-                }
-            }
-            .frame(width: 15, height: 15)
-            .frame(width: slotWidth)
+        } trailing: {
+            // Avancement du plan, ou anneau qui tourne sans plan.
+            ProgressRing(fraction: session?.planFraction, tint: .claude)
+                .frame(width: 15, height: 15)
         }
         .help(session.map { "\($0.title ?? $0.projectName) · \($0.detail ?? "en cours")" } ?? "Claude travaille")
     }
@@ -135,7 +144,7 @@ struct CollapsedDownloadView: View {
     let slotWidth: CGFloat
 
     var body: some View {
-        HStack(spacing: 0) {
+        CollapsedActivityLayout(slotWidth: slotWidth) {
             ZStack {
                 if downloads.finishedName != nil {
                     Image(systemName: "checkmark.circle.fill")
@@ -150,8 +159,7 @@ struct CollapsedDownloadView: View {
                         .foregroundStyle(.blue)
                 }
             }
-            .frame(width: slotWidth)
-            Spacer(minLength: 0)
+        } trailing: {
             Group {
                 if downloads.finishedName != nil {
                     Image(systemName: "folder.fill").foregroundStyle(.blue)
@@ -163,7 +171,6 @@ struct CollapsedDownloadView: View {
                 }
             }
             .font(.system(size: 12))
-            .frame(width: slotWidth)
         }
         .animation(.snappy, value: downloads.finishedName)
         .help(downloads.finishedName.map { "\($0) téléchargé" } ?? downloads.currentName ?? "Téléchargement")
@@ -188,7 +195,7 @@ struct DeviceHUDView: View {
                 Spacer(minLength: 4)
                 if let battery = event.battery, event.isConnected {
                     HStack(spacing: 3) {
-                        Image(systemName: Self.batterySymbol(battery))
+                        Image(systemName: BatteryMonitor.symbol(forLevel: battery))
                             .symbolRenderingMode(.hierarchical)
                         Text("\(battery) %")
                     }
@@ -206,13 +213,4 @@ struct DeviceHUDView: View {
         }
     }
 
-    private static func batterySymbol(_ level: Int) -> String {
-        switch level {
-        case ..<13: return "battery.0percent"
-        case ..<38: return "battery.25percent"
-        case ..<63: return "battery.50percent"
-        case ..<88: return "battery.75percent"
-        default: return "battery.100percent"
-        }
-    }
 }

@@ -52,6 +52,26 @@ enum ClaudeActivity {
         return text.replacingOccurrences(of: "\n", with: " ")
     }
 
+    /// Résumé court de ce qu'un outil s'apprête à faire, pour une demande de permission
+    /// (la commande, le fichier, l'adresse…).
+    static func summarize(tool: String, input: [String: Any]) -> String {
+        let value: String?
+        switch tool {
+        case "Bash":
+            value = input["command"] as? String
+        case "Edit", "MultiEdit", "Write", "Read", "NotebookEdit":
+            value = (input["file_path"] as? String ?? input["notebook_path"] as? String)
+                .map { URL(fileURLWithPath: $0).lastPathComponent }
+        case "WebFetch":
+            value = input["url"] as? String
+        case "WebSearch":
+            value = input["query"] as? String
+        default:
+            value = input["description"] as? String
+        }
+        return shorten(value ?? tool, 140)
+    }
+
     /// Met à jour le plan quand Claude écrit sa liste de tâches
     /// (`TodoWrite` dans le terminal, `update_plan` dans l'app Claude).
     static func applyPlan(tool: String, input: [String: Any], to plan: inout [ClaudeCodeSession.PlanItem]) {

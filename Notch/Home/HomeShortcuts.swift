@@ -11,7 +11,7 @@ import SwiftUI
 @MainActor
 final class HomeShortcuts {
     static let folderName = "Encoche"
-    private static let tool = "/usr/bin/shortcuts"
+    private nonisolated static let tool = "/usr/bin/shortcuts"
 
     struct Shortcut: Identifiable, Hashable {
         let name: String
@@ -64,31 +64,10 @@ final class HomeShortcuts {
         }
     }
 
-    /// Lance `shortcuts` hors du fil principal. Renvoie sa sortie, ou `nil` en cas d'échec.
+    /// Lance `shortcuts`. Renvoie sa sortie, ou `nil` en cas d'échec.
     private nonisolated static func execute(_ arguments: [String]) async -> String? {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: tool)
-                process.arguments = arguments
-                let output = Pipe()
-                process.standardOutput = output
-                process.standardError = FileHandle.nullDevice
-                do {
-                    try process.run()
-                } catch {
-                    continuation.resume(returning: nil)
-                    return
-                }
-                let data = output.fileHandleForReading.readDataToEndOfFile()
-                process.waitUntilExit()
-                guard process.terminationStatus == 0 else {
-                    continuation.resume(returning: nil)
-                    return
-                }
-                continuation.resume(returning: String(decoding: data, as: UTF8.self))
-            }
-        }
+        guard let output = await ProcessRunner.run(tool, arguments), output.status == 0 else { return nil }
+        return output.text
     }
 }
 

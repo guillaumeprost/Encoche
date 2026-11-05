@@ -169,9 +169,8 @@ struct NotchRootView: View {
         Color(nsColor: .windowBackgroundColor).opacity(settings.systemGlassTint * 0.85)
     }
 
-    /// Ouverte ou notification, avec le Liquid Glass activé.
-    /// Notifications et indicateurs restent toujours noirs, comme l'encoche matérielle (effet
-    /// Dynamic Island) ; seule l'encoche ouverte peut passer en verre, si l'option est activée.
+    /// Ouverte, en style Liquid Glass. Notifications et activités restent toujours noires,
+    /// comme l'encoche matérielle (effet Dynamic Island) : seule l'encoche ouverte change de style.
     private var glassActive: Bool { vm.isOpen && settings.notchStyle == .glass }
 
     /// Ouverte en verre noir.
@@ -210,9 +209,9 @@ struct NotchRootView: View {
         )
     }
 
-    /// Noir pur par défaut, pour se fondre dans l'encoche physique, y compris ouverte et pour
-    /// les notifications. En option, l'encoche ouverte passe en Liquid Glass natif, qui suit
-    /// l'apparence du Mac et son réglage de transparence.
+    /// Fond selon le style choisi pour l'encoche ouverte : noir pur, verre noir (par défaut) ou
+    /// Liquid Glass natif, qui suit l'apparence du Mac et son réglage de transparence.
+    /// Repliée, l'encoche reste noire pour se fondre dans l'encoche physique.
     @ViewBuilder
     private func background(_ shape: NotchShape) -> some View {
         ZStack(alignment: .top) {

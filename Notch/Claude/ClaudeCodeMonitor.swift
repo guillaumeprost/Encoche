@@ -48,9 +48,18 @@ struct ClaudeCodeSession: Identifiable, Equatable {
         (plan.filter { $0.status == .completed }.count, plan.count)
     }
 
-    var projectName: String {
+    var projectName: String { Self.projectName(for: cwd) }
+
+    /// Nom du projet : le dossier de travail de la session.
+    static func projectName(for cwd: String) -> String {
         let name = URL(fileURLWithPath: cwd).lastPathComponent
         return name.isEmpty ? "Claude Code" : name
+    }
+
+    /// Avancement du plan entre 0 et 1, ou `nil` sans plan.
+    var planFraction: Double? {
+        let progress = planProgress
+        return progress.total > 0 ? Double(progress.done) / Double(progress.total) : nil
     }
 }
 
@@ -119,7 +128,7 @@ final class ClaudeCodeMonitor {
         if hooksInstalled { try? ClaudeHooksInstaller.install() }
 
         cleanupTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.removeStale() }
+            MainActor.assumeIsolated { self?.markStaleSessionsInactive() }
         }
         loadRecentSessions()
     }
@@ -127,11 +136,10 @@ final class ClaudeCodeMonitor {
     /// Retrouve les dernières sessions dans les transcriptions de Claude Code,
     /// pour que le sélecteur ne soit pas vide après un lancement.
     private func loadRecentSessions() {
-        let askFolder = ClaudeAsk.workingDirectory.standardizedFileURL.path
         Task {
             let found = await ClaudeTranscript.recentSessions(limit: Self.recentLimit + 3)
             for item in found where !sessions.contains(where: { $0.id == item.id }) {
-                guard let cwd = item.info.cwd, URL(fileURLWithPath: cwd).standardizedFileURL.path != askFolder else { continue }
+                guard let cwd = item.info.cwd, !isAskSession(cwd) else { continue }
                 var session = ClaudeCodeSession(id: item.id, cwd: cwd, state: .inactive, detail: nil, updatedAt: item.date)
                 session.title = item.info.title
                 session.prompt = item.info.lastPrompt
@@ -249,12 +257,11 @@ final class ClaudeCodeMonitor {
 
         let tool = event["tool_name"] as? String ?? "Outil"
         let input = event["tool_input"] as? [String: Any] ?? [:]
-        let project = URL(fileURLWithPath: cwd).lastPathComponent
         let permission = PendingPermission(
             sessionID: sessionID,
-            projectName: project.isEmpty ? "Claude Code" : project,
+            projectName: ClaudeCodeSession.projectName(for: cwd),
             toolName: tool,
-            summary: Self.summarize(tool: tool, input: input),
+            summary: ClaudeActivity.summarize(tool: tool, input: input),
             suggestions: event["permission_suggestions"] as? [[String: Any]] ?? [],
             reply: reply
         )
@@ -308,25 +315,6 @@ final class ClaudeCodeMonitor {
             permission.reply.send(nil)
             remove(permission)
         }
-    }
-
-    private static func summarize(tool: String, input: [String: Any]) -> String {
-        let value: String?
-        switch tool {
-        case "Bash":
-            value = input["command"] as? String
-        case "Edit", "MultiEdit", "Write", "Read", "NotebookEdit":
-            value = (input["file_path"] as? String ?? input["notebook_path"] as? String)
-                .map { URL(fileURLWithPath: $0).lastPathComponent }
-        case "WebFetch":
-            value = input["url"] as? String
-        case "WebSearch":
-            value = input["query"] as? String
-        default:
-            value = input["description"] as? String
-        }
-        let text = (value ?? tool).replacingOccurrences(of: "\n", with: " ")
-        return text.count > 140 ? String(text.prefix(140)) + "…" : text
     }
 
     // MARK: - Événements
@@ -483,7 +471,7 @@ final class ClaudeCodeMonitor {
     }
 
     /// Une session muette depuis longtemps est sans doute fermée : elle devient inactive.
-    private func removeStale() {
+    private func markStaleSessionsInactive() {
         let limit = Date().addingTimeInterval(-Self.staleAfter)
         for index in sessions.indices where sessions[index].updatedAt < limit && sessions[index].state != .inactive {
             sessions[index].state = .inactive

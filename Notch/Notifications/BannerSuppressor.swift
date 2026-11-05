@@ -1,8 +1,8 @@
 import AppKit
 import ApplicationServices
 
-/// Ferme les bannières de notification de macOS pendant que Notch tourne : les
-/// notifications ne s'affichent alors que dans l'encoche. Quand Notch est fermée,
+/// Ferme les bannières de notification de macOS pendant qu'Encoche tourne : les
+/// notifications ne s'affichent alors que dans l'encoche. Quand Encoche est fermée,
 /// rien n'est intercepté et macOS affiche ses bannières comme d'habitude.
 ///
 /// Passe par l'Accessibilité : chaque bannière est un élément `AXNotificationCenterBanner`

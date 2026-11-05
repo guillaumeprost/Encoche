@@ -1,5 +1,4 @@
 import AppKit
-import Darwin
 
 /// Envoie une réponse à une session Claude Code, depuis l'encoche.
 ///
@@ -28,7 +27,7 @@ enum ClaudeReply {
         guard !message.isEmpty else { return .failed("Message vide") }
         guard let app = ProcessOwner.app(of: pid) else { return .failed("Session introuvable") }
         let appName = app.localizedName ?? "l'app"
-        let tty = ttyPath(of: pid)
+        let tty = ProcessOwner.ttyPath(of: pid)
 
         switch (app.bundleIdentifier, tty) {
         case (iTermID, let tty?):
@@ -127,17 +126,6 @@ enum ClaudeReply {
     }
 
     // MARK: - Outils
-
-    /// Terminal du processus (`/dev/ttys003`), ou `nil` s'il n'en a pas (app Claude…).
-    private static func ttyPath(of pid: pid_t) -> String? {
-        var info = kinfo_proc()
-        var size = MemoryLayout<kinfo_proc>.stride
-        var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]
-        guard sysctl(&mib, u_int(mib.count), &info, &size, nil, 0) == 0, size > 0 else { return nil }
-        let device = info.kp_eproc.e_tdev
-        guard device != -1, let name = devname(device, S_IFCHR) else { return nil }
-        return "/dev/" + String(cString: name)
-    }
 
     private static func escaped(_ text: String) -> String {
         text.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")

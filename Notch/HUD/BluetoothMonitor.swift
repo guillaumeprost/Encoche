@@ -78,20 +78,8 @@ final class BluetoothMonitor: NSObject {
     }
 
     private nonisolated static func batteryLevel(address: String) async -> Int? {
-        await withCheckedContinuation { continuation in
-            DispatchQueue.global(qos: .utility).async {
-                let process = Process()
-                process.executableURL = URL(fileURLWithPath: "/usr/sbin/system_profiler")
-                process.arguments = ["SPBluetoothDataType", "-json"]
-                let output = Pipe()
-                process.standardOutput = output
-                process.standardError = FileHandle.nullDevice
-                guard (try? process.run()) != nil else { return continuation.resume(returning: nil) }
-                let data = output.fileHandleForReading.readDataToEndOfFile()
-                process.waitUntilExit()
-                continuation.resume(returning: parseBattery(data, address: address))
-            }
-        }
+        guard let output = await ProcessRunner.run("/usr/sbin/system_profiler", ["SPBluetoothDataType", "-json"]) else { return nil }
+        return parseBattery(output.data, address: address)
     }
 
     /// `SPBluetoothDataType[0].device_connected` : `[{ "Nom": { "device_address": …, "device_batteryLevelLeft": "80%" … } }]`.

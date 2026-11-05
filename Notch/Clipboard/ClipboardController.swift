@@ -53,8 +53,7 @@ final class ClipboardController {
     private let imagesURL: URL
 
     init() {
-        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Notch", isDirectory: true)
+        let base = URL.appSupport
         storeURL = base.appendingPathComponent("clipboard.json")
         imagesURL = base.appendingPathComponent("ClipboardImages", isDirectory: true)
         try? FileManager.default.createDirectory(at: imagesURL, withIntermediateDirectories: true)

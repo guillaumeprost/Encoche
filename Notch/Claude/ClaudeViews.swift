@@ -9,7 +9,6 @@ extension Color {
 
 struct ClaudeTab: View {
     @Environment(ClaudeCodeMonitor.self) private var monitor
-    @Environment(ClaudeAsk.self) private var ask
     @State private var selectedID: String?
     /// Le champ du bas répond à la session choisie (par défaut) ou pose une question rapide.
     @State private var quickQuestion = false
@@ -19,7 +18,8 @@ struct ClaudeTab: View {
         return sessions.first { $0.id == selectedID } ?? sessions.first
     }
 
-    /// Sessions Claude Code à gauche, discussion à droite, champ sur toute la largeur en bas.
+    /// Sélecteur des dernières sessions en haut, session choisie à gauche, discussion à droite,
+    /// champ sur toute la largeur en bas.
     var body: some View {
         let session = quickQuestion ? nil : selectedSession
         VStack(spacing: 10) {
@@ -27,7 +27,7 @@ struct ClaudeTab: View {
                 SessionChips(selectedID: $selectedID)
             }
             HStack(spacing: 20) {
-                SessionsPanel(selectedID: $selectedID)
+                SessionsPanel(session: selectedSession)
                     .frame(width: 290)
                 Rectangle()
                     .fill(.primary.opacity(0.12))
@@ -303,7 +303,7 @@ private struct AskPanel: View {
                                 .font(.system(size: 11, weight: .medium))
                                 .foregroundStyle(.primary.opacity(0.4))
                                 .lineLimit(1)
-                            Text(markdown(exchange.answer))
+                            Text(claudeMarkdown(exchange.answer))
                                 .font(.system(size: 13))
                                 .foregroundStyle(.primary.opacity(0.6))
                                 .textSelection(.enabled)
@@ -317,7 +317,7 @@ private struct AskPanel: View {
                         if ask.answer.isEmpty && ask.isStreaming {
                             ThinkingDots()
                         } else {
-                            Text(markdown(ask.answer))
+                            Text(claudeMarkdown(ask.answer))
                                 .font(.system(size: 13.5))
                                 .textSelection(.enabled)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -346,12 +346,7 @@ private struct AskPanel: View {
         }
     }
 
-    private func markdown(_ text: String) -> AttributedString {
-        (try? AttributedString(
-            markdown: text,
-            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-        )) ?? AttributedString(text)
-    }
+
 }
 
 private struct ThinkingDots: View {
@@ -424,13 +419,8 @@ struct ClaudeAskField: View {
 
 private struct SessionsPanel: View {
     @Environment(ClaudeCodeMonitor.self) private var monitor
-    @Binding var selectedID: String?
-
     /// Session affichée : celle choisie, sinon la plus urgente.
-    private var selected: ClaudeCodeSession? {
-        let sessions = monitor.sortedSessions
-        return sessions.first { $0.id == selectedID } ?? sessions.first
-    }
+    let session: ClaudeCodeSession?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -448,8 +438,8 @@ private struct SessionsPanel: View {
                         Text(error).font(.system(size: 10)).foregroundStyle(.orange)
                     }
                 }
-            } else if let selected {
-                SessionDetail(session: selected)
+            } else if let session {
+                SessionDetail(session: session)
             } else {
                 title
                 Text("Aucune session active")
@@ -725,13 +715,12 @@ struct CollapsedClaudeView: View {
     let slotWidth: CGFloat
 
     var body: some View {
-        HStack(spacing: 0) {
+        CollapsedActivityLayout(slotWidth: slotWidth) {
             Image(systemName: "sparkle")
                 .font(.system(size: 13, weight: .bold))
                 .foregroundStyle(Color.claude)
                 .symbolEffect(.pulse, isActive: monitor.waitingCount > 0)
-                .frame(width: slotWidth)
-            Spacer(minLength: 0)
+        } trailing: {
             Group {
                 if monitor.waitingCount > 0 {
                     HStack(spacing: 2) {
@@ -748,7 +737,6 @@ struct CollapsedClaudeView: View {
                 }
             }
             .font(.system(size: 12, weight: .semibold))
-            .frame(width: slotWidth)
         }
     }
 }

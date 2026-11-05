@@ -7,13 +7,11 @@ struct CollapsedMusicView: View {
     let slotWidth: CGFloat
 
     var body: some View {
-        HStack(spacing: 0) {
+        CollapsedActivityLayout(slotWidth: slotWidth) {
             Artwork(image: music.artwork, cornerRadius: 5)
                 .frame(width: 20, height: 20)
-                .frame(width: slotWidth)
-            Spacer(minLength: 0)
+        } trailing: {
             AudioBars(isPlaying: music.isPlaying, color: music.accent)
-                .frame(width: slotWidth)
         }
     }
 }

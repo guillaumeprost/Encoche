@@ -7,7 +7,7 @@ import SQLite3
 /// macOS n'offre pas d'API pour lire les notifications des autres apps : on lit la
 /// base où le Centre de notifications les enregistre (format non documenté, il peut
 /// changer avec une mise à jour de macOS — on échoue alors en silence).
-/// Cette base est protégée : il faut l'accès complet au disque pour Notch.
+/// Cette base est protégée : il faut l'accès complet au disque pour Encoche.
 @Observable
 @MainActor
 final class SystemNotificationWatcher {

@@ -60,7 +60,7 @@ struct AppServices {
         launchAtLogin = LaunchAtLogin()
         systemNotifications = SystemNotificationWatcher(alerts: alerts, settings: settings)
 
-        // Bannières de macOS fermées tant que Notch les relaie : seulement si le relais marche,
+        // Bannières de macOS fermées tant qu'Encoche les relaie : seulement si le relais marche,
         // pour ne jamais perdre une notification.
         bannerSuppressor = BannerSuppressor()
         let settings = settings, watcher = systemNotifications
