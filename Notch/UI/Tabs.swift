@@ -50,28 +50,47 @@ struct TopBar: View {
 
     /// Onglets centrés ; avec une encoche physique, répartis de part et d'autre de la caméra.
     var body: some View {
-        ZStack {
-            if vm.hasPhysicalNotch {
-                let tabs = NotchTab.allCases
-                let half = (tabs.count + 1) / 2
-                let sideWidth = CGFloat(half) * (TabButton.width + 4)
-                HStack(spacing: 0) {
-                    tabRow(Array(tabs.prefix(half)))
-                        .frame(width: sideWidth, alignment: .trailing)
-                    Color.clear.frame(width: vm.notchSize.width + 16)
-                    tabRow(Array(tabs.dropFirst(half)))
-                        .frame(width: sideWidth, alignment: .leading)
+        GeometryReader { geometry in
+            ZStack {
+                tabs
+                HStack(spacing: 4) {
+                    // Concentration et minuteur, dans la place laissée à gauche des onglets.
+                    StatusChips()
+                        .frame(maxWidth: max((geometry.size.width - tabsWidth) / 2 - 8, 0), alignment: .leading)
+                    Spacer()
+                    actions
                 }
-            } else {
-                tabRow(NotchTab.allCases)
             }
-            HStack(spacing: 4) {
-                Spacer()
-                actions
-            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
         }
         .foregroundStyle(.primary)
         .animation(.snappy(duration: 0.2), value: settings.tab)
+    }
+
+    /// Largeur occupée au centre par les onglets (et l'encoche physique).
+    private var tabsWidth: CGFloat {
+        let count = CGFloat(NotchTab.allCases.count)
+        guard vm.hasPhysicalNotch else { return count * (TabButton.width + 4) }
+        let half = CGFloat((NotchTab.allCases.count + 1) / 2)
+        return 2 * half * (TabButton.width + 4) + vm.notchSize.width + 16
+    }
+
+    @ViewBuilder
+    private var tabs: some View {
+        if vm.hasPhysicalNotch {
+            let tabs = NotchTab.allCases
+            let half = (tabs.count + 1) / 2
+            let sideWidth = CGFloat(half) * (TabButton.width + 4)
+            HStack(spacing: 0) {
+                tabRow(Array(tabs.prefix(half)))
+                    .frame(width: sideWidth, alignment: .trailing)
+                Color.clear.frame(width: vm.notchSize.width + 16)
+                tabRow(Array(tabs.dropFirst(half)))
+                    .frame(width: sideWidth, alignment: .leading)
+            }
+        } else {
+            tabRow(NotchTab.allCases)
+        }
     }
 
     private func tabRow(_ tabs: [NotchTab]) -> some View {
