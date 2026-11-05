@@ -11,7 +11,7 @@ struct ClaudeTab: View {
     @Environment(ClaudeCodeMonitor.self) private var monitor
     @State private var selectedID: String?
     /// Le champ du bas répond à la session choisie (par défaut) ou pose une question rapide.
-    @State private var quickQuestion = false
+    @Environment(ClaudeAsk.self) private var ask
 
     private var selectedSession: ClaudeCodeSession? {
         let sessions = monitor.sortedSessions
@@ -21,7 +21,8 @@ struct ClaudeTab: View {
     /// Sélecteur des dernières sessions en haut, session choisie à gauche, discussion à droite,
     /// champ sur toute la largeur en bas.
     var body: some View {
-        let session = quickQuestion ? nil : selectedSession
+        @Bindable var ask = ask
+        let session = ask.quickMode ? nil : selectedSession
         VStack(spacing: 10) {
             if monitor.hooksInstalled, monitor.sessions.count > 1 {
                 SessionChips(selectedID: $selectedID)
@@ -43,7 +44,7 @@ struct ClaudeTab: View {
                 ClaudeTabField(
                     session: session,
                     canReply: selectedSession != nil,
-                    quickQuestion: $quickQuestion
+                    quickQuestion: $ask.quickMode
                 )
                 // Quota hebdomadaire de l'abonnement, comme dans l'app Claude.
                 ClaudeQuotaRing()
@@ -54,13 +55,16 @@ struct ClaudeTab: View {
 }
 
 /// Champ du bas de l'onglet Claude : répond à une session, ou pose une question rapide.
-private struct ClaudeTabField: View {
+/// Champ Claude (onglet Claude et accueil) : répond à une session, ou pose une question rapide.
+struct ClaudeTabField: View {
     @Environment(ClaudeCodeMonitor.self) private var monitor
     @Environment(ClaudeAsk.self) private var ask
     @Environment(NotchViewModel.self) private var vm
     let session: ClaudeCodeSession?
     let canReply: Bool
     @Binding var quickQuestion: Bool
+    /// Appelé après l'envoi (l'accueil bascule alors sur l'onglet Claude pour montrer la suite).
+    var onSend: () -> Void = {}
 
     @State private var reply = ""
     @State private var feedback: ClaudeReply.Outcome?
@@ -174,6 +178,7 @@ private struct ClaudeTabField: View {
             sending = true
             focused = false
             Task {
+                onSend()
                 let outcome = await monitor.reply(text, to: session.id)
                 sending = false
                 feedback = outcome
@@ -184,6 +189,7 @@ private struct ClaudeTabField: View {
         } else {
             guard !ask.question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
             ask.send()
+            onSend()
         }
     }
 }
@@ -370,54 +376,6 @@ private struct ThinkingDots: View {
     }
 }
 
-/// Champ de question à Claude, utilisé dans l'onglet Claude et sur l'accueil.
-/// Garde l'encoche ouverte tant qu'il a le focus.
-struct ClaudeAskField: View {
-    @Environment(ClaudeAsk.self) private var ask
-    @Environment(NotchViewModel.self) private var vm
-    @FocusState private var focused: Bool
-    /// Appelé après l'envoi d'une question (l'accueil bascule alors sur l'onglet Claude).
-    var onSend: () -> Void = {}
-
-    var body: some View {
-        @Bindable var ask = ask
-        HStack(spacing: 8) {
-            Image(systemName: "sparkle")
-                .foregroundStyle(Color.claude)
-            TextField("Demande à Claude…", text: $ask.question)
-                .textFieldStyle(.plain)
-                .font(.system(size: 13))
-                .focused($focused)
-                .onSubmit(send)
-                .onExitCommand { focused = false }
-            if ask.isStreaming {
-                Button { ask.cancel() } label: {
-                    Image(systemName: "stop.circle.fill").font(.system(size: 15))
-                }
-                .buttonStyle(.plain)
-                .help("Arrêter")
-            } else if !ask.question.isEmpty {
-                Button(action: send) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.system(size: 15))
-                        .foregroundStyle(Color.claude)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(.horizontal, 12)
-        .frame(height: 32)
-        .glassEffect(.regular.tint(.primary.opacity(0.05)).interactive(), in: Capsule())
-        .onChange(of: focused) { vm.holdOpen = focused }
-        .onDisappear { vm.holdOpen = false }
-    }
-
-    private func send() {
-        guard !ask.question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-        ask.send()
-        onSend()
-    }
-}
 
 // MARK: - Sessions Claude Code
 
