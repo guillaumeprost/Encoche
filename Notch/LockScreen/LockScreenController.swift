@@ -17,6 +17,8 @@ final class LockScreenController {
     @ObservationIgnored private var hideTask: Task<Void, Never>?
 
     static let musicCardSize = CGSize(width: 420, height: 124)
+    /// Zone des cartes : assez basse pour ne jamais recouvrir le champ du mot de passe.
+    static let activitiesSize = CGSize(width: 420, height: 380)
 
     init(services: AppServices) {
         self.services = services
@@ -53,16 +55,15 @@ final class LockScreenController {
         )
         windows.append(notchWindow)
 
-        if settings.lockScreenMusic, services.music.track != nil {
-            let size = Self.musicCardSize
-            let musicWindow = makeWindow(
-                frame: NSRect(x: screen.frame.midX - size.width / 2, y: screen.frame.minY + 120,
-                              width: size.width, height: size.height),
-                content: LockMusicCard(),
-                clickable: true
-            )
-            windows.append(musicWindow)
-        }
+        // Activités et lecteur de musique, empilés en bas de l'écran ; mis à jour en direct.
+        let size = Self.activitiesSize
+        let activitiesWindow = makeWindow(
+            frame: NSRect(x: screen.frame.midX - size.width / 2, y: screen.frame.minY + 110,
+                          width: size.width, height: size.height),
+            content: LockActivitiesView(),
+            clickable: true
+        )
+        windows.append(activitiesWindow)
         windows.forEach(space.add)
     }
 
@@ -166,14 +167,10 @@ struct LockNotchView: View {
 
 /// Lecteur de musique en bas de l'écran verrouillé.
 struct LockMusicCard: View {
-    @Environment(LockScreenController.self) private var lock
-
     var body: some View {
         ExpandedMusicView()
             .padding(16)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .glassEffect(.regular.tint(.black.opacity(0.35)), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-            .opacity(lock.phase == .locked ? 1 : 0)
-            .animation(.easeOut(duration: 0.3), value: lock.phase)
     }
 }

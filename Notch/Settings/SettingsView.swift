@@ -77,6 +77,8 @@ struct SettingsView: View {
 
                 Section {
                     Toggle("Afficher sur l'écran de verrouillage", isOn: $settings.showOnLockScreen)
+                    Toggle("Activités en direct (minuteur, Claude, réunion…)", isOn: $settings.lockScreenActivities)
+                        .disabled(!settings.showOnLockScreen)
                     Toggle("Lecteur de musique", isOn: $settings.lockScreenMusic)
                         .disabled(!settings.showOnLockScreen)
                     Picker("Son de verrouillage", selection: $settings.lockSound) {

@@ -86,6 +86,10 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(lockScreenMusic, forKey: "lockScreenMusic") }
     }
 
+    var lockScreenActivities: Bool = UserDefaults.standard.object(forKey: "lockScreenActivities") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(lockScreenActivities, forKey: "lockScreenActivities") }
+    }
+
     var lockSound: LockSound = UserDefaults.standard.string(forKey: "lockSound").flatMap(LockSound.init) ?? .none {
         didSet { UserDefaults.standard.set(lockSound.rawValue, forKey: "lockSound") }
     }
