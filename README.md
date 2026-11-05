@@ -42,24 +42,18 @@ Quand une musique est chargée, une mini-pochette avec lecture/pause et suivant 
 - **Réglages** (clic droit sur l'encoche → Réglages…) : style de l'encoche (noir, verre noir, Liquid Glass), activités, écran de verrouillage, et l'état de chaque autorisation.
 - Très légère : environ 0,1 % de processeur au repos.
 
-## Configuration requise
-
-- macOS 26 ou plus récent
-- Xcode 26 et [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`)
-- Pour Claude : [Claude Code](https://claude.com/claude-code), connecté à ton abonnement. Encoche passe par la commande `claude`, sans clé d'API.
-
 ## Installation
 
-1. Crée une seule fois le certificat de signature local. Il garde la même identité à l'app d'un build à l'autre, et macOS conserve ainsi les autorisations accordées :
-   ```bash
-   ./scripts/create-signing-cert.sh
-   ```
-2. Compile et installe dans `/Applications`. Le script lance aussi l'app :
-   ```bash
-   ./scripts/install.sh
-   ```
+Il faut **macOS 26** ou plus récent, sur un Mac Apple Silicon ou Intel.
 
-Au premier lancement, Encoche s'ajoute aux éléments d'ouverture du Mac (désactivable dans les réglages).
+1. Télécharge **`Encoche-x.y.z.zip`** depuis la [dernière version](https://github.com/guillaumeprost/Encoche/releases/latest), ouvre-le et glisse **Encoche** dans le dossier **Applications**.
+2. Ouvre Encoche. macOS refuse la première fois, car l'app n'est pas notarisée par Apple : clique sur **OK**.
+3. Va dans **Réglages Système → Confidentialité et sécurité**, descends jusqu'à « Encoche a été bloquée » et clique sur **Ouvrir quand même**, puis confirme. C'est à faire une seule fois.
+4. Encoche apparaît dans l'encoche. Elle te propose les autorisations au fur et à mesure (voir plus bas) et s'ajoute aux éléments d'ouverture du Mac (désactivable dans ses réglages).
+
+Pour les fonctions Claude, il faut aussi [Claude Code](https://claude.com/claude-code), connecté à ton abonnement : Encoche passe par la commande `claude`, sans clé d'API. Tout le reste fonctionne sans.
+
+Pour mettre à jour, remplace l'app dans Applications par la nouvelle version : les autorisations sont conservées.
 
 ### Autorisations
 
@@ -93,11 +87,25 @@ Deux fonctions interrogent un service public, sans compte ni clé :
 
 ## Développement
 
+Il faut Xcode 26 et [XcodeGen](https://github.com/yonaskolb/XcodeGen) (`brew install xcodegen`).
+
+1. Crée une seule fois le certificat de signature local. Il garde la même identité à l'app d'un build à l'autre, et macOS conserve ainsi les autorisations accordées :
+   ```bash
+   ./scripts/create-signing-cert.sh
+   ```
+2. Compile et installe dans `/Applications` (le script lance aussi l'app) :
+   ```bash
+   ./scripts/install.sh
+   ```
+
+Pendant le développement :
+
 ```bash
 ./scripts/run.sh          # compile en Debug et relance l'app
+./scripts/release.sh      # version universelle zippée dans dist/, pour une Release GitHub
 ```
 
-Le projet Xcode est généré par XcodeGen depuis `project.yml`. Ne modifie pas le `.xcodeproj` : il n'est pas versionné.
+Le projet Xcode est généré par XcodeGen depuis `project.yml`. Ne modifie pas le `.xcodeproj` : il n'est pas versionné. La version de l'app (`CFBundleShortVersionString`) est aussi dans `project.yml`.
 
 L'icône est dessinée par code. Pour la retoucher, modifie le script puis relance-le :
 

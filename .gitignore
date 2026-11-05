@@ -3,3 +3,4 @@ build/
 *.xcodeproj
 Notch/Info.plist
 xcuserdata/
+dist/
