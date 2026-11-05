@@ -6,6 +6,7 @@ struct NotchRootView: View {
     @Environment(MusicController.self) private var music
     @Environment(HUDCenter.self) private var hud
     @Environment(PrivacyMonitor.self) private var privacy
+    @Environment(DownloadMonitor.self) private var downloads
     @Environment(ClaudeCodeMonitor.self) private var claudeCode
     @Environment(AlertCenter.self) private var alerts
     /// Apparence du Mac (clair / sombre).
@@ -84,6 +85,16 @@ struct NotchRootView: View {
                     .padding(.horizontal, vm.topRadius)
                     .frame(height: vm.notchSize.height)
                     .transition(.opacity)
+            } else if showsDownload {
+                CollapsedDownloadView(slotWidth: vm.activitySlotWidth)
+                    .padding(.horizontal, vm.topRadius)
+                    .frame(height: vm.notchSize.height)
+                    .transition(.opacity)
+            } else if showsClaudeWorking {
+                CollapsedClaudeWorkingView(slotWidth: vm.activitySlotWidth)
+                    .padding(.horizontal, vm.topRadius)
+                    .frame(height: vm.notchSize.height)
+                    .transition(.opacity)
             } else if music.showsActivity {
                 CollapsedMusicView(slotWidth: vm.activitySlotWidth)
                     .padding(.horizontal, vm.topRadius)
@@ -126,8 +137,14 @@ struct NotchRootView: View {
         vm.alertHasButtons = alerts.current?.isPersistent ?? false
     }
 
-    /// Une « live activity » occupe les côtés de l'encoche repliée : Claude Code en priorité, sinon la musique.
-    private var showsActivity: Bool { claudeCode.needsAttention || privacy.isActive || music.showsActivity }
+    /// Une « live activity » occupe les côtés de l'encoche repliée, par priorité : Claude Code qui
+    /// t'attend, caméra ou micro, téléchargement, Claude Code au travail, puis la musique.
+    private var showsActivity: Bool {
+        claudeCode.needsAttention || privacy.isActive || showsDownload || showsClaudeWorking || music.showsActivity
+    }
+
+    private var showsDownload: Bool { settings.showDownloadActivity && downloads.showsActivity }
+    private var showsClaudeWorking: Bool { settings.showClaudeActivity && claudeCode.workingSession != nil }
 
     /// Teinte du verre d'après le réglage « Liquid Glass » de macOS : couleur de fond de
     /// l'apparence courante (clair ou sombre), plus ou moins opaque.

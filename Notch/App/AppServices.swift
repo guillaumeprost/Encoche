@@ -9,6 +9,8 @@ struct AppServices {
     let battery: BatteryMonitor
     let brightness: BrightnessController
     let privacy: PrivacyMonitor
+    let downloads: DownloadMonitor
+    let bluetooth: BluetoothMonitor
     let music: MusicController
     let volume: VolumeController
     let calendar: CalendarController
@@ -31,6 +33,12 @@ struct AppServices {
         brightness = BrightnessController()
         brightness.hud = hud
         privacy = PrivacyMonitor()
+        downloads = DownloadMonitor()
+        bluetooth = BluetoothMonitor()
+        bluetooth.hud = hud
+        let appSettings = settings
+        bluetooth.isEnabled = { appSettings.showBluetoothActivity }
+        bluetooth.start()
         music = MusicController()
         volume = VolumeController()
         calendar = CalendarController()
@@ -83,6 +91,8 @@ extension View {
             .environment(services.battery)
             .environment(services.brightness)
             .environment(services.privacy)
+            .environment(services.downloads)
+            .environment(services.bluetooth)
             .environment(services.music)
             .environment(services.volume)
             .environment(services.calendar)

@@ -32,6 +32,19 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(replaceSystemVolumeHUD, forKey: "replaceSystemVolumeHUD") }
     }
 
+    /// Activités en direct autour de l'encoche repliée.
+    var showClaudeActivity: Bool = UserDefaults.standard.object(forKey: "showClaudeActivity") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(showClaudeActivity, forKey: "showClaudeActivity") }
+    }
+
+    var showDownloadActivity: Bool = UserDefaults.standard.object(forKey: "showDownloadActivity") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(showDownloadActivity, forKey: "showDownloadActivity") }
+    }
+
+    var showBluetoothActivity: Bool = UserDefaults.standard.object(forKey: "showBluetoothActivity") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(showBluetoothActivity, forKey: "showBluetoothActivity") }
+    }
+
     /// Ouvre la fenêtre de réglages (branché par l'app au lancement).
     @ObservationIgnored var openSettings: () -> Void = {}
 

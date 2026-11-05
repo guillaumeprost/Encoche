@@ -119,6 +119,11 @@ final class ClaudeCodeMonitor {
         }
     }
 
+    /// Session en train de travailler (la plus récente), pour l'activité en direct.
+    var workingSession: ClaudeCodeSession? {
+        sessions.filter { $0.state == .working }.max { $0.updatedAt < $1.updatedAt }
+    }
+
     var waitingCount: Int { sessions.filter { $0.state == .waiting }.count }
     /// L'encoche repliée signale en continu les sessions qui t'attendent
     /// (les fins de tâche passent par une notification).

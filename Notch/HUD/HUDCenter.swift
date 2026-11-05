@@ -9,6 +9,8 @@ final class HUDCenter {
         case volume
         case brightness
         case battery
+        /// Appareil Bluetooth connecté ou déconnecté.
+        case device
     }
 
     private(set) var current: Kind?

@@ -9,6 +9,7 @@ struct HUDView: View {
         case .volume: VolumeHUDView()
         case .brightness: BrightnessHUDView()
         case .battery: BatteryHUDView()
+        case .device: DeviceHUDView()
         }
     }
 }

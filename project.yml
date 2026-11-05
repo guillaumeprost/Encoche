@@ -23,6 +23,7 @@ targets:
         LSUIElement: true
         CFBundleDevelopmentRegion: fr
         NSCalendarsFullAccessUsageDescription: "Encoche affiche les événements de tes calendriers dans l'encoche."
+        NSBluetoothAlwaysUsageDescription: "Encoche affiche la connexion de tes appareils Bluetooth (AirPods, casque…) et leur batterie."
         NSAppleEventsUsageDescription: "Encoche pilote Musique et Spotify pour afficher et contrôler le morceau en cours."
     settings:
       base:

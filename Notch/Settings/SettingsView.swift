@@ -74,6 +74,16 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    Toggle("Claude Code au travail", isOn: $settings.showClaudeActivity)
+                    Toggle("Téléchargements", isOn: $settings.showDownloadActivity)
+                    Toggle("Appareils Bluetooth (AirPods…)", isOn: $settings.showBluetoothActivity)
+                } header: {
+                    Text("Activités en direct")
+                } footer: {
+                    Text("Affichées autour de l'encoche repliée, comme la musique, la caméra et le micro.")
+                }
+
+                Section {
                     Toggle("Remplacer les indicateurs de volume et de luminosité", isOn: Binding(
                         get: { settings.replaceSystemVolumeHUD },
                         set: {
