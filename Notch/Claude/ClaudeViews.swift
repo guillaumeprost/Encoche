@@ -19,7 +19,7 @@ struct ClaudeTab: View {
                 .padding(.vertical, 4)
             SessionsPanel()
                 // Plus de place quand une session a des choses à montrer.
-                .frame(width: monitor.sessions.isEmpty ? 220 : 330)
+                .frame(width: monitor.sessions.isEmpty ? 220 : 340)
         }
         .foregroundStyle(.primary)
     }
@@ -85,7 +85,7 @@ private struct AskPanel: View {
                                 .foregroundStyle(.primary.opacity(0.4))
                                 .lineLimit(1)
                             Text(markdown(exchange.answer))
-                                .font(.system(size: 12))
+                                .font(.system(size: 13))
                                 .foregroundStyle(.primary.opacity(0.6))
                                 .textSelection(.enabled)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -99,7 +99,7 @@ private struct AskPanel: View {
                             ThinkingDots()
                         } else {
                             Text(markdown(ask.answer))
-                                .font(.system(size: 12.5))
+                                .font(.system(size: 13.5))
                                 .textSelection(.enabled)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
@@ -268,11 +268,11 @@ private struct SessionsPanel: View {
                                 .scaleEffect(0.8)
                                 .frame(width: 12)
                             Text(session.projectName)
-                                .font(.system(size: 10.5, weight: .semibold))
+                                .font(.system(size: 12, weight: .semibold))
                                 .lineLimit(1)
                         }
-                        .padding(.horizontal, 8)
-                        .frame(height: 20)
+                        .padding(.horizontal, 10)
+                        .frame(height: 24)
                         .background(Capsule().fill(.primary.opacity(isSelected ? 0.16 : 0.06)))
                         .foregroundStyle(.primary.opacity(isSelected ? 1 : 0.6))
                         .contentShape(Capsule())
@@ -299,13 +299,13 @@ private struct SessionDetail: View {
                     if let prompt = session.prompt {
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
                             Image(systemName: "text.bubble")
-                                .font(.system(size: 10))
+                                .font(.system(size: 11.5))
                                 .foregroundStyle(Color.claude)
                                 .frame(width: 16)
                             Text(prompt)
-                                .font(.system(size: 11))
-                                .foregroundStyle(.primary.opacity(0.6))
-                                .lineLimit(2)
+                                .font(.system(size: 12.5))
+                                .foregroundStyle(.primary.opacity(0.65))
+                                .lineLimit(3)
                         }
                     }
                     status
@@ -324,7 +324,7 @@ private struct SessionDetail: View {
                             .frame(width: 16)
                             Image(systemName: "person.2.fill").font(.system(size: 9)).foregroundStyle(.primary.opacity(0.45))
                             Text(agent.name)
-                                .font(.system(size: 11))
+                                .font(.system(size: 12.5))
                                 .foregroundStyle(.primary.opacity(agent.isRunning ? 0.85 : 0.5))
                                 .lineLimit(1)
                         }
@@ -334,9 +334,9 @@ private struct SessionDetail: View {
                     }
                     if let message = session.lastMessage, session.state != .working {
                         Text(claudeMarkdown(message))
-                            .font(.system(size: 11.5))
-                            .foregroundStyle(.primary.opacity(0.8))
-                            .lineLimit(6)
+                            .font(.system(size: 13))
+                            .foregroundStyle(.primary.opacity(0.85))
+                            .lineLimit(10)
                             .textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(8)
@@ -357,12 +357,12 @@ private struct SessionDetail: View {
     private var header: some View {
         HStack(spacing: 6) {
             Text(session.title ?? session.projectName)
-                .font(.system(size: 13, weight: .bold))
+                .font(.system(size: 15, weight: .bold))
                 .lineLimit(1)
                 .layoutPriority(1)
             if session.title != nil {
                 Text(session.projectName)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.system(size: 12.5, weight: .medium))
                     .foregroundStyle(Color.claude)
                     .lineLimit(1)
             }
@@ -384,7 +384,7 @@ private struct SessionDetail: View {
             SessionStateIcon(state: session.state)
                 .frame(width: 16)
             Text(statusText)
-                .font(.system(size: 11.5, weight: .medium))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(session.state == .waiting ? Color.claude : .primary.opacity(0.85))
                 .lineLimit(2)
                 .contentTransition(.opacity)
@@ -415,10 +415,10 @@ private struct SessionDetail: View {
     private func smallButton(_ label: String, color: Color, filled: Bool = false, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(label)
-                .font(.system(size: 10.5, weight: .semibold))
+                .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(filled ? .white : color)
-                .padding(.horizontal, 9)
-                .frame(height: 20)
+                .padding(.horizontal, 11)
+                .frame(height: 24)
                 .background(Capsule().fill(filled ? color : .primary.opacity(0.08)))
                 .contentShape(Capsule())
         }
@@ -435,14 +435,14 @@ private struct PlanView: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 6) {
                 Image(systemName: "checklist")
-                    .font(.system(size: 10))
+                    .font(.system(size: 11.5))
                     .foregroundStyle(.primary.opacity(0.5))
                     .frame(width: 16)
                 Text("Progression")
-                    .font(.system(size: 10.5, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.primary.opacity(0.55))
                 Text("\(progress.done)/\(progress.total)")
-                    .font(.system(size: 10.5, weight: .semibold).monospacedDigit())
+                    .font(.system(size: 12, weight: .semibold).monospacedDigit())
                     .foregroundStyle(Color.claude)
                 ProgressView(value: Double(progress.done), total: Double(max(progress.total, 1)))
                     .progressViewStyle(.linear)
@@ -454,7 +454,7 @@ private struct PlanView: View {
                     icon(item.status)
                         .frame(width: 16)
                     Text(item.content)
-                        .font(.system(size: 11, weight: item.status == .inProgress ? .semibold : .regular))
+                        .font(.system(size: 12.5, weight: item.status == .inProgress ? .semibold : .regular))
                         .foregroundStyle(.primary.opacity(item.status == .completed ? 0.4 : item.status == .inProgress ? 0.95 : 0.65))
                         .strikethrough(item.status == .completed, color: .primary.opacity(0.3))
                         .lineLimit(1)
@@ -471,20 +471,20 @@ private struct PlanView: View {
         guard let start = plan.firstIndex(where: { $0.status != .completed }) else {
             return Array(plan.suffix(3))
         }
-        return Array(plan[start...].prefix(4))
+        return Array(plan[start...].prefix(6))
     }
 
     @ViewBuilder
     private func icon(_ status: ClaudeCodeSession.PlanItem.Status) -> some View {
         switch status {
         case .completed:
-            Image(systemName: "checkmark.circle.fill").font(.system(size: 10)).foregroundStyle(.green)
+            Image(systemName: "checkmark.circle.fill").font(.system(size: 11.5)).foregroundStyle(.green)
         case .inProgress:
-            Image(systemName: "circle.dotted.circle").font(.system(size: 10, weight: .semibold))
+            Image(systemName: "circle.dotted.circle").font(.system(size: 11.5, weight: .semibold))
                 .foregroundStyle(Color.claude)
                 .symbolEffect(.pulse)
         case .pending:
-            Image(systemName: "circle").font(.system(size: 10)).foregroundStyle(.primary.opacity(0.35))
+            Image(systemName: "circle").font(.system(size: 11.5)).foregroundStyle(.primary.opacity(0.35))
         }
     }
 }

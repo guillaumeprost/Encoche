@@ -37,15 +37,42 @@ enum NotchTab: String, CaseIterable {
 /// Bandeau du haut de l'encoche ouverte, de part et d'autre de l'encoche :
 /// onglets à gauche, actions de l'onglet courant à droite.
 struct TopBar: View {
+    @Environment(NotchViewModel.self) private var vm
     @Environment(AppSettings.self) private var settings
     @Environment(ClipboardController.self) private var clipboard
     @Environment(ClaudeCodeMonitor.self) private var claudeCode
     @Environment(AlertCenter.self) private var alerts
     @Environment(ShelfController.self) private var shelf
 
+    /// Onglets centrés ; avec une encoche physique, répartis de part et d'autre de la caméra.
     var body: some View {
+        ZStack {
+            if vm.hasPhysicalNotch {
+                let tabs = NotchTab.allCases
+                let half = (tabs.count + 1) / 2
+                let sideWidth = CGFloat(half) * (TabButton.width + 4)
+                HStack(spacing: 0) {
+                    tabRow(Array(tabs.prefix(half)))
+                        .frame(width: sideWidth, alignment: .trailing)
+                    Color.clear.frame(width: vm.notchSize.width + 16)
+                    tabRow(Array(tabs.dropFirst(half)))
+                        .frame(width: sideWidth, alignment: .leading)
+                }
+            } else {
+                tabRow(NotchTab.allCases)
+            }
+            HStack(spacing: 4) {
+                Spacer()
+                actions
+            }
+        }
+        .foregroundStyle(.primary)
+        .animation(.snappy(duration: 0.2), value: settings.tab)
+    }
+
+    private func tabRow(_ tabs: [NotchTab]) -> some View {
         HStack(spacing: 4) {
-            ForEach(NotchTab.allCases, id: \.self) { tab in
+            ForEach(tabs, id: \.self) { tab in
                 TabButton(tab: tab, isSelected: settings.tab == tab) { settings.tab = tab }
                     .overlay(alignment: .topTrailing) {
                         if tab == .claude, claudeCode.waitingCount > 0 {
@@ -55,7 +82,13 @@ struct TopBar: View {
                         }
                     }
             }
-            Spacer()
+        }
+    }
+
+    /// Actions de l'onglet courant, au bord droit.
+    @ViewBuilder
+    private var actions: some View {
+        HStack(spacing: 4) {
             if settings.tab == .clipboard, !clipboard.items.isEmpty {
                 IconButton(symbol: "trash", help: "Vider l'historique (les épinglés sont conservés)") {
                     withAnimation(.snappy) { clipboard.clearUnpinned() }
@@ -77,12 +110,12 @@ struct TopBar: View {
                 .transition(.opacity)
             }
         }
-        .foregroundStyle(.primary)
-        .animation(.snappy(duration: 0.2), value: settings.tab)
     }
 }
 
 private struct TabButton: View {
+    static let width: CGFloat = 28
+
     let tab: NotchTab
     let isSelected: Bool
     let action: () -> Void
@@ -92,7 +125,7 @@ private struct TabButton: View {
         Button(action: action) {
             Image(systemName: tab.symbol)
                 .font(.system(size: 12, weight: .semibold))
-                .frame(width: 30, height: 22)
+                .frame(width: Self.width, height: 22)
                 .background(
                     Capsule().fill(.primary.opacity(isSelected ? 0.2 : hovering ? 0.1 : 0))
                 )
