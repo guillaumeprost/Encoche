@@ -53,7 +53,9 @@ struct SettingsView: View {
                         Text("Ouverture au démarrage : seulement pour la copie installée dans Applications.")
                             .foregroundStyle(.secondary)
                     }
-                    Toggle("Liquid Glass pour l'encoche ouverte", isOn: $settings.useGlass)
+                    Picker("Encoche ouverte", selection: $settings.notchStyle) {
+                        ForEach(AppSettings.NotchStyle.allCases) { Text($0.label).tag($0) }
+                    }
                 }
 
                 Section {

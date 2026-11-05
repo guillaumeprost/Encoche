@@ -5,10 +5,34 @@ import Observation
 @Observable
 @MainActor
 final class AppSettings {
-    /// Liquid Glass pour l'encoche ouverte. Désactivé par défaut : en noir, l'encoche se fond
-    /// dans celle du Mac.
-    var useGlass: Bool = UserDefaults.standard.object(forKey: "useGlass") as? Bool ?? false {
-        didSet { UserDefaults.standard.set(useGlass, forKey: "useGlass") }
+    /// Apparence de l'encoche ouverte.
+    enum NotchStyle: String, CaseIterable, Identifiable {
+        /// Noir pur, comme l'encoche du Mac.
+        case black
+        /// Noir en haut, collé à l'encoche du Mac, qui s'éclaircit en verre vers le bas.
+        case darkGlass
+        /// Liquid Glass de macOS, qui suit l'apparence claire ou sombre.
+        case glass
+
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .black: return "Noir"
+            case .darkGlass: return "Verre noir"
+            case .glass: return "Liquid Glass"
+            }
+        }
+    }
+
+    var notchStyle: NotchStyle = AppSettings.initialNotchStyle() {
+        didSet { UserDefaults.standard.set(notchStyle.rawValue, forKey: "notchStyle") }
+    }
+
+    /// L'ancien réglage « Liquid Glass » (oui / non) est repris tel quel.
+    private static func initialNotchStyle() -> NotchStyle {
+        let defaults = UserDefaults.standard
+        if let raw = defaults.string(forKey: "notchStyle"), let style = NotchStyle(rawValue: raw) { return style }
+        return defaults.bool(forKey: "useGlass") ? .glass : .darkGlass
     }
 
     /// Relayer les notifications de macOS dans l'encoche.

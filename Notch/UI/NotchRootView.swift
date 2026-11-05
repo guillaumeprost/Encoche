@@ -155,7 +155,28 @@ struct NotchRootView: View {
     /// Ouverte ou notification, avec le Liquid Glass activé.
     /// Notifications et indicateurs restent toujours noirs, comme l'encoche matérielle (effet
     /// Dynamic Island) ; seule l'encoche ouverte peut passer en verre, si l'option est activée.
-    private var glassActive: Bool { vm.isOpen && settings.useGlass }
+    private var glassActive: Bool { vm.isOpen && settings.notchStyle == .glass }
+
+    /// Ouverte en verre noir.
+    private var darkGlassActive: Bool { vm.isOpen && settings.notchStyle == .darkGlass }
+
+    private var darkGlassGradient: LinearGradient {
+        let height = vm.shapeSize(
+            showsActivity: false,
+            extraHeight: settings.tab == .home ? NotchViewModel.homeExtraHeight : 0
+        ).height
+        let solid = min(max((vm.notchSize.height + 6) / max(height, 1), 0), 1)
+        return LinearGradient(
+            stops: [
+                .init(color: .black, location: 0),
+                .init(color: .black, location: solid),
+                .init(color: .black.opacity(0.78), location: min(solid + 0.25, 1)),
+                .init(color: .black.opacity(0.42), location: 1),
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
 
     /// Noir pur par défaut, pour se fondre dans l'encoche physique, y compris ouverte et pour
     /// les notifications. En option, l'encoche ouverte passe en Liquid Glass natif, qui suit
@@ -164,11 +185,20 @@ struct NotchRootView: View {
     private func background(_ shape: NotchShape) -> some View {
         ZStack(alignment: .top) {
             shape.fill(.black)
-                .opacity(glassActive ? 0 : 1)
+                .opacity(glassActive || darkGlassActive ? 0 : 1)
 
             Color.clear
                 .glassEffect(.regular.tint(glassTint), in: shape)
                 .opacity(glassActive ? 1 : 0)
+
+            // Verre noir : verre sombre sous un dégradé, noir pur sur la hauteur de l'encoche
+            // du Mac (elle s'y fond), puis de plus en plus transparent vers le bas.
+            ZStack {
+                Color.clear
+                    .glassEffect(.regular.tint(.black.opacity(0.45)), in: shape)
+                shape.fill(darkGlassGradient)
+            }
+            .opacity(darkGlassActive ? 1 : 0)
         }
     }
 }
