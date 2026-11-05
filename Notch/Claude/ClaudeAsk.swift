@@ -47,7 +47,10 @@ final class ClaudeAsk {
         case quickQuestion
     }
 
+    /// Destinataire du champ de l'onglet Claude (`nil` : la session choisie ou la plus urgente).
     var target: Target?
+    /// Destinataire du champ de l'accueil (`nil` : une nouvelle conversation dans Claude Chat).
+    var homeTarget: Target?
     /// Échanges précédents de la conversation en cours (le dernier est `askedQuestion` / `answer`).
     private(set) var history: [Exchange] = []
     private(set) var askedQuestion = ""

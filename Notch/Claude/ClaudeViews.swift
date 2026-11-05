@@ -42,7 +42,8 @@ struct ClaudeTab: View {
                 }
             }
             HStack(spacing: 6) {
-                ClaudeTabField(defaultSession: selectedSession)
+                @Bindable var ask = ask
+                ClaudeTabField(target: $ask.target, defaultSession: selectedSession)
                 // Quota hebdomadaire de l'abonnement, comme dans l'app Claude.
                 ClaudeQuotaRing()
             }
@@ -73,7 +74,9 @@ struct ClaudeTabField: View {
     @Environment(ClaudeCodeMonitor.self) private var monitor
     @Environment(ClaudeAsk.self) private var ask
     @Environment(NotchViewModel.self) private var vm
-    /// Session visée quand aucune n'a été choisie dans le menu.
+    /// Destinataire choisi dans le menu (propre à chaque champ : accueil, onglet Claude).
+    @Binding var target: ClaudeAsk.Target?
+    /// Session visée quand rien n'a été choisi ; sans session, une nouvelle conversation.
     let defaultSession: ClaudeCodeSession?
     /// Appelé après l'envoi d'une question rapide (l'accueil bascule alors sur l'onglet Claude).
     var onQuickQuestion: () -> Void = {}
@@ -102,7 +105,7 @@ struct ClaudeTabField: View {
         return session.map { .session($0) } ?? .newConversation
     }
 
-    private var resolved: Resolved { Self.resolve(ask.target, default: defaultSession, in: monitor) }
+    private var resolved: Resolved { Self.resolve(target, default: defaultSession, in: monitor) }
 
     var body: some View {
         @Bindable var ask = ask
@@ -166,7 +169,7 @@ struct ClaudeTabField: View {
                 Section("Dernières conversations") {
                     ForEach(Array(recent)) { session in
                         Button {
-                            ask.target = .session(session.id)
+                            target = .session(session.id)
                         } label: {
                             Label(session.title ?? session.projectName,
                                   systemImage: session.state == .inactive ? "moon.zzz" : "bubble.left.and.text.bubble.right")
@@ -175,13 +178,13 @@ struct ClaudeTabField: View {
                 }
             }
             Button {
-                ask.target = .newConversation
+                target = .newConversation
             } label: {
                 Label("Nouvelle conversation dans Claude", systemImage: "square.and.pencil")
             }
             Divider()
             Button {
-                ask.target = .quickQuestion
+                target = .quickQuestion
             } label: {
                 Label("Question rapide (réponse dans l'encoche)", systemImage: "sparkle")
             }
@@ -261,7 +264,7 @@ struct ClaudeTabField: View {
             } else {
                 outcome = await ClaudeReply.startNewConversation(text)
                 // La nouvelle conversation devient la plus récente : on y répondra ensuite.
-                if case .sent = outcome { ask.target = nil }
+                if case .sent = outcome, target == .newConversation { target = nil }
             }
             sending = false
             feedback = outcome

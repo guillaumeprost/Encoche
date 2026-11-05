@@ -206,13 +206,6 @@ private struct IconButton: View {
 struct HomeTab: View {
     @Environment(AppSettings.self) private var settings
     @Environment(ClaudeAsk.self) private var ask
-    @Environment(ClaudeCodeMonitor.self) private var claudeCode
-
-    /// Session à laquelle répond le champ : la plus urgente des sessions ouvertes.
-    private var session: ClaudeCodeSession? {
-        claudeCode.sortedSessions.first { $0.state != .inactive }
-    }
-
     var body: some View {
         VStack(spacing: 10) {
             HStack(spacing: 20) {
@@ -224,8 +217,13 @@ struct HomeTab: View {
                     .padding(.vertical, 4)
                 CalendarView()
             }
-            // Même champ que l'onglet Claude ; la réponse à une question rapide s'y affiche.
-            ClaudeTabField(defaultSession: session) { settings.tab = .claude }
+            // Même champ que l'onglet Claude. Par défaut, une nouvelle conversation dans Claude Chat ;
+            // la réponse à une question rapide s'affiche dans l'onglet Claude.
+            @Bindable var ask = ask
+            ClaudeTabField(target: $ask.homeTarget, defaultSession: nil) {
+                ask.target = .quickQuestion
+                settings.tab = .claude
+            }
         }
     }
 }
