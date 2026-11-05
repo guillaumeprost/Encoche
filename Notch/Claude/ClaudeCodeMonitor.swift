@@ -17,6 +17,34 @@ struct ClaudeCodeSession: Identifiable, Equatable {
     var updatedAt: Date
     /// Processus Claude Code (envoyé par les hooks) : sert à retrouver son app.
     var pid: pid_t?
+    /// Titre donné à la session par Claude Code (lu dans la transcription).
+    var title: String?
+    /// Dernière demande envoyée à Claude.
+    var prompt: String?
+    /// Plan de la tâche en cours (liste de tâches de Claude).
+    var plan: [PlanItem] = []
+    /// Agents lancés pendant la demande en cours.
+    var agents: [SubAgent] = []
+    /// Dernière réponse de Claude.
+    var lastMessage: String?
+    var transcriptPath: String?
+
+    struct PlanItem: Equatable, Identifiable {
+        enum Status: Equatable { case pending, inProgress, completed }
+        let id: Int
+        var content: String
+        var status: Status
+    }
+
+    struct SubAgent: Equatable, Identifiable {
+        let id: String
+        var name: String
+        var isRunning: Bool
+    }
+
+    var planProgress: (done: Int, total: Int) {
+        (plan.filter { $0.status == .completed }.count, plan.count)
+    }
 
     var projectName: String {
         let name = URL(fileURLWithPath: cwd).lastPathComponent
@@ -294,15 +322,55 @@ final class ClaudeCodeMonitor {
 
         let previousState = sessions.first { $0.id == id }?.state
 
+        let isNew = !sessions.contains { $0.id == id }
+        if let path = event["transcript_path"] as? String, !path.isEmpty {
+            upsert(id, cwd: cwd) { $0.transcriptPath = path }
+            // Session découverte en cours de route (Encoche relancé) : titre et demande sont dans la transcription.
+            if isNew && name != "SessionStart" && name != "UserPromptSubmit" { readTranscript(of: id) }
+        }
+
         switch name {
         case "SessionStart":
             upsert(id, cwd: cwd) { $0.state = .idle; $0.detail = nil }
+            readTranscript(of: id)
         case "UserPromptSubmit":
-            upsert(id, cwd: cwd) { $0.state = .working; $0.detail = nil }
+            let prompt = (event["prompt"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+            upsert(id, cwd: cwd) { session in
+                session.state = .working
+                session.detail = nil
+                session.prompt = prompt?.isEmpty == false ? prompt : session.prompt
+                session.agents = []
+                session.lastMessage = nil
+                // Plan terminé : il appartenait à la demande précédente.
+                if session.plan.allSatisfy({ $0.status == .completed }) { session.plan = [] }
+            }
+            readTranscript(of: id)
         case "PreToolUse":
-            upsert(id, cwd: cwd) { $0.state = .working; $0.detail = event["tool_name"] as? String }
+            let tool = event["tool_name"] as? String ?? ""
+            let input = event["tool_input"] as? [String: Any] ?? [:]
+            let toolUseID = event["tool_use_id"] as? String
+            upsert(id, cwd: cwd) { session in
+                session.state = .working
+                session.detail = ClaudeActivity.describe(tool: tool, input: input)
+                ClaudeActivity.applyPlan(tool: tool, input: input, to: &session.plan)
+                if ClaudeActivity.agentTools.contains(tool) {
+                    let name = (input["description"] as? String)
+                        ?? (input["subagent_type"] as? String) ?? "Agent"
+                    session.agents.append(.init(id: toolUseID ?? UUID().uuidString, name: name, isRunning: true))
+                }
+            }
         case "PostToolUse":
-            upsert(id, cwd: cwd) { $0.state = .working }
+            let tool = event["tool_name"] as? String ?? ""
+            let toolUseID = event["tool_use_id"] as? String
+            let input = event["tool_input"] as? [String: Any] ?? [:]
+            upsert(id, cwd: cwd) { session in
+                session.state = .working
+                guard ClaudeActivity.agentTools.contains(tool) else { return }
+                let name = input["description"] as? String
+                let index = session.agents.firstIndex { $0.id == toolUseID }
+                    ?? session.agents.firstIndex { $0.isRunning && $0.name == name }
+                if let index { session.agents[index].isRunning = false }
+            }
         case "Notification":
             let message = event["message"] as? String ?? ""
             let type = event["notification_type"] as? String ?? ""
@@ -322,7 +390,12 @@ final class ClaudeCodeMonitor {
                 action: .run { [weak self] in self?.focus(id) }
             ))
         case "Stop":
-            upsert(id, cwd: cwd) { $0.state = .done; $0.detail = nil }
+            upsert(id, cwd: cwd) { session in
+                session.state = .done
+                session.detail = nil
+                for index in session.agents.indices { session.agents[index].isRunning = false }
+            }
+            readTranscript(of: id)
             let project = sessions.first { $0.id == id }?.projectName ?? "Claude Code"
             alerts?.post(NotchAlert(
                 icon: .symbol("checkmark", .green),
@@ -354,6 +427,19 @@ final class ClaudeCodeMonitor {
         guard let index = sessions.firstIndex(where: { $0.id == id }) else { return }
         change(&sessions[index])
         sessions[index].updatedAt = Date()
+    }
+
+    /// Relit le titre de la session et la dernière réponse de Claude dans la transcription.
+    private func readTranscript(of id: String) {
+        guard let path = sessions.first(where: { $0.id == id })?.transcriptPath else { return }
+        Task {
+            let info = await ClaudeTranscript.read(path: path)
+            update(id) { session in
+                if let title = info.title { session.title = title }
+                if session.prompt == nil { session.prompt = info.lastPrompt }
+                if let message = info.lastMessage, session.state != .working { session.lastMessage = message }
+            }
+        }
     }
 
     private func removeStale() {

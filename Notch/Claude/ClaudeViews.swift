@@ -8,6 +8,8 @@ extension Color {
 // MARK: - Onglet Claude
 
 struct ClaudeTab: View {
+    @Environment(ClaudeCodeMonitor.self) private var monitor
+
     var body: some View {
         HStack(spacing: 20) {
             AskPanel()
@@ -16,7 +18,8 @@ struct ClaudeTab: View {
                 .frame(width: 1)
                 .padding(.vertical, 4)
             SessionsPanel()
-                .frame(width: 220)
+                // Plus de place quand une session a des choses à montrer.
+                .frame(width: monitor.sessions.isEmpty ? 220 : 330)
         }
         .foregroundStyle(.primary)
     }
@@ -202,17 +205,18 @@ struct ClaudeAskField: View {
 
 private struct SessionsPanel: View {
     @Environment(ClaudeCodeMonitor.self) private var monitor
+    @State private var selectedID: String?
+
+    /// Session affichée : celle choisie, sinon la plus urgente.
+    private var selected: ClaudeCodeSession? {
+        let sessions = monitor.sortedSessions
+        return sessions.first { $0.id == selectedID } ?? sessions.first
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text("Claude Code")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.primary.opacity(0.55))
-                Spacer()
-            }
-
+        VStack(alignment: .leading, spacing: 8) {
             if !monitor.hooksInstalled {
+                title
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Affiche l'état de tes sessions et te prévient quand l'une d'elles t'attend.")
                         .font(.system(size: 11))
@@ -225,24 +229,17 @@ private struct SessionsPanel: View {
                         Text(error).font(.system(size: 10)).foregroundStyle(.orange)
                     }
                 }
-            } else if monitor.sessions.isEmpty {
+            } else if let selected {
+                if monitor.sessions.count > 1 {
+                    chips(selected: selected.id)
+                }
+                SessionDetail(session: selected)
+            } else {
+                title
                 Text("Aucune session active")
                     .font(.system(size: 12))
                     .foregroundStyle(.primary.opacity(0.45))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView(.vertical) {
-                    VStack(spacing: 4) {
-                        ForEach(monitor.sortedSessions) { session in
-                            SessionRow(session: session)
-                                .onTapGesture { monitor.focus(session.id) }
-                                .contextMenu {
-                                    Button("Masquer") { monitor.dismiss(session) }
-                                }
-                        }
-                    }
-                }
-                .scrollIndicators(.never)
             }
         }
         .frame(maxHeight: .infinity, alignment: .top)
@@ -252,30 +249,167 @@ private struct SessionsPanel: View {
             }
         }
     }
+
+    private var title: some View {
+        Text("Claude Code")
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.primary.opacity(0.55))
+    }
+
+    /// Une pastille par session, pour passer de l'une à l'autre.
+    private func chips(selected: String) -> some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 4) {
+                ForEach(monitor.sortedSessions) { session in
+                    let isSelected = session.id == selected
+                    Button { selectedID = session.id } label: {
+                        HStack(spacing: 5) {
+                            SessionStateIcon(state: session.state)
+                                .scaleEffect(0.8)
+                                .frame(width: 12)
+                            Text(session.projectName)
+                                .font(.system(size: 10.5, weight: .semibold))
+                                .lineLimit(1)
+                        }
+                        .padding(.horizontal, 8)
+                        .frame(height: 20)
+                        .background(Capsule().fill(.primary.opacity(isSelected ? 0.16 : 0.06)))
+                        .foregroundStyle(.primary.opacity(isSelected ? 1 : 0.6))
+                        .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .contextMenu { Button("Masquer") { monitor.dismiss(session) } }
+                }
+            }
+        }
+        .scrollIndicators(.never)
+    }
 }
 
-private struct SessionRow: View {
+/// Ce que fait une session : demande, activité, agents, plan et dernière réponse.
+private struct SessionDetail: View {
     @Environment(ClaudeCodeMonitor.self) private var monitor
     let session: ClaudeCodeSession
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 6) {
             header
-            if let permission = monitor.permission(for: session.id) {
-                HStack(spacing: 6) {
-                    Spacer(minLength: 0)
-                    smallButton("Refuser", color: .red) { monitor.decide(permission, .deny) }
-                    smallButton("Autoriser", color: .claude, filled: true) { monitor.decide(permission, .allow) }
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: 6) {
+                    if let prompt = session.prompt {
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Image(systemName: "text.bubble")
+                                .font(.system(size: 10))
+                                .foregroundStyle(Color.claude)
+                                .frame(width: 16)
+                            Text(prompt)
+                                .font(.system(size: 11))
+                                .foregroundStyle(.primary.opacity(0.6))
+                                .lineLimit(2)
+                        }
+                    }
+                    status
+                    if let permission = monitor.permission(for: session.id) {
+                        permissionButtons(permission)
+                    }
+                    ForEach(session.agents) { agent in
+                        HStack(spacing: 6) {
+                            Group {
+                                if agent.isRunning {
+                                    ProgressView().controlSize(.mini).tint(Color.claude)
+                                } else {
+                                    Image(systemName: "checkmark").font(.system(size: 9, weight: .bold)).foregroundStyle(.green)
+                                }
+                            }
+                            .frame(width: 16)
+                            Image(systemName: "person.2.fill").font(.system(size: 9)).foregroundStyle(.primary.opacity(0.45))
+                            Text(agent.name)
+                                .font(.system(size: 11))
+                                .foregroundStyle(.primary.opacity(agent.isRunning ? 0.85 : 0.5))
+                                .lineLimit(1)
+                        }
+                    }
+                    if !session.plan.isEmpty {
+                        PlanView(session: session)
+                    }
+                    if let message = session.lastMessage, session.state != .working {
+                        Text(claudeMarkdown(message))
+                            .font(.system(size: 11.5))
+                            .foregroundStyle(.primary.opacity(0.8))
+                            .lineLimit(6)
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(.primary.opacity(0.07))
+                            )
+                    }
                 }
                 .padding(.bottom, 4)
             }
+            .scrollIndicators(.never)
         }
-        .padding(.horizontal, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(session.state == .waiting ? Color.claude.opacity(0.18) : .primary.opacity(0.06))
-        )
         .help(session.cwd)
+        .contextMenu { Button("Masquer") { monitor.dismiss(session) } }
+    }
+
+    private var header: some View {
+        HStack(spacing: 6) {
+            Text(session.title ?? session.projectName)
+                .font(.system(size: 13, weight: .bold))
+                .lineLimit(1)
+                .layoutPriority(1)
+            if session.title != nil {
+                Text(session.projectName)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Color.claude)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+            Button { monitor.focus(session.id) } label: {
+                Image(systemName: "arrow.up.forward.app")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.primary.opacity(0.6))
+                    .frame(width: 22, height: 22)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Ouvrir la session")
+        }
+    }
+
+    private var status: some View {
+        HStack(spacing: 6) {
+            SessionStateIcon(state: session.state)
+                .frame(width: 16)
+            Text(statusText)
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundStyle(session.state == .waiting ? Color.claude : .primary.opacity(0.85))
+                .lineLimit(2)
+                .contentTransition(.opacity)
+                .animation(.snappy, value: statusText)
+        }
+    }
+
+    private var statusText: String {
+        switch session.state {
+        case .idle: return "Prête"
+        case .working: return session.detail ?? "Réfléchit…"
+        case .waiting: return session.detail ?? "T'attend"
+        case .done: return "Terminé"
+        }
+    }
+
+    private func permissionButtons(_ permission: PendingPermission) -> some View {
+        HStack(spacing: 6) {
+            Spacer(minLength: 0)
+            smallButton("Refuser", color: .red) { monitor.decide(permission, .deny) }
+            if permission.canAllowAlways {
+                smallButton("Toujours", color: .claude) { monitor.decide(permission, .allowAlways) }
+            }
+            smallButton("Autoriser", color: .claude, filled: true) { monitor.decide(permission, .allow) }
+        }
     }
 
     private func smallButton(_ label: String, color: Color, filled: Bool = false, action: @escaping () -> Void) -> some View {
@@ -290,33 +424,77 @@ private struct SessionRow: View {
         }
         .buttonStyle(.plain)
     }
+}
 
-    private var header: some View {
-        HStack(spacing: 8) {
-            SessionStateIcon(state: session.state)
-                .frame(width: 16)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(session.projectName)
-                    .font(.system(size: 12, weight: .semibold))
-                    .lineLimit(1)
-                Text(subtitle)
+/// Plan de Claude : avancement et étapes.
+private struct PlanView: View {
+    let session: ClaudeCodeSession
+
+    var body: some View {
+        let progress = session.planProgress
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: "checklist")
                     .font(.system(size: 10))
-                    .foregroundStyle(session.state == .waiting ? Color.claude : .primary.opacity(0.5))
-                    .lineLimit(1)
+                    .foregroundStyle(.primary.opacity(0.5))
+                    .frame(width: 16)
+                Text("Progression")
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(.primary.opacity(0.55))
+                Text("\(progress.done)/\(progress.total)")
+                    .font(.system(size: 10.5, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(Color.claude)
+                ProgressView(value: Double(progress.done), total: Double(max(progress.total, 1)))
+                    .progressViewStyle(.linear)
+                    .tint(Color.claude)
+                    .controlSize(.mini)
             }
-            Spacer(minLength: 0)
+            ForEach(visibleItems) { item in
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    icon(item.status)
+                        .frame(width: 16)
+                    Text(item.content)
+                        .font(.system(size: 11, weight: item.status == .inProgress ? .semibold : .regular))
+                        .foregroundStyle(.primary.opacity(item.status == .completed ? 0.4 : item.status == .inProgress ? 0.95 : 0.65))
+                        .strikethrough(item.status == .completed, color: .primary.opacity(0.3))
+                        .lineLimit(1)
+                }
+            }
         }
-        .frame(height: 34)
+        .padding(.top, 2)
     }
 
-    private var subtitle: String {
-        switch session.state {
-        case .idle: return "Prête"
-        case .working: return session.detail.map { "En cours · \($0)" } ?? "En cours…"
-        case .waiting: return session.detail ?? "T'attend"
-        case .done: return "Terminé"
+    /// L'étape en cours et les suivantes : la barre résume déjà celles qui sont faites.
+    /// Plan terminé : on montre les dernières étapes.
+    private var visibleItems: [ClaudeCodeSession.PlanItem] {
+        let plan = session.plan
+        guard let start = plan.firstIndex(where: { $0.status != .completed }) else {
+            return Array(plan.suffix(3))
+        }
+        return Array(plan[start...].prefix(4))
+    }
+
+    @ViewBuilder
+    private func icon(_ status: ClaudeCodeSession.PlanItem.Status) -> some View {
+        switch status {
+        case .completed:
+            Image(systemName: "checkmark.circle.fill").font(.system(size: 10)).foregroundStyle(.green)
+        case .inProgress:
+            Image(systemName: "circle.dotted.circle").font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(Color.claude)
+                .symbolEffect(.pulse)
+        case .pending:
+            Image(systemName: "circle").font(.system(size: 10)).foregroundStyle(.primary.opacity(0.35))
         }
     }
+}
+
+/// Markdown simple (gras, italique, code) des réponses de Claude.
+func claudeMarkdown(_ text: String) -> AttributedString {
+    (try? AttributedString(
+        markdown: text,
+        options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+    )) ?? AttributedString(text)
 }
 
 struct SessionStateIcon: View {
