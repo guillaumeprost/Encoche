@@ -78,9 +78,12 @@ struct ActivityBubble: View {
             }
         case .timer:
             TimelineView(.periodic(from: .now, by: 1)) { context in
+                let tint = timer.tint(remaining: timer.remaining(at: context.date))
                 ZStack {
-                    ProgressRing(fraction: timer.fraction(at: context.date), tint: .orange)
-                    Image(systemName: timer.kind.symbol).font(.system(size: 7, weight: .bold)).foregroundStyle(.orange)
+                    ProgressRing(fraction: timer.fraction(at: context.date), tint: tint)
+                    Image(systemName: timer.isPaused ? "pause.fill" : timer.kind.symbol)
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundStyle(tint)
                 }
                 .frame(width: 18, height: 18)
             }
@@ -276,28 +279,49 @@ struct CollapsedMeetingView: View {
     }
 }
 
-/// Minuteur en cours : anneau qui se vide à gauche, temps restant à droite.
+/// Minuteur en cours : anneau et type à gauche, temps restant à droite, et une fine barre
+/// de progression sous l'encoche. Orange au travail, turquoise en pause, rouge la dernière minute.
 struct CollapsedTimerView: View {
     @Environment(TimerController.self) private var timer
     let slotWidth: CGFloat
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
-            let remaining = Int(timer.remaining(at: context.date).rounded(.up))
-            CollapsedActivityLayout(slotWidth: slotWidth) {
-                ZStack {
-                    ProgressRing(fraction: timer.fraction(at: context.date), tint: .orange)
-                    Image(systemName: timer.kind.symbol)
-                        .font(.system(size: 7, weight: .bold))
-                        .foregroundStyle(.orange)
+            let remaining = timer.remaining(at: context.date)
+            let tint = timer.tint(remaining: remaining)
+            let seconds = Int(remaining.rounded(.up))
+            let finalMinute = seconds <= 60 && !timer.isPaused
+            ZStack(alignment: .bottom) {
+                CollapsedActivityLayout(slotWidth: slotWidth) {
+                    ZStack {
+                        ProgressRing(fraction: timer.fraction(at: context.date), tint: tint, lineWidth: 2.5)
+                        Image(systemName: timer.isPaused ? "pause.fill" : timer.kind.symbol)
+                            .font(.system(size: 7.5, weight: .bold))
+                            .foregroundStyle(tint)
+                    }
+                    .frame(width: 19, height: 19)
+                } trailing: {
+                    Text(finalMinute ? "\(seconds)" : String(format: "%d:%02d", seconds / 60, seconds % 60))
+                        .font(.system(size: finalMinute ? 13 : 11.5, weight: .bold).monospacedDigit())
+                        .foregroundStyle(timer.isPaused ? Color.white.opacity(0.45) : tint)
+                        .contentTransition(.numericText(countsDown: true))
+                        .opacity(finalMinute && seconds % 2 == 0 ? 0.7 : 1)
                 }
-                .frame(width: 17, height: 17)
-            } trailing: {
-                Text(String(format: "%d:%02d", remaining / 60, remaining % 60))
-                    .font(.system(size: 11, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(timer.isPaused ? .white.opacity(0.5) : .orange)
-                    .contentTransition(.numericText())
+                // Avancement, sous l'encoche : la barre se vide jusqu'à la fin.
+                GeometryReader { geometry in
+                    Capsule()
+                        .fill(Color.white.opacity(0.12))
+                        .overlay(alignment: .leading) {
+                            Capsule()
+                                .fill(tint)
+                                .frame(width: geometry.size.width * timer.fraction(at: context.date))
+                        }
+                }
+                .frame(height: 2.5)
+                .padding(.horizontal, slotWidth + 6)
+                .padding(.bottom, 2)
             }
+            .animation(.linear(duration: 1), value: seconds)
         }
         .help(timer.kind.label + (timer.isPaused ? " (en pause)" : ""))
     }

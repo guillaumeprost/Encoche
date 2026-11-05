@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Bouton minuteur en haut à droite de l'encoche ouverte : lancer, mettre en pause, arrêter.
+/// Bouton minuteur en haut à gauche de l'encoche ouverte : lancer, mettre en pause, arrêter.
+/// Quand un minuteur tourne, le bouton l'affiche (anneau et temps restant).
 struct TimerMenu: View {
     @Environment(TimerController.self) private var timer
     @State private var hovering = false
@@ -23,19 +24,48 @@ struct TimerMenu: View {
                 Button("Minuteur · \(Int(minutes)) min") { timer.start(minutes: minutes) }
             }
         } label: {
-            Image(systemName: timer.isActive ? "timer.circle.fill" : "timer")
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(timer.isActive ? Color.orange : Color.primary)
-                .frame(width: 26, height: 22)
-                .background(Capsule().fill(.primary.opacity(hovering ? 0.12 : 0)))
-                .opacity(hovering || timer.isActive ? 1 : 0.6)
-                .contentShape(Capsule())
+            label
         }
         .menuStyle(.button)
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
         .onHover { hovering = $0 }
-        .help("Minuteur")
+        .help(timer.isActive ? "\(timer.kind.label) : cliquer pour mettre en pause ou arrêter" : "Minuteur")
     }
+
+    @ViewBuilder
+    private var label: some View {
+        if timer.isActive {
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                let remaining = Int(timer.remaining(at: context.date).rounded(.up))
+                HStack(spacing: 5) {
+                    ZStack {
+                        ProgressRing(fraction: timer.fraction(at: context.date), tint: tint, lineWidth: 2)
+                        if timer.isPaused {
+                            Image(systemName: "pause.fill").font(.system(size: 5, weight: .black))
+                        }
+                    }
+                    .frame(width: 12, height: 12)
+                    Text(String(format: "%d:%02d", remaining / 60, remaining % 60))
+                        .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                        .contentTransition(.numericText())
+                }
+                .foregroundStyle(timer.isPaused ? Color.primary.opacity(0.55) : tint)
+                .padding(.horizontal, 8)
+                .frame(height: 22)
+                .background(Capsule().fill(tint.opacity(hovering ? 0.26 : 0.16)))
+                .contentShape(Capsule())
+            }
+        } else {
+            Image(systemName: "timer")
+                .font(.system(size: 11, weight: .semibold))
+                .frame(width: 26, height: 22)
+                .background(Capsule().fill(.primary.opacity(hovering ? 0.12 : 0)))
+                .opacity(hovering ? 1 : 0.6)
+                .contentShape(Capsule())
+        }
+    }
+
+    private var tint: Color { timer.tint(remaining: timer.remaining(at: Date())) }
 }

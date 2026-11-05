@@ -1,5 +1,6 @@
 import AppKit
 import Observation
+import SwiftUI
 
 /// Minuteur et Pomodoro, lancés depuis l'encoche et affichés en activité en direct.
 @Observable
@@ -50,6 +51,12 @@ final class TimerController {
     /// Part restante, de 1 (début) à 0 (fin).
     func fraction(at date: Date) -> Double {
         duration > 0 ? remaining(at: date) / duration : 0
+    }
+
+    /// Couleur du minuteur : turquoise en pause café, rouge la dernière minute, orange sinon.
+    func tint(remaining: TimeInterval) -> Color {
+        if kind == .pause { return .teal }
+        return remaining <= 60 && !isPaused ? .red : .orange
     }
 
     func start(minutes: Double, kind: Kind = .timer) {
