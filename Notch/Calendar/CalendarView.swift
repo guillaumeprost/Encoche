@@ -206,3 +206,179 @@ private struct AccessPrompt: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
+
+// MARK: - Onglet Calendrier
+
+/// Onglet Calendrier : le mois à gauche, l'agenda du jour choisi à droite.
+struct CalendarTab: View {
+    @Environment(CalendarController.self) private var calendar
+
+    var body: some View {
+        switch calendar.access {
+        case .granted:
+            HStack(spacing: 20) {
+                MonthGrid()
+                    .frame(width: 196)
+                Rectangle()
+                    .fill(.primary.opacity(0.12))
+                    .frame(width: 1)
+                    .padding(.vertical, 4)
+                VStack(alignment: .leading, spacing: 6) {
+                    DayHeader()
+                    Agenda()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
+            .foregroundStyle(.primary)
+        case .notDetermined:
+            AccessPrompt(message: "Affiche ton agenda ici", button: "Autoriser le calendrier", action: calendar.requestAccess)
+        case .denied:
+            AccessPrompt(message: "Accès au calendrier refusé", button: "Ouvrir les Réglages", action: calendar.openPrivacySettings)
+        }
+    }
+}
+
+private struct DayHeader: View {
+    @Environment(CalendarController.self) private var calendar
+
+    var body: some View {
+        let isToday = Calendar.current.isDateInToday(calendar.selectedDay)
+        HStack(spacing: 6) {
+            Text(calendar.selectedDay.formatted(.dateTime.weekday(.wide).day().month(.wide)).capitalizedFirst)
+                .font(.system(size: 13, weight: .bold))
+                .lineLimit(1)
+            if isToday {
+                Text("Aujourd'hui")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.red)
+            }
+            Spacer(minLength: 0)
+            if !isToday {
+                Button { calendar.selectToday() } label: {
+                    Text("Aujourd'hui")
+                        .font(.system(size: 10, weight: .semibold))
+                        .padding(.horizontal, 8)
+                        .frame(height: 18)
+                        .background(Capsule().fill(.primary.opacity(0.1)))
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .transition(.opacity)
+            }
+            Button {
+                NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Calendar.app"))
+            } label: {
+                Image(systemName: "arrow.up.forward.app")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.primary.opacity(0.6))
+                    .frame(width: 20, height: 18)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Ouvrir Calendrier")
+        }
+        .animation(.snappy, value: isToday)
+    }
+}
+
+/// Mini-calendrier du mois : un point sous les jours qui ont des événements.
+private struct MonthGrid: View {
+    @Environment(CalendarController.self) private var calendar
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
+
+    var body: some View {
+        VStack(spacing: 2) {
+            HStack(spacing: 2) {
+                Text(calendar.displayedMonth.formatted(.dateTime.month(.wide).year()).capitalizedFirst)
+                    .font(.system(size: 12, weight: .bold))
+                    .contentTransition(.numericText())
+                Spacer(minLength: 0)
+                arrow("chevron.left") { calendar.showMonth(offset: -1) }
+                arrow("chevron.right") { calendar.showMonth(offset: 1) }
+            }
+            LazyVGrid(columns: columns, spacing: 0) {
+                ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, symbol in
+                    Text(symbol)
+                        .font(.system(size: 8.5, weight: .semibold))
+                        .foregroundStyle(.primary.opacity(0.4))
+                        .frame(height: 10)
+                }
+                ForEach(calendar.monthGridDays, id: \.self) { day in
+                    MonthDayCell(
+                        day: day,
+                        inMonth: Calendar.current.isDate(day, equalTo: calendar.displayedMonth, toGranularity: .month),
+                        isSelected: Calendar.current.isDate(day, inSameDayAs: calendar.selectedDay),
+                        isToday: Calendar.current.isDateInToday(day),
+                        isBusy: calendar.busyDays.contains(day)
+                    )
+                    .onTapGesture { calendar.select(day) }
+                }
+            }
+        }
+        .animation(.snappy(duration: 0.2), value: calendar.displayedMonth)
+    }
+
+    /// Initiales des jours, dans l'ordre de la semaine du Mac (lundi en premier en France).
+    private var weekdaySymbols: [String] {
+        let cal = Calendar.current
+        let symbols = cal.veryShortStandaloneWeekdaySymbols
+        return (0..<7).map { symbols[(cal.firstWeekday - 1 + $0) % 7].uppercased() }
+    }
+
+    private func arrow(_ symbol: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(.primary.opacity(0.6))
+                .frame(width: 18, height: 16)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct MonthDayCell: View {
+    let day: Date
+    let inMonth: Bool
+    let isSelected: Bool
+    let isToday: Bool
+    let isBusy: Bool
+    @State private var hovering = false
+
+    var body: some View {
+        ZStack {
+            if isSelected {
+                Circle().fill(isToday ? Color.red : Color.primary.opacity(0.85))
+                    .frame(width: 13, height: 13)
+            } else if hovering {
+                Circle().fill(.primary.opacity(0.12)).frame(width: 13, height: 13)
+            }
+            Text(day.formatted(.dateTime.day()))
+                .font(.system(size: 9, weight: isToday || isSelected ? .bold : .medium).monospacedDigit())
+                .foregroundStyle(numberColor)
+        }
+        .frame(height: 13)
+        .overlay(alignment: .bottom) {
+            if isBusy && !isSelected {
+                Circle()
+                    .fill(isToday ? Color.red : .primary.opacity(inMonth ? 0.55 : 0.25))
+                    .frame(width: 2.5, height: 2.5)
+                    .offset(y: 2.5)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+    }
+
+    private var numberColor: Color {
+        if isSelected { return isToday ? .white : Color(nsColor: .windowBackgroundColor) }
+        if isToday { return .red }
+        return .primary.opacity(inMonth ? 0.9 : 0.3)
+    }
+}
+
+private extension String {
+    /// Majuscule à la première lettre seulement (« Jeudi 5 novembre »).
+    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
+}

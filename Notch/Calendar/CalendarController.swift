@@ -55,6 +55,8 @@ final class CalendarController {
     private(set) var events: [CalendarEvent] = []
     /// Jours (début de journée) qui ont au moins un événement, pour les points du bandeau.
     private(set) var busyDays: Set<Date> = []
+    /// Premier jour du mois affiché dans l'onglet Calendrier.
+    private(set) var displayedMonth: Date
 
     private let store = EKEventStore()
     /// Pour les rappels de réunion dans l'encoche.
@@ -65,6 +67,7 @@ final class CalendarController {
 
     init() {
         selectedDay = Calendar.current.startOfDay(for: Date())
+        displayedMonth = Calendar.current.dateInterval(of: .month, for: Date())?.start ?? Date()
         switch EKEventStore.authorizationStatus(for: .event) {
         case .fullAccess: access = .granted
         case .notDetermined: access = .notDetermined
@@ -87,6 +90,20 @@ final class CalendarController {
         return (-1..<(Self.stripLength - 1)).compactMap { calendar.date(byAdding: .day, value: $0, to: today) }
     }
 
+    /// Grille du mois affiché : 6 semaines complètes, à partir du premier jour de la semaine.
+    var monthGridDays: [Date] {
+        let weekday = calendar.component(.weekday, from: displayedMonth)
+        let offset = (weekday - calendar.firstWeekday + 7) % 7
+        guard let start = calendar.date(byAdding: .day, value: -offset, to: displayedMonth) else { return [] }
+        return (0..<42).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
+    }
+
+    func showMonth(offset: Int) {
+        guard let month = calendar.date(byAdding: .month, value: offset, to: displayedMonth) else { return }
+        displayedMonth = month
+        reload()
+    }
+
     // MARK: - Actions
 
     func requestAccess() {
@@ -105,6 +122,10 @@ final class CalendarController {
 
     func select(_ day: Date) {
         selectedDay = calendar.startOfDay(for: day)
+        // Jour d'un autre mois (cliqué en bordure de grille) : on y passe.
+        if !calendar.isDate(selectedDay, equalTo: displayedMonth, toGranularity: .month) {
+            displayedMonth = calendar.dateInterval(of: .month, for: selectedDay)?.start ?? displayedMonth
+        }
         reload()
     }
 
@@ -169,22 +190,27 @@ final class CalendarController {
     // MARK: - Chargement
 
     func reload() {
-        guard access == .granted, let first = stripDays.first,
-              let stripEnd = calendar.date(byAdding: .day, value: Self.stripLength, to: first)
+        let grid = monthGridDays
+        guard access == .granted, let stripStart = stripDays.first, let gridStart = grid.first,
+              let stripEnd = calendar.date(byAdding: .day, value: Self.stripLength, to: stripStart),
+              let gridEnd = calendar.date(byAdding: .day, value: grid.count, to: gridStart)
         else {
             events = []
             busyDays = []
             return
         }
 
-        let predicate = store.predicateForEvents(withStart: first, end: stripEnd, calendars: nil)
-        let all = store.events(matching: predicate)
+        // Bandeau de l'accueil et grille du mois.
+        let first = min(stripStart, gridStart)
+        let last = max(stripEnd, gridEnd)
+        let predicate = store.predicateForEvents(withStart: first, end: last, calendars: nil)
+        var all = store.events(matching: predicate)
 
         var busy = Set<Date>()
         for event in all {
             var day = calendar.startOfDay(for: max(event.startDate, first))
             // Un événement sur plusieurs jours marque chacun de ses jours ; la fin est exclusive.
-            while day < min(event.endDate, stripEnd) {
+            while day < min(event.endDate, last) {
                 busy.insert(day)
                 guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
                 day = next
@@ -193,6 +219,9 @@ final class CalendarController {
         busyDays = busy
 
         guard let dayEnd = calendar.date(byAdding: .day, value: 1, to: selectedDay) else { return }
+        if selectedDay < first || dayEnd > last {
+            all = store.events(matching: store.predicateForEvents(withStart: selectedDay, end: dayEnd, calendars: nil))
+        }
         events = all
             .filter { $0.startDate < dayEnd && $0.endDate > selectedDay }
             .sorted { a, b in
