@@ -92,6 +92,8 @@ private struct DayCell: View {
 
 private struct Agenda: View {
     @Environment(CalendarController.self) private var calendar
+    /// Version agrandie de l'onglet Calendrier.
+    var large = false
 
     var body: some View {
         if calendar.events.isEmpty {
@@ -103,9 +105,9 @@ private struct Agenda: View {
             TimelineView(.everyMinute) { context in
                 ScrollViewReader { proxy in
                     ScrollView(.vertical) {
-                        VStack(spacing: 4) {
+                        VStack(spacing: large ? 6 : 4) {
                             ForEach(calendar.events) { event in
-                                EventRow(event: event, now: context.date)
+                                EventRow(event: event, now: context.date, large: large)
                                     .id(event.id)
                                     .onTapGesture { calendar.open(event) }
                             }
@@ -129,6 +131,7 @@ private struct Agenda: View {
 private struct EventRow: View {
     let event: CalendarEvent
     let now: Date
+    var large = false
     @State private var hovering = false
 
     private var isPast: Bool { !event.isAllDay && event.end <= now }
@@ -138,13 +141,13 @@ private struct EventRow: View {
         HStack(spacing: 8) {
             Capsule()
                 .fill(event.color)
-                .frame(width: 3)
+                .frame(width: large ? 4 : 3)
             VStack(alignment: .leading, spacing: 1) {
                 Text(event.title)
-                    .font(.system(size: 12, weight: .semibold))
+                    .font(.system(size: large ? 14 : 12, weight: .semibold))
                     .lineLimit(1)
                 Text(timeLabel)
-                    .font(.system(size: 10, weight: .medium).monospacedDigit())
+                    .font(.system(size: large ? 12 : 10, weight: .medium).monospacedDigit())
                     .foregroundStyle(isNow ? event.color : .primary.opacity(0.5))
             }
             Spacer(minLength: 0)
@@ -153,7 +156,7 @@ private struct EventRow: View {
                     Image(systemName: "video.fill")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(.white)
-                        .frame(width: 26, height: 20)
+                        .frame(width: large ? 32 : 26, height: large ? 24 : 20)
                         .background(Capsule().fill(Color.green.opacity(isNow ? 1 : 0.7)))
                 }
                 .buttonStyle(.plain)
@@ -162,7 +165,7 @@ private struct EventRow: View {
         }
         .padding(.vertical, 4)
         .padding(.horizontal, 6)
-        .frame(height: 36)
+        .frame(height: large ? 46 : 36)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(isNow ? event.color.opacity(0.18) : .primary.opacity(hovering ? 0.08 : 0))
@@ -218,14 +221,14 @@ struct CalendarTab: View {
         case .granted:
             HStack(spacing: 20) {
                 MonthGrid()
-                    .frame(width: 196)
+                    .frame(width: 260)
                 Rectangle()
                     .fill(.primary.opacity(0.12))
                     .frame(width: 1)
                     .padding(.vertical, 4)
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 10) {
                     DayHeader()
-                    Agenda()
+                    Agenda(large: true)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
@@ -245,20 +248,20 @@ private struct DayHeader: View {
         let isToday = Calendar.current.isDateInToday(calendar.selectedDay)
         HStack(spacing: 6) {
             Text(calendar.selectedDay.formatted(.dateTime.weekday(.wide).day().month(.wide)).capitalizedFirst)
-                .font(.system(size: 13, weight: .bold))
+                .font(.system(size: 16, weight: .bold))
                 .lineLimit(1)
             if isToday {
                 Text("Aujourd'hui")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.red)
             }
             Spacer(minLength: 0)
             if !isToday {
                 Button { calendar.selectToday() } label: {
                     Text("Aujourd'hui")
-                        .font(.system(size: 10, weight: .semibold))
-                        .padding(.horizontal, 8)
-                        .frame(height: 18)
+                        .font(.system(size: 11, weight: .semibold))
+                        .padding(.horizontal, 10)
+                        .frame(height: 22)
                         .background(Capsule().fill(.primary.opacity(0.1)))
                         .contentShape(Capsule())
                 }
@@ -269,9 +272,9 @@ private struct DayHeader: View {
                 NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Calendar.app"))
             } label: {
                 Image(systemName: "arrow.up.forward.app")
-                    .font(.system(size: 11))
+                    .font(.system(size: 13))
                     .foregroundStyle(.primary.opacity(0.6))
-                    .frame(width: 20, height: 18)
+                    .frame(width: 24, height: 22)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -287,10 +290,10 @@ private struct MonthGrid: View {
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 0), count: 7)
 
     var body: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: 4) {
             HStack(spacing: 2) {
                 Text(calendar.displayedMonth.formatted(.dateTime.month(.wide).year()).capitalizedFirst)
-                    .font(.system(size: 12, weight: .bold))
+                    .font(.system(size: 15, weight: .bold))
                     .contentTransition(.numericText())
                 Spacer(minLength: 0)
                 arrow("chevron.left") { calendar.showMonth(offset: -1) }
@@ -299,9 +302,9 @@ private struct MonthGrid: View {
             LazyVGrid(columns: columns, spacing: 0) {
                 ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, symbol in
                     Text(symbol)
-                        .font(.system(size: 8.5, weight: .semibold))
-                        .foregroundStyle(.primary.opacity(0.4))
-                        .frame(height: 10)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.primary.opacity(0.45))
+                        .frame(height: 16)
                 }
                 ForEach(calendar.monthGridDays, id: \.self) { day in
                     MonthDayCell(
@@ -328,9 +331,9 @@ private struct MonthGrid: View {
     private func arrow(_ symbol: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 9, weight: .bold))
-                .foregroundStyle(.primary.opacity(0.6))
-                .frame(width: 18, height: 16)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(.primary.opacity(0.7))
+                .frame(width: 24, height: 22)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -349,21 +352,21 @@ private struct MonthDayCell: View {
         ZStack {
             if isSelected {
                 Circle().fill(isToday ? Color.red : Color.primary.opacity(0.85))
-                    .frame(width: 13, height: 13)
+                    .frame(width: 22, height: 22)
             } else if hovering {
-                Circle().fill(.primary.opacity(0.12)).frame(width: 13, height: 13)
+                Circle().fill(.primary.opacity(0.12)).frame(width: 22, height: 22)
             }
             Text(day.formatted(.dateTime.day()))
-                .font(.system(size: 9, weight: isToday || isSelected ? .bold : .medium).monospacedDigit())
+                .font(.system(size: 12, weight: isToday || isSelected ? .bold : .medium).monospacedDigit())
                 .foregroundStyle(numberColor)
         }
-        .frame(height: 13)
+        .frame(height: 23)
         .overlay(alignment: .bottom) {
             if isBusy && !isSelected {
                 Circle()
                     .fill(isToday ? Color.red : .primary.opacity(inMonth ? 0.55 : 0.25))
-                    .frame(width: 2.5, height: 2.5)
-                    .offset(y: 2.5)
+                    .frame(width: 3.5, height: 3.5)
+                    .offset(y: 1)
             }
         }
         .frame(maxWidth: .infinity)

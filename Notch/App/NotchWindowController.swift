@@ -130,7 +130,7 @@ final class NotchWindowController {
     private func hotRect() -> NSRect {
         let size = viewModel.shapeSize(
             showsActivity: claudeCode.needsAttention || privacy.isActive || music.showsActivity,
-            extraHeight: settings.tab == .home ? NotchViewModel.homeExtraHeight : 0
+            extraHeight: NotchViewModel.extraHeight(for: settings.tab)
         )
         let rect = NSRect(x: screenFrame.midX - size.width / 2, y: screenFrame.maxY - size.height,
                           width: size.width, height: size.height)

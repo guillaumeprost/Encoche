@@ -25,6 +25,16 @@ final class NotchViewModel {
     static let expandedContentHeight: CGFloat = 136
     /// Hauteur en plus pour l'accueil, qui porte le champ Claude sous la musique et le calendrier.
     static let homeExtraHeight: CGFloat = 42
+    static let calendarExtraHeight: CGFloat = 96
+
+    /// Hauteur ajoutée à l'encoche ouverte selon l'onglet (accueil et calendrier sont plus hauts).
+    static func extraHeight(for tab: NotchTab) -> CGFloat {
+        switch tab {
+        case .home: return homeExtraHeight
+        case .calendar: return calendarExtraHeight
+        default: return 0
+        }
+    }
     static let alertBodyWidth: CGFloat = 380
     static let alertContentHeight: CGFloat = 60
     static let alertButtonsHeight: CGFloat = 36

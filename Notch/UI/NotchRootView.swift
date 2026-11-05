@@ -18,7 +18,7 @@ struct NotchRootView: View {
     var body: some View {
         let size = vm.shapeSize(
             showsActivity: showsActivity,
-            extraHeight: settings.tab == .home ? NotchViewModel.homeExtraHeight : 0
+            extraHeight: NotchViewModel.extraHeight(for: settings.tab)
         )
         let shape = NotchShape(topRadius: vm.topRadius, bottomRadius: vm.bottomRadius)
 
@@ -164,7 +164,7 @@ struct NotchRootView: View {
     private var darkGlassGradient: LinearGradient {
         let height = vm.shapeSize(
             showsActivity: false,
-            extraHeight: settings.tab == .home ? NotchViewModel.homeExtraHeight : 0
+            extraHeight: NotchViewModel.extraHeight(for: settings.tab)
         ).height
         let solid = min(max((vm.notchSize.height + 6) / max(height, 1), 0), 1)
         return LinearGradient(
