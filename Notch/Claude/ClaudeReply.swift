@@ -80,39 +80,34 @@ enum ClaudeReply {
             end tell
             return "missing"
             """
-            releaseKeyboard()
             guard await AppleScriptRunner.run(script, cached: false)?.stringValue == "ok" else {
                 return .failed("Onglet Terminal introuvable")
             }
             try? await Task.sleep(for: .milliseconds(250))
-            await paste(message, thenReturn: true)
+            await paste(message, thenReturn: true, to: pid_t(app.processIdentifier))
             return .sent(app: appName)
 
         case (claudeAppID, _):
             // App Claude : on ouvre la conversation de la session, on écrit dans son champ par
             // l'Accessibilité, puis Entrée. Sans pouvoir vérifier la conversation, on colle sans envoyer.
             let appPID = pid_t(app.processIdentifier)
-            // L'encoche garde le clavier (on vient d'y taper) même si Claude est déjà au premier
-            // plan : on le lui rend, sinon Entrée retombe dans l'encoche.
-            releaseKeyboard()
             // Au premier plan d'abord : sur un autre bureau, ses fenêtres sont invisibles pour l'Accessibilité.
             guard app.activate() else { return .failed("Impossible d'ouvrir \(appName)") }
             try? await Task.sleep(for: .milliseconds(500))
             await Task.detached { raiseMainWindow(ofAppWith: appPID) }.value
             let typed = await Task.detached { typeInComposer(message, inAppWith: appPID, conversation: sessionTitle) }.value
             guard typed else {
-                await paste(message, thenReturn: false)
+                await paste(message, thenReturn: false, to: appPID)
                 return .pasted(app: appName)
             }
             try? await Task.sleep(for: .milliseconds(200))
-            press(key: 36, flags: []) // Entrée
+            press(key: 36, flags: [], to: appPID) // Entrée
             return .sent(app: appName)
 
         default:
-            releaseKeyboard()
             guard app.activate() else { return .failed("Impossible d'ouvrir \(appName)") }
             try? await Task.sleep(for: .milliseconds(350))
-            await paste(message, thenReturn: false)
+            await paste(message, thenReturn: false, to: pid_t(app.processIdentifier))
             return .pasted(app: appName)
         }
     }
@@ -183,14 +178,6 @@ enum ClaudeReply {
         let value = draft.isEmpty ? text : draft + " " + text
         let status = AXUIElementSetAttributeValue(composer, kAXValueAttribute as CFString, value as CFString)
         return status == .success
-    }
-
-    /// Les fenêtres d'Encoche (l'encoche ouverte) cessent de recevoir le clavier, sans disparaître.
-    static func releaseKeyboard() {
-        for window in NSApp.windows where window.isKeyWindow {
-            window.orderOut(nil)
-            window.orderFrontRegardless()
-        }
     }
 
     /// Fenêtre de l'app au premier plan et principale : c'est elle qui reçoit le clavier.
@@ -307,7 +294,9 @@ enum ClaudeReply {
     // MARK: - Clavier
 
     /// Colle le texte avec ⌘V (le presse-papier est rétabli juste après), puis Entrée si demandé.
-    private static func paste(_ text: String, thenReturn: Bool) async {
+    /// Les touches sont envoyées à l'app visée (`pid`) : l'encoche, où l'on vient de taper,
+    /// garde sinon le clavier et les recevrait.
+    private static func paste(_ text: String, thenReturn: Bool, to pid: pid_t) async {
         let pasteboard = NSPasteboard.general
         let saved = pasteboard.pasteboardItems?.map { item in
             item.types.reduce(into: [NSPasteboard.PasteboardType: Data]()) { result, type in
@@ -322,9 +311,9 @@ enum ClaudeReply {
         item.setString("", forType: .init("org.nspasteboard.ConcealedType"))
         pasteboard.writeObjects([item])
 
-        press(key: 9, flags: .maskCommand) // V
+        press(key: 9, flags: .maskCommand, to: pid) // V
         try? await Task.sleep(for: .milliseconds(300))
-        if thenReturn { press(key: 36, flags: []) } // Entrée
+        if thenReturn { press(key: 36, flags: [], to: pid) } // Entrée
 
         try? await Task.sleep(for: .milliseconds(400))
         pasteboard.clearContents()
@@ -336,12 +325,12 @@ enum ClaudeReply {
         if !restored.isEmpty { pasteboard.writeObjects(restored) }
     }
 
-    private static func press(key: CGKeyCode, flags: CGEventFlags) {
+    private static func press(key: CGKeyCode, flags: CGEventFlags, to pid: pid_t) {
         let source = CGEventSource(stateID: .hidSystemState)
         for down in [true, false] {
             let event = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: down)
             event?.flags = flags
-            event?.post(tap: .cghidEventTap)
+            event?.postToPid(pid)
         }
     }
 
