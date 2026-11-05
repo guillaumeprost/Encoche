@@ -9,23 +9,24 @@ extension Color {
 
 struct ClaudeTab: View {
     @Environment(ClaudeCodeMonitor.self) private var monitor
-    @State private var selectedID: String?
-    /// Le champ du bas répond à la session choisie (par défaut) ou pose une question rapide.
     @Environment(ClaudeAsk.self) private var ask
 
+    /// Session affichée : celle choisie (pastilles ou champ), sinon la plus urgente.
     private var selectedSession: ClaudeCodeSession? {
         let sessions = monitor.sortedSessions
-        return sessions.first { $0.id == selectedID } ?? sessions.first
+        if case .session(let id) = ask.target, let chosen = sessions.first(where: { $0.id == id }) { return chosen }
+        return sessions.first
     }
 
     /// Sélecteur des dernières sessions en haut, session choisie à gauche, discussion à droite,
     /// champ sur toute la largeur en bas.
     var body: some View {
-        @Bindable var ask = ask
-        let session = ask.quickMode ? nil : selectedSession
         VStack(spacing: 10) {
             if monitor.hooksInstalled, monitor.sessions.count > 1 {
-                SessionChips(selectedID: $selectedID)
+                SessionChips(selectedID: Binding(
+                    get: { selectedSession?.id },
+                    set: { id in ask.target = id.map { .session($0) } }
+                ))
             }
             HStack(spacing: 20) {
                 SessionsPanel(session: selectedSession)
@@ -34,18 +35,14 @@ struct ClaudeTab: View {
                     .fill(.primary.opacity(0.12))
                     .frame(width: 1)
                     .padding(.vertical, 4)
-                if let session {
-                    SessionConversation(session: session)
-                } else {
-                    AskPanel()
+                switch ClaudeTabField.resolve(ask.target, default: selectedSession, in: monitor) {
+                case .session(let session): SessionConversation(session: session)
+                case .newConversation: NewConversationHint()
+                case .quickQuestion: AskPanel()
                 }
             }
             HStack(spacing: 6) {
-                ClaudeTabField(
-                    session: session,
-                    canReply: selectedSession != nil,
-                    quickQuestion: $ask.quickMode
-                )
+                ClaudeTabField(defaultSession: selectedSession)
                 // Quota hebdomadaire de l'abonnement, comme dans l'app Claude.
                 ClaudeQuotaRing()
             }
@@ -54,32 +51,72 @@ struct ClaudeTab: View {
     }
 }
 
-/// Champ du bas de l'onglet Claude : répond à une session, ou pose une question rapide.
-/// Champ Claude (onglet Claude et accueil) : répond à une session, ou pose une question rapide.
+/// Nouvelle conversation choisie : ce qui va se passer.
+private struct NewConversationHint: View {
+    var body: some View {
+        VStack(spacing: 6) {
+            Image(systemName: "square.and.pencil")
+                .font(.system(size: 20))
+                .foregroundStyle(Color.claude.opacity(0.7))
+            Text("Ton message ouvrira une nouvelle conversation dans l'app Claude")
+                .font(.system(size: 12))
+                .foregroundStyle(.primary.opacity(0.5))
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+/// Champ Claude (onglet Claude et accueil) : répond à une de tes dernières conversations, en
+/// démarre une nouvelle dans l'app Claude, ou pose une question rapide.
 struct ClaudeTabField: View {
     @Environment(ClaudeCodeMonitor.self) private var monitor
     @Environment(ClaudeAsk.self) private var ask
     @Environment(NotchViewModel.self) private var vm
-    let session: ClaudeCodeSession?
-    let canReply: Bool
-    @Binding var quickQuestion: Bool
-    /// Appelé après l'envoi (l'accueil bascule alors sur l'onglet Claude pour montrer la suite).
-    var onSend: () -> Void = {}
+    /// Session visée quand aucune n'a été choisie dans le menu.
+    let defaultSession: ClaudeCodeSession?
+    /// Appelé après l'envoi d'une question rapide (l'accueil bascule alors sur l'onglet Claude).
+    var onQuickQuestion: () -> Void = {}
 
     @State private var reply = ""
     @State private var feedback: ClaudeReply.Outcome?
     @State private var sending = false
     @FocusState private var focused: Bool
 
+    /// Destinataire effectif.
+    enum Resolved {
+        case session(ClaudeCodeSession)
+        case newConversation
+        case quickQuestion
+    }
+
+    static func resolve(_ target: ClaudeAsk.Target?, default session: ClaudeCodeSession?,
+                        in monitor: ClaudeCodeMonitor) -> Resolved {
+        switch target {
+        case .session(let id):
+            if let chosen = monitor.sessions.first(where: { $0.id == id }) { return .session(chosen) }
+        case .newConversation: return .newConversation
+        case .quickQuestion: return .quickQuestion
+        case nil: break
+        }
+        return session.map { .session($0) } ?? .newConversation
+    }
+
+    private var resolved: Resolved { Self.resolve(ask.target, default: defaultSession, in: monitor) }
+
     var body: some View {
         @Bindable var ask = ask
+        let resolved = resolved
         HStack(spacing: 8) {
-            targetMenu
+            targetMenu(resolved)
             Group {
-                if let session {
+                switch resolved {
+                case .session(let session):
                     TextField("Répondre à \(session.title ?? session.projectName)…", text: $reply)
-                } else {
-                    TextField("Demande à Claude…", text: $ask.question)
+                case .newConversation:
+                    TextField("Nouvelle conversation dans Claude…", text: $reply)
+                case .quickQuestion:
+                    TextField("Question rapide à Claude…", text: $ask.question)
                 }
             }
             .textFieldStyle(.plain)
@@ -90,7 +127,7 @@ struct ClaudeTabField: View {
 
             if let feedback { feedbackLabel(feedback) }
 
-            if session == nil, ask.isStreaming {
+            if case .quickQuestion = resolved, ask.isStreaming {
                 Button { ask.cancel() } label: {
                     Image(systemName: "stop.circle.fill").font(.system(size: 16))
                 }
@@ -98,7 +135,7 @@ struct ClaudeTabField: View {
                 .help("Arrêter")
             } else if sending {
                 ProgressView().controlSize(.small)
-            } else if !(session == nil ? ask.question : reply).isEmpty {
+            } else if !currentText(resolved).isEmpty {
                 Button(action: send) {
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.system(size: 17))
@@ -116,28 +153,46 @@ struct ClaudeTabField: View {
         .onDisappear { vm.holdOpen = false }
     }
 
-    /// Choix de la cible : la session sélectionnée à gauche, ou une question rapide.
-    private var targetMenu: some View {
+    private func currentText(_ resolved: Resolved) -> String {
+        if case .quickQuestion = resolved { return ask.question }
+        return reply
+    }
+
+    /// Choix du destinataire : tes 3 dernières conversations, une nouvelle, ou une question rapide.
+    private func targetMenu(_ resolved: Resolved) -> some View {
         Menu {
-            if canReply {
-                Button {
-                    quickQuestion = false
-                } label: {
-                    Label("Répondre à la session choisie", systemImage: "arrowshape.turn.up.left")
+            let recent = monitor.sortedSessions.prefix(3)
+            if !recent.isEmpty {
+                Section("Dernières conversations") {
+                    ForEach(Array(recent)) { session in
+                        Button {
+                            ask.target = .session(session.id)
+                        } label: {
+                            Label(session.title ?? session.projectName,
+                                  systemImage: session.state == .inactive ? "moon.zzz" : "bubble.left.and.text.bubble.right")
+                        }
+                    }
                 }
             }
             Button {
-                quickQuestion = true
+                ask.target = .newConversation
             } label: {
-                Label("Question rapide à Claude", systemImage: "sparkle")
+                Label("Nouvelle conversation dans Claude", systemImage: "square.and.pencil")
+            }
+            Divider()
+            Button {
+                ask.target = .quickQuestion
+            } label: {
+                Label("Question rapide (réponse dans l'encoche)", systemImage: "sparkle")
             }
         } label: {
             HStack(spacing: 4) {
-                Image(systemName: session == nil ? "sparkle" : "arrowshape.turn.up.left.fill")
+                Image(systemName: chipSymbol(resolved))
                     .font(.system(size: 11, weight: .semibold))
-                Text(session?.projectName ?? "Claude")
+                Text(chipTitle(resolved))
                     .font(.system(size: 11.5, weight: .semibold))
                     .lineLimit(1)
+                    .frame(maxWidth: 150)
                 Image(systemName: "chevron.down")
                     .font(.system(size: 8, weight: .bold))
                     .opacity(0.6)
@@ -151,7 +206,23 @@ struct ClaudeTabField: View {
         .buttonStyle(.plain)
         .menuIndicator(.hidden)
         .fixedSize()
-        .help(session == nil ? "Question rapide, sans lien avec tes sessions" : "Répond à la session choisie à gauche")
+        .help("Choisir la conversation")
+    }
+
+    private func chipTitle(_ resolved: Resolved) -> String {
+        switch resolved {
+        case .session(let session): session.title ?? session.projectName
+        case .newConversation: "Nouvelle conversation"
+        case .quickQuestion: "Question rapide"
+        }
+    }
+
+    private func chipSymbol(_ resolved: Resolved) -> String {
+        switch resolved {
+        case .session: "arrowshape.turn.up.left.fill"
+        case .newConversation: "square.and.pencil"
+        case .quickQuestion: "sparkle"
+        }
     }
 
     @ViewBuilder
@@ -172,24 +243,31 @@ struct ClaudeTabField: View {
     }
 
     private func send() {
-        if let session {
-            let text = reply.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !text.isEmpty, !sending else { return }
-            sending = true
-            focused = false
-            Task {
-                onSend()
-                let outcome = await monitor.reply(text, to: session.id)
-                sending = false
-                feedback = outcome
-                if case .failed = outcome {} else { reply = "" }
-                try? await Task.sleep(for: .seconds(4))
-                if feedback == outcome { feedback = nil }
-            }
-        } else {
+        let resolved = resolved
+        if case .quickQuestion = resolved {
             guard !ask.question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
             ask.send()
-            onSend()
+            onQuickQuestion()
+            return
+        }
+        let text = reply.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, !sending else { return }
+        sending = true
+        focused = false
+        Task {
+            let outcome: ClaudeReply.Outcome
+            if case .session(let session) = resolved {
+                outcome = await monitor.reply(text, to: session.id)
+            } else {
+                outcome = await ClaudeReply.startNewConversation(text)
+                // La nouvelle conversation devient la plus récente : on y répondra ensuite.
+                if case .sent = outcome { ask.target = nil }
+            }
+            sending = false
+            feedback = outcome
+            if case .failed = outcome {} else { reply = "" }
+            try? await Task.sleep(for: .seconds(4))
+            if feedback == outcome { feedback = nil }
         }
     }
 }

@@ -224,19 +224,8 @@ struct HomeTab: View {
                     .padding(.vertical, 4)
                 CalendarView()
             }
-            if ask.cliURL != nil || session != nil {
-                @Bindable var ask = ask
-                // Même champ que l'onglet Claude ; la suite (réponse, conversation) s'y affiche.
-                ClaudeTabField(
-                    session: ask.quickMode ? nil : session,
-                    canReply: session != nil,
-                    quickQuestion: $ask.quickMode
-                ) {
-                    // Sans session ouverte, c'est une question rapide : l'onglet Claude montre sa réponse.
-                    if session == nil { ask.quickMode = true }
-                    settings.tab = .claude
-                }
-            }
+            // Même champ que l'onglet Claude ; la réponse à une question rapide s'y affiche.
+            ClaudeTabField(defaultSession: session) { settings.tab = .claude }
         }
     }
 }

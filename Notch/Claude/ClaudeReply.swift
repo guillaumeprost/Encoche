@@ -112,6 +112,82 @@ enum ClaudeReply {
         }
     }
 
+    /// Démarre une nouvelle conversation dans l'app Claude, en mode Chat (pas Code), avec ce message.
+    static func startNewConversation(_ text: String) async -> Outcome {
+        let message = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !message.isEmpty else { return .failed("Message vide") }
+        var app = NSRunningApplication.runningApplications(withBundleIdentifier: claudeAppID).first
+        if app == nil {
+            // App fermée : on l'ouvre et on lui laisse le temps de démarrer.
+            guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: claudeAppID) else {
+                return .failed("App Claude introuvable")
+            }
+            app = try? await NSWorkspace.shared.openApplication(at: url, configuration: .init())
+            try? await Task.sleep(for: .seconds(3))
+        }
+        guard let app, app.activate() else { return .failed("Impossible d'ouvrir Claude") }
+        let appPID = pid_t(app.processIdentifier)
+        try? await Task.sleep(for: .milliseconds(500))
+        await Task.detached { raiseMainWindow(ofAppWith: appPID) }.value
+        // Mode « Chat » d'abord : en mode Code, ⌘N ouvrirait une session de code.
+        if await Task.detached(operation: { selectChatMode(inAppWith: appPID) }).value {
+            try? await Task.sleep(for: .milliseconds(700))
+        }
+        press(key: 45, flags: .maskCommand, to: appPID) // ⌘N
+        try? await Task.sleep(for: .milliseconds(1200))
+
+        let typed = await Task.detached { typeInVisibleComposer(message, inAppWith: appPID) }.value
+        guard typed else {
+            await paste(message, thenReturn: false, to: appPID)
+            return .pasted(app: "Claude")
+        }
+        try? await Task.sleep(for: .milliseconds(200))
+        press(key: 36, flags: [], to: appPID) // Entrée
+        return .sent(app: "Claude")
+    }
+
+    /// Clique sur le mode « Chat et Cowork » de l'app Claude. Renvoie `true` s'il a fallu changer.
+    nonisolated static func selectChatMode(inAppWith appPID: pid_t) -> Bool {
+        guard AXIsProcessTrusted() else { return false }
+        let app = AXUIElementCreateApplication(appPID)
+        AXUIElementSetAttributeValue(app, "AXManualAccessibility" as CFString, kCFBooleanTrue)
+        for _ in 0..<6 {
+            if let window = axChildren(app, kAXWindowsAttribute).first ?? axElement(app, kAXFocusedWindowAttribute),
+               let chat = first(in: window, where: {
+                   // Le nom est dans la description : le titre est vide.
+                   axString($0, kAXRoleAttribute) == "AXRadioButton" && label(of: $0).hasPrefix("Chat")
+               }) {
+                var selected: AnyObject?
+                AXUIElementCopyAttributeValue(chat, kAXValueAttribute as CFString, &selected)
+                if (selected as? Int) == 1 { return false }
+                return AXUIElementPerformAction(chat, kAXPressAction as CFString) == .success
+            }
+            Thread.sleep(forTimeInterval: 0.3)
+        }
+        return false
+    }
+
+    /// Écrit dans le champ de la conversation affichée (la nouvelle, après ⌘N).
+    nonisolated static func typeInVisibleComposer(_ text: String, inAppWith appPID: pid_t) -> Bool {
+        guard AXIsProcessTrusted() else { return false }
+        let app = AXUIElementCreateApplication(appPID)
+        AXUIElementSetAttributeValue(app, "AXManualAccessibility" as CFString, kCFBooleanTrue)
+        for _ in 0..<10 {
+            if let window = axChildren(app, kAXWindowsAttribute).first ?? axElement(app, kAXFocusedWindowAttribute) {
+                var webAreas: [AXUIElement] = []
+                collect(in: window, into: &webAreas) { axString($0, kAXRoleAttribute) == "AXWebArea" }
+                // La zone de la conversation est celle qui contient un champ de saisie vide.
+                for area in webAreas.reversed() {
+                    guard let field = first(in: area, where: { axString($0, kAXRoleAttribute) == "AXTextArea" }) else { continue }
+                    AXUIElementSetAttributeValue(field, kAXFocusedAttribute as CFString, kCFBooleanTrue)
+                    return AXUIElementSetAttributeValue(field, kAXValueAttribute as CFString, text as CFString) == .success
+                }
+            }
+            Thread.sleep(forTimeInterval: 0.3)
+        }
+        return false
+    }
+
     /// La session tourne dans l'app Claude.
     static func isInClaudeApp(_ pid: pid_t) -> Bool {
         ProcessOwner.app(of: pid)?.bundleIdentifier == claudeAppID
@@ -271,6 +347,12 @@ enum ClaudeReply {
             if let found { return found }
         }
         return nil
+    }
+
+    /// Nom affiché d'un élément : son titre, ou sa description quand le titre est vide.
+    private nonisolated static func label(of element: AXUIElement) -> String {
+        if let title = axString(element, kAXTitleAttribute), !title.isEmpty { return title }
+        return axString(element, kAXDescriptionAttribute) ?? ""
     }
 
     private nonisolated static func axString(_ element: AXUIElement, _ name: String) -> String? {

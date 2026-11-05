@@ -38,9 +38,16 @@ final class ClaudeAsk {
     }
 
     var question = ""
-    /// Les champs Claude (accueil, onglet Claude) posent une question rapide au lieu de répondre
-    /// à une session.
-    var quickMode = false
+    /// Destinataire des champs Claude (accueil, onglet Claude). `nil` : la session par défaut.
+    enum Target: Equatable {
+        case session(String)
+        /// Nouvelle conversation dans l'app Claude.
+        case newConversation
+        /// Question rapide, répondue dans l'encoche.
+        case quickQuestion
+    }
+
+    var target: Target?
     /// Échanges précédents de la conversation en cours (le dernier est `askedQuestion` / `answer`).
     private(set) var history: [Exchange] = []
     private(set) var askedQuestion = ""
