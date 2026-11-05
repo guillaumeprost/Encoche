@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 
 /// Lit le « À l'écoute » de macOS (YouTube dans le navigateur, Deezer, Podcasts…) et le pilote.
 ///
@@ -40,7 +40,27 @@ final class NowPlayingAdapter: @unchecked Sendable {
     }
 
     func start() {
-        queue.async { self.launchStream() }
+        queue.async {
+            self.stopLeftovers()
+            self.launchStream()
+        }
+        // Le flux s'arrête avec l'app.
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification, object: nil, queue: nil
+        ) { [weak self] _ in
+            self?.process?.terminationHandler = nil
+            self?.process?.terminate()
+        }
+    }
+
+    /// Flux laissés par une instance précédente d'Encoche (arrêtée brutalement).
+    private func stopLeftovers() {
+        guard let framework else { return }
+        let pkill = Process()
+        pkill.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+        pkill.arguments = ["-f", "\(framework) stream"]
+        try? pkill.run()
+        pkill.waitUntilExit()
     }
 
     func send(_ command: Command) {

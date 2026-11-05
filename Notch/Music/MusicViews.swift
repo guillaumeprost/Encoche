@@ -225,6 +225,10 @@ struct MusicTab: View {
         if music.track == nil {
             EmptyMusicView()
                 .padding(.horizontal, 40)
+        } else if music.externalPlayer != nil {
+            // Vidéo ou autre lecteur (YouTube…) : pas de paroles ni de file, le lecteur prend la place.
+            VideoPlayerView()
+                .foregroundStyle(.primary)
         } else {
             HStack(spacing: 20) {
                 MusicTabPlayer()
@@ -481,5 +485,88 @@ private struct MiniButton: View {
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
+    }
+}
+
+// MARK: - Vidéo (YouTube…) et autres lecteurs
+
+/// Lecteur d'une vidéo ou d'un autre lecteur : vignette au format vidéo, commandes et image dans l'image.
+private struct VideoPlayerView: View {
+    @Environment(MusicController.self) private var music
+    @State private var pipOutcome: PictureInPicture.Outcome?
+    @State private var pipRunning = false
+
+    var body: some View {
+        if let track = music.track {
+            HStack(spacing: 18) {
+                Artwork(image: music.artwork, cornerRadius: 14)
+                    .aspectRatio(16 / 9, contentMode: .fit)
+                    .frame(height: 124)
+                    .shadow(color: music.accent.opacity(0.4), radius: 14, y: 5)
+                    .onTapGesture { music.openSourceApp() }
+
+                VStack(alignment: .leading, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(track.title)
+                            .font(.system(size: 15, weight: .bold))
+                            .lineLimit(2)
+                        HStack(spacing: 6) {
+                            Text(track.artist)
+                                .font(.system(size: 13))
+                                .foregroundStyle(.primary.opacity(0.65))
+                                .lineLimit(1)
+                            if let app = appName {
+                                Text("· \(app)")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(.primary.opacity(0.4))
+                                    .lineLimit(1)
+                            }
+                        }
+                    }
+                    if track.duration > 0 {
+                        ProgressBar(duration: track.duration)
+                    }
+                    HStack {
+                        Controls()
+                        if PictureInPicture.isSupported(music.externalPlayer) {
+                            pipButton
+                        }
+                    }
+                    if case .needsJavaScriptPermission(let browser) = pipOutcome {
+                        Text("Pour l'image dans l'image, active « Autoriser le JavaScript des Apple Events » dans \(browser) › Réglages › Développeur.")
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(.orange)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .onChange(of: track) { pipOutcome = nil }
+        }
+    }
+
+    private var appName: String? {
+        guard let bundleID = music.externalPlayer,
+              let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return nil }
+        return FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
+    }
+
+    private var pipButton: some View {
+        Button {
+            guard let player = music.externalPlayer, !pipRunning else { return }
+            pipRunning = true
+            Task {
+                pipOutcome = await PictureInPicture.toggle(in: player)
+                pipRunning = false
+            }
+        } label: {
+            Image(systemName: pipOutcome == .done ? "pip.exit" : "pip.enter")
+                .font(.system(size: 15, weight: .semibold))
+                .frame(width: 34, height: 30)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help("Image dans l'image")
+        .opacity(pipRunning ? 0.5 : 1)
     }
 }
