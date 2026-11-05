@@ -3,6 +3,7 @@ import SwiftUI
 enum NotchTab: String, CaseIterable {
     case home
     case calendar
+    case music
     case house
     case shelf
     case clipboard
@@ -13,6 +14,7 @@ enum NotchTab: String, CaseIterable {
         switch self {
         case .home: "music.note.house"
         case .calendar: "calendar"
+        case .music: "music.note"
         case .house: "homekit"
         case .shelf: "tray.full"
         case .clipboard: "doc.on.clipboard"
@@ -25,6 +27,7 @@ enum NotchTab: String, CaseIterable {
         switch self {
         case .home: "Accueil"
         case .calendar: "Calendrier"
+        case .music: "Musique"
         case .house: "Maison"
         case .shelf: "Étagère"
         case .clipboard: "Presse-papier"
@@ -43,6 +46,7 @@ struct TopBar: View {
     @Environment(ClaudeCodeMonitor.self) private var claudeCode
     @Environment(AlertCenter.self) private var alerts
     @Environment(ShelfController.self) private var shelf
+    @Environment(MusicController.self) private var music
 
     /// Onglets centrés ; avec une encoche physique, répartis de part et d'autre de la caméra.
     var body: some View {
@@ -89,6 +93,11 @@ struct TopBar: View {
     @ViewBuilder
     private var actions: some View {
         HStack(spacing: 4) {
+            // Mini-lecteur, sauf là où le lecteur complet est déjà affiché.
+            if music.track != nil, settings.tab != .music, settings.tab != .home {
+                MiniMusicControls()
+                    .transition(.opacity)
+            }
             if settings.tab == .clipboard, !clipboard.items.isEmpty {
                 IconButton(symbol: "trash", help: "Vider l'historique (les épinglés sont conservés)") {
                     withAnimation(.snappy) { clipboard.clearUnpinned() }
@@ -114,7 +123,7 @@ struct TopBar: View {
 }
 
 private struct TabButton: View {
-    static let width: CGFloat = 28
+    static let width: CGFloat = 26
 
     let tab: NotchTab
     let isSelected: Bool

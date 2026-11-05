@@ -211,3 +211,264 @@ struct AudioBars: View {
         }
     }
 }
+
+// MARK: - Onglet Musique
+
+/// Onglet Musique : le lecteur à gauche, les paroles ou la file d'attente à droite.
+struct MusicTab: View {
+    @Environment(MusicController.self) private var music
+    @Environment(MusicExtras.self) private var extras
+    @AppStorage("musicSidePanel") private var showsQueue = false
+
+    var body: some View {
+        if music.track == nil {
+            EmptyMusicView()
+                .padding(.horizontal, 40)
+        } else {
+            HStack(spacing: 20) {
+                MusicTabPlayer()
+                    .frame(width: 270)
+                Rectangle()
+                    .fill(.primary.opacity(0.12))
+                    .frame(width: 1)
+                    .padding(.vertical, 4)
+                VStack(alignment: .leading, spacing: 8) {
+                    Picker("", selection: $showsQueue) {
+                        Text("Paroles").tag(false)
+                        Text("À suivre").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(width: 180)
+                    .frame(maxWidth: .infinity)
+
+                    if showsQueue {
+                        QueueView()
+                    } else {
+                        LyricsView()
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            }
+            .foregroundStyle(.primary)
+            .onAppear { extras.refresh() }
+            .onChange(of: music.track) { extras.refresh() }
+        }
+    }
+}
+
+/// Lecteur de l'onglet Musique, en colonne.
+private struct MusicTabPlayer: View {
+    @Environment(MusicController.self) private var music
+
+    var body: some View {
+        if let track = music.track {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 14) {
+                    Artwork(image: music.artwork, cornerRadius: 14)
+                        .frame(width: 96, height: 96)
+                        .shadow(color: music.accent.opacity(0.4), radius: 14, y: 5)
+                        .onTapGesture { music.openSourceApp() }
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(track.title)
+                            .font(.system(size: 15, weight: .bold))
+                            .lineLimit(2)
+                        Text(track.artist)
+                            .font(.system(size: 13))
+                            .foregroundStyle(.primary.opacity(0.65))
+                            .lineLimit(1)
+                        if !track.album.isEmpty {
+                            Text(track.album)
+                                .font(.system(size: 11.5))
+                                .foregroundStyle(.primary.opacity(0.45))
+                                .lineLimit(1)
+                        }
+                        AudioBars(isPlaying: music.isPlaying, color: music.accent)
+                            .frame(width: 22, height: 14)
+                            .padding(.top, 4)
+                    }
+                }
+                if track.duration > 0 {
+                    ProgressBar(duration: track.duration)
+                }
+                Controls()
+            }
+            .frame(maxHeight: .infinity)
+        }
+    }
+}
+
+/// Paroles, synchronisées quand c'est possible : la ligne en cours est mise en avant.
+private struct LyricsView: View {
+    @Environment(MusicController.self) private var music
+    @Environment(MusicExtras.self) private var extras
+
+    var body: some View {
+        switch extras.lyricsState {
+        case .idle, .loading:
+            ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .unavailable:
+            placeholder("Pas de paroles pour ce morceau", symbol: "quote.bubble")
+        case .loaded:
+            TimelineView(.periodic(from: .now, by: 0.25)) { context in
+                let current = extras.currentLineID(at: music.position(at: context.date))
+                ScrollViewReader { proxy in
+                    ScrollView(.vertical) {
+                        VStack(alignment: .leading, spacing: 7) {
+                            ForEach(extras.lyrics) { line in
+                                Text(line.text)
+                                    .font(.system(size: 14.5, weight: .semibold))
+                                    .foregroundStyle(.primary.opacity(opacity(of: line, current: current)))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .id(line.id)
+                                    .onTapGesture { if let time = line.time { music.seek(to: time) } }
+                            }
+                        }
+                        .padding(.vertical, 40)
+                    }
+                    .scrollIndicators(.never)
+                    .mask(LinearGradient(
+                        stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.15),
+                                .init(color: .black, location: 0.85), .init(color: .clear, location: 1)],
+                        startPoint: .top, endPoint: .bottom
+                    ))
+                    .onChange(of: current) {
+                        guard let current else { return }
+                        withAnimation(.easeInOut(duration: 0.4)) { proxy.scrollTo(current, anchor: .center) }
+                    }
+                    .onAppear { if let current { proxy.scrollTo(current, anchor: .center) } }
+                }
+                .animation(.easeOut(duration: 0.25), value: current)
+            }
+        }
+    }
+
+    private func opacity(of line: MusicExtras.LyricLine, current: Int?) -> Double {
+        guard extras.lyricsSynced else { return 0.8 }
+        guard let current else { return 0.35 }
+        return line.id == current ? 1 : 0.3
+    }
+}
+
+/// Morceaux suivants de la playlist ou de l'album en cours (Musique uniquement).
+private struct QueueView: View {
+    @Environment(MusicController.self) private var music
+    @Environment(MusicExtras.self) private var extras
+
+    var body: some View {
+        switch extras.queueState {
+        case .idle, .loading:
+            ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
+        case .unavailable:
+            placeholder(
+                music.source == .spotify
+                    ? "Spotify ne partage pas sa file d'attente"
+                    : "File d'attente disponible pour une playlist ou un album",
+                symbol: "list.bullet"
+            )
+        case .loaded:
+            if extras.queue.isEmpty {
+                placeholder("Plus rien après ce morceau", symbol: "list.bullet")
+            } else {
+                ScrollView(.vertical) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        if let title = extras.queueTitle {
+                            Text(title)
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(.primary.opacity(0.45))
+                                .padding(.bottom, 2)
+                        }
+                        ForEach(extras.queue) { item in
+                            QueueRow(item: item) { extras.play(item) }
+                        }
+                    }
+                }
+                .scrollIndicators(.never)
+            }
+        }
+    }
+}
+
+private struct QueueRow: View {
+    let item: MusicExtras.QueueItem
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: hovering ? "play.fill" : "music.note")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.primary.opacity(0.5))
+                    .frame(width: 16)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(item.title).font(.system(size: 12.5, weight: .semibold)).lineLimit(1)
+                    Text(item.artist).font(.system(size: 11)).foregroundStyle(.primary.opacity(0.5)).lineLimit(1)
+                }
+                Spacer(minLength: 4)
+                if item.duration > 0 {
+                    Text(String(format: "%d:%02d", Int(item.duration) / 60, Int(item.duration) % 60))
+                        .font(.system(size: 10.5, weight: .medium).monospacedDigit())
+                        .foregroundStyle(.primary.opacity(0.4))
+                }
+            }
+            .padding(.horizontal, 6)
+            .frame(height: 34)
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(.primary.opacity(hovering ? 0.08 : 0)))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help("Lire maintenant")
+    }
+}
+
+private func placeholder(_ text: String, symbol: String) -> some View {
+    VStack(spacing: 6) {
+        Image(systemName: symbol).font(.system(size: 18)).foregroundStyle(.primary.opacity(0.4))
+        Text(text)
+            .font(.system(size: 12))
+            .foregroundStyle(.primary.opacity(0.5))
+            .multilineTextAlignment(.center)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+}
+
+/// Mini-lecteur en haut à droite de l'encoche ouverte : pochette, lecture/pause, suivant.
+struct MiniMusicControls: View {
+    @Environment(MusicController.self) private var music
+    @Environment(AppSettings.self) private var settings
+
+    var body: some View {
+        HStack(spacing: 2) {
+            Button { settings.tab = .music } label: {
+                Artwork(image: music.artwork, cornerRadius: 4)
+                    .frame(width: 18, height: 18)
+            }
+            .buttonStyle(.plain)
+            .help(music.track.map { "\($0.title) · \($0.artist)" } ?? "Musique")
+            .padding(.trailing, 2)
+            MiniButton(symbol: music.isPlaying ? "pause.fill" : "play.fill") { music.playPause() }
+            MiniButton(symbol: "forward.fill") { music.next() }
+        }
+    }
+}
+
+private struct MiniButton: View {
+    let symbol: String
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 10.5, weight: .bold))
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: 22, height: 22)
+                .background(Circle().fill(.primary.opacity(hovering ? 0.14 : 0)))
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+    }
+}

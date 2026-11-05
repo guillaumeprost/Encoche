@@ -35,6 +35,7 @@ struct NotchRootView: View {
                         switch settings.tab {
                         case .home: HomeTab().transition(tabTransition)
                         case .calendar: CalendarTab().transition(tabTransition)
+                        case .music: MusicTab().transition(tabTransition)
                         case .house: HomeControlView().transition(tabTransition)
                         case .shelf: ShelfView().transition(tabTransition)
                         case .clipboard: ClipboardView().transition(tabTransition)

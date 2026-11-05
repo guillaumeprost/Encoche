@@ -32,7 +32,7 @@ final class NotchViewModel {
     static func extraHeight(for tab: NotchTab) -> CGFloat {
         switch tab {
         case .home: return homeExtraHeight
-        case .calendar: return calendarExtraHeight
+        case .calendar, .music: return calendarExtraHeight
         case .claude: return claudeExtraHeight
         default: return 0
         }

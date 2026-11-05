@@ -12,6 +12,7 @@ struct AppServices {
     let downloads: DownloadMonitor
     let bluetooth: BluetoothMonitor
     let music: MusicController
+    let musicExtras: MusicExtras
     let volume: VolumeController
     let calendar: CalendarController
     let clipboard: ClipboardController
@@ -40,6 +41,7 @@ struct AppServices {
         bluetooth.isEnabled = { appSettings.showBluetoothActivity }
         bluetooth.start()
         music = MusicController()
+        musicExtras = MusicExtras(music: music)
         volume = VolumeController()
         calendar = CalendarController()
         clipboard = ClipboardController()
@@ -94,6 +96,7 @@ extension View {
             .environment(services.downloads)
             .environment(services.bluetooth)
             .environment(services.music)
+            .environment(services.musicExtras)
             .environment(services.volume)
             .environment(services.calendar)
             .environment(services.clipboard)
