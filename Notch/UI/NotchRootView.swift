@@ -181,8 +181,8 @@ struct NotchRootView: View {
             stops: [
                 .init(color: .black, location: 0),
                 .init(color: .black, location: solid),
-                .init(color: .black.opacity(0.45), location: min(solid + 0.14, 1)),
-                .init(color: .black.opacity(0.1), location: min(solid + 0.45, 1)),
+                .init(color: .black.opacity(0.35), location: min(solid + 0.14, 1)),
+                .init(color: .black.opacity(0.04), location: min(solid + 0.4, 1)),
                 .init(color: .clear, location: 1),
             ],
             startPoint: .top,
@@ -223,8 +223,13 @@ struct NotchRootView: View {
             // et un fin liseré lumineux, plus marqué vers le bas, dessine le bord comme sur macOS 26.
             ZStack {
                 Color.clear
-                    .glassEffect(.regular.tint(.black.opacity(0.4)), in: shape)
+                    .glassEffect(.regular.tint(.black.opacity(0.22)), in: shape)
                 shape.fill(darkGlassGradient)
+                // Léger reflet clair dans le bas du verre.
+                shape.fill(LinearGradient(
+                    stops: [.init(color: .white.opacity(0), location: 0.55), .init(color: .white.opacity(0.07), location: 1)],
+                    startPoint: .top, endPoint: .bottom
+                ))
                 shape.stroke(darkGlassRim, lineWidth: 1.5)
             }
             .opacity(darkGlassActive ? 1 : 0)
