@@ -53,12 +53,15 @@ struct TopBar: View {
         GeometryReader { geometry in
             ZStack {
                 tabs
+                // De chaque côté, les boutons restent dans la place laissée par les onglets.
+                let sideSpace = max((geometry.size.width - tabsWidth) / 2 - 8, 0)
                 HStack(spacing: 4) {
-                    // Concentration et minuteur, dans la place laissée à gauche des onglets.
+                    // Minuteur et Concentration à gauche.
                     StatusChips()
-                        .frame(maxWidth: max((geometry.size.width - tabsWidth) / 2 - 8, 0), alignment: .leading)
+                        .frame(maxWidth: sideSpace, alignment: .leading)
                     Spacer()
                     actions
+                        .frame(maxWidth: sideSpace, alignment: .trailing)
                 }
             }
             .frame(width: geometry.size.width, height: geometry.size.height)

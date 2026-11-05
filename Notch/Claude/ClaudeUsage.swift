@@ -130,14 +130,11 @@ struct ClaudeUsageLabel: View {
     @Environment(ClaudeUsage.self) private var usage
 
     var body: some View {
-        HStack(spacing: 4) {
-            Image(systemName: "chart.bar.fill")
-                .font(.system(size: 9))
-            if usage.isLoaded {
-                Text("\(ClaudeUsage.format(usage.today.total)) auj. · \(ClaudeUsage.format(usage.week.total)) 7 j")
-            } else {
-                Text("…")
-            }
+        // Se raccourcit quand la place manque : jour et semaine, puis le jour seul, puis l'icône.
+        ViewThatFits(in: .horizontal) {
+            label(usage.isLoaded ? "\(ClaudeUsage.format(usage.today.total)) auj. · \(ClaudeUsage.format(usage.week.total)) 7 j" : "…")
+            label(usage.isLoaded ? "\(ClaudeUsage.format(usage.today.total)) auj." : "…")
+            label(nil)
         }
         .font(.system(size: 10.5, weight: .medium).monospacedDigit())
         .foregroundStyle(.primary.opacity(0.55))
@@ -151,6 +148,15 @@ struct ClaudeUsageLabel: View {
                 usage.refresh()
             }
         }
+    }
+
+    private func label(_ text: String?) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: "chart.bar.fill")
+                .font(.system(size: 9))
+            if let text { Text(text).lineLimit(1) }
+        }
+        .fixedSize()
     }
 
     private var details: String {
