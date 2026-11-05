@@ -4,8 +4,9 @@ import Observation
 
 /// File d'attente et paroles du morceau en cours, chargées à la demande (onglet Musique).
 ///
-/// - File d'attente : la vraie file « À suivre » n'est accessible par aucune API publique.
-///   Avec Musique, on lit les morceaux qui suivent dans la playlist en cours (bibliothèque).
+/// - File d'attente : avec Musique, la vraie file est lue dans son panneau de file d'attente
+///   (Accessibilité, voir `MusicQueueReader`). Panneau fermé : morceaux suivants de la
+///   playlist en cours (bibliothèque, AppleScript).
 ///   Sinon (Apple Music en streaming, Spotify), on affiche la suite de l'album en cours,
 ///   trouvée dans le catalogue public d'Apple (iTunes Search : titre, artiste et album envoyés).
 /// - Paroles : LRCLIB (lrclib.net), service libre et gratuit, avec paroles synchronisées.
@@ -36,6 +37,8 @@ final class MusicExtras {
     private(set) var queueTitle: String?
     /// La file est la suite de l'album (et non la playlist en cours).
     private(set) var queueIsAlbum = false
+    /// Le panneau de file d'attente de Musique est fermé : la vraie file n'est pas lisible.
+    private(set) var musicPanelClosed = false
     private(set) var queueState: LoadState = .idle
     private(set) var lyrics: [LyricLine] = []
     private(set) var lyricsSynced = false
@@ -64,6 +67,11 @@ final class MusicExtras {
 
     /// Lance un morceau de la file.
     func play(_ item: QueueItem) {
+        // Morceau lu dans la file de Musique : pas de moyen fiable de le lancer, on montre Musique.
+        if item.index < 0 {
+            music.open(.music)
+            return
+        }
         if item.index == 0 {
             // Morceau du catalogue : ouvert dans Musique.
             if let url = item.url, let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Music") {
@@ -88,12 +96,42 @@ final class MusicExtras {
 
     // MARK: - File d'attente
 
+    /// Ouvre le panneau de file d'attente dans Musique, puis relit la file.
+    func showMusicQueuePanel() {
+        Task {
+            await Task.detached { MusicQueueReader.showPanel() }.value
+            try? await Task.sleep(for: .milliseconds(600))
+            refresh(force: true)
+        }
+    }
+
     private func loadQueue(for track: MusicController.Track) {
         queueState = .loading
+        musicPanelClosed = false
         guard music.source == .music else {
             loadAlbumQueue(for: track)
             return
         }
+        Task {
+            // La vraie file, lue dans le panneau de Musique.
+            let result = await Task.detached(priority: .userInitiated) { MusicQueueReader.read() }.value
+            guard music.track == track else { return }
+            switch result {
+            case .entries(let entries):
+                queue = entries.enumerated().map { offset, entry in
+                    QueueItem(id: offset, index: -1, title: entry.title, artist: entry.artist, duration: 0)
+                }
+                queueTitle = nil
+                queueIsAlbum = false
+                queueState = .loaded
+            case .panelClosed, .unavailable:
+                musicPanelClosed = result.isPanelClosed
+                loadPlaylistQueue(for: track)
+            }
+        }
+    }
+
+    private func loadPlaylistQueue(for track: MusicController.Track) {
         let script = """
         tell application id "com.apple.Music"
             set pl to current playlist
@@ -305,4 +343,8 @@ final class MusicExtras {
         }
         return lines
     }
+}
+
+private extension MusicQueueReader.Result {
+    var isPanelClosed: Bool { if case .panelClosed = self { true } else { false } }
 }

@@ -360,12 +360,22 @@ private struct QueueView: View {
         case .idle, .loading:
             ProgressView().controlSize(.small).frame(maxWidth: .infinity, maxHeight: .infinity)
         case .unavailable:
-            placeholder(
-                music.source == .spotify
-                    ? "Album introuvable dans le catalogue d'Apple"
-                    : "Pas de playlist en cours, et album introuvable dans le catalogue d'Apple",
-                symbol: "list.bullet"
-            )
+            VStack(spacing: 8) {
+                placeholder(
+                    music.source == .spotify
+                        ? "Album introuvable dans le catalogue d'Apple"
+                        : extras.musicPanelClosed
+                            ? "Ouvre la file d'attente dans Musique pour la voir ici"
+                            : "Pas de playlist en cours, et album introuvable dans le catalogue d'Apple",
+                    symbol: "list.bullet"
+                )
+                if extras.musicPanelClosed {
+                    Button("Afficher la file dans Musique") { extras.showMusicQueuePanel() }
+                        .buttonStyle(.glass)
+                        .controlSize(.small)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         case .loaded:
             if extras.queue.isEmpty {
                 placeholder("Plus rien après ce morceau", symbol: "list.bullet")
