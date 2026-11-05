@@ -29,11 +29,7 @@ enum ClaudeReply {
             .replacingOccurrences(of: "\n", with: " ")
             .trimmingCharacters(in: .whitespaces)
         guard !message.isEmpty else { return .failed("Message vide") }
-        guard let app = ProcessOwner.app(of: pid) else {
-            ReplyLog.write(" no app for pid \(pid)")
-            return .failed("Session introuvable")
-        }
-        ReplyLog.write(" app \(app.bundleIdentifier ?? "?"), title \(sessionTitle ?? "nil"), choice \(asChoice)")
+        guard let app = ProcessOwner.app(of: pid) else { return .failed("Session introuvable") }
         let appName = app.localizedName ?? "l'app"
         let tty = ProcessOwner.ttyPath(of: pid)
 
@@ -84,6 +80,7 @@ enum ClaudeReply {
             end tell
             return "missing"
             """
+            releaseKeyboard()
             guard await AppleScriptRunner.run(script, cached: false)?.stringValue == "ok" else {
                 return .failed("Onglet Terminal introuvable")
             }
@@ -92,20 +89,27 @@ enum ClaudeReply {
             return .sent(app: appName)
 
         case (claudeAppID, _):
-            // App Claude : on ouvre la conversation de la session et on écrit dans son champ.
-            // Si on ne peut pas vérifier que c'est la bonne conversation, on colle sans envoyer.
-            // L'app d'abord au premier plan : sur un autre bureau, ses fenêtres sont invisibles
-            // pour l'Accessibilité.
+            // App Claude : on ouvre la conversation de la session, on écrit dans son champ par
+            // l'Accessibilité, puis Entrée. Sans pouvoir vérifier la conversation, on colle sans envoyer.
             let appPID = pid_t(app.processIdentifier)
+            // L'encoche garde le clavier (on vient d'y taper) même si Claude est déjà au premier
+            // plan : on le lui rend, sinon Entrée retombe dans l'encoche.
+            releaseKeyboard()
+            // Au premier plan d'abord : sur un autre bureau, ses fenêtres sont invisibles pour l'Accessibilité.
             guard app.activate() else { return .failed("Impossible d'ouvrir \(appName)") }
             try? await Task.sleep(for: .milliseconds(500))
-            let ready = await Task.detached { focusComposer(inAppWith: appPID, conversation: sessionTitle) }.value
-            ReplyLog.write(" composer ready \(ready), frontmost \(NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "?")")
-            try? await Task.sleep(for: .milliseconds(150))
-            await paste(message, thenReturn: ready)
-            return ready ? .sent(app: appName) : .pasted(app: appName)
+            await Task.detached { raiseMainWindow(ofAppWith: appPID) }.value
+            let typed = await Task.detached { typeInComposer(message, inAppWith: appPID, conversation: sessionTitle) }.value
+            guard typed else {
+                await paste(message, thenReturn: false)
+                return .pasted(app: appName)
+            }
+            try? await Task.sleep(for: .milliseconds(200))
+            press(key: 36, flags: []) // Entrée
+            return .sent(app: appName)
 
         default:
+            releaseKeyboard()
             guard app.activate() else { return .failed("Impossible d'ouvrir \(appName)") }
             try? await Task.sleep(for: .milliseconds(350))
             await paste(message, thenReturn: false)
@@ -169,17 +173,44 @@ enum ClaudeReply {
         }
     }
 
-    /// Affiche la conversation de la session dans l'app Claude (au besoin en cliquant sur son
-    /// entrée dans la barre latérale) et donne le focus à son champ de saisie.
-    /// Renvoie `false` si la bonne conversation n'a pas pu être vérifiée.
-    nonisolated static func focusComposer(inAppWith appPID: pid_t, conversation title: String?) -> Bool {
-        guard AXIsProcessTrusted(), let title, !title.isEmpty else { return false }
+    /// Écrit le texte dans le champ de saisie de la conversation de la session (app Claude).
+    nonisolated static func typeInComposer(_ text: String, inAppWith appPID: pid_t, conversation title: String?) -> Bool {
+        guard let composer = composer(inAppWith: appPID, conversation: title) else { return false }
+        AXUIElementSetAttributeValue(composer, kAXFocusedAttribute as CFString, kCFBooleanTrue)
+        // On remplace la valeur du champ (en gardant un éventuel brouillon) : c'est ce que l'app
+        // prend en compte, une insertion « comme une saisie » est ignorée.
+        let draft = axString(composer, kAXValueAttribute)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let value = draft.isEmpty ? text : draft + " " + text
+        let status = AXUIElementSetAttributeValue(composer, kAXValueAttribute as CFString, value as CFString)
+        return status == .success
+    }
+
+    /// Les fenêtres d'Encoche (l'encoche ouverte) cessent de recevoir le clavier, sans disparaître.
+    static func releaseKeyboard() {
+        for window in NSApp.windows where window.isKeyWindow {
+            window.orderOut(nil)
+            window.orderFrontRegardless()
+        }
+    }
+
+    /// Fenêtre de l'app au premier plan et principale : c'est elle qui reçoit le clavier.
+    nonisolated static func raiseMainWindow(ofAppWith appPID: pid_t) {
+        let app = AXUIElementCreateApplication(appPID)
+        AXUIElementSetAttributeValue(app, kAXFrontmostAttribute as CFString, kCFBooleanTrue)
+        guard let window = axChildren(app, kAXWindowsAttribute).first ?? axElement(app, kAXFocusedWindowAttribute) else { return }
+        AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+        AXUIElementSetAttributeValue(window, kAXMainAttribute as CFString, kCFBooleanTrue)
+    }
+
+    /// Champ de saisie de la conversation de la session dans l'app Claude (au besoin en cliquant
+    /// sur son entrée dans la barre latérale). `nil` si la bonne conversation n'a pas pu être vérifiée.
+    nonisolated static func composer(inAppWith appPID: pid_t, conversation title: String?) -> AXUIElement? {
+        guard AXIsProcessTrusted(), let title, !title.isEmpty else { return nil }
         let app = AXUIElementCreateApplication(appPID)
         AXUIElementSetAttributeValue(app, "AXManualAccessibility" as CFString, kCFBooleanTrue)
 
         for attempt in 0..<10 {
             guard let window = axChildren(app, kAXWindowsAttribute).first ?? axElement(app, kAXFocusedWindowAttribute) else {
-                ReplyLog.write("attempt \(attempt), no window yet")
                 Thread.sleep(forTimeInterval: 0.2)
                 continue
             }
@@ -193,27 +224,22 @@ enum ClaudeReply {
             } ?? webAreas.first { area in
                 first(in: area, where: { axString($0, kAXRoleAttribute) == "AXHeading" && axString($0, kAXTitleAttribute) == title }) != nil
             }
-            ReplyLog.write("attempt \(attempt), \(webAreas.count) web areas, conversation found \(conversation != nil)")
 
             if let conversation {
                 guard let composer = first(in: conversation, where: { axString($0, kAXRoleAttribute) == "AXTextArea" }) else {
-                    ReplyLog.write("no message field found")
-                    return false
+                    return nil
                 }
-                let status = AXUIElementSetAttributeValue(composer, kAXFocusedAttribute as CFString, kCFBooleanTrue)
-                ReplyLog.write("focus status \(status.rawValue)")
-                return status == .success
+                return composer
             }
             // Autre conversation affichée : on clique une fois sur celle de la session.
             if attempt == 1, let entry = first(in: window, where: {
                 axString($0, kAXRoleAttribute) == "AXButton" && axString($0, kAXTitleAttribute) == title
             }) {
-                ReplyLog.write("opening the session from the sidebar")
                 AXUIElementPerformAction(entry, kAXPressAction as CFString)
             }
             Thread.sleep(forTimeInterval: 0.3)
         }
-        return false
+        return nil
     }
 
     private nonisolated static func collect(in element: AXUIElement, into results: inout [AXUIElement],
@@ -326,18 +352,3 @@ enum ClaudeReply {
     }
 }
 
-/// Journal de diagnostic de l'envoi des réponses (sans le texte des messages), dans le dossier
-/// de données d'Encoche : `reply.log`.
-enum ReplyLog {
-    nonisolated static func write(_ line: String) {
-        let url = URL.appSupport.appendingPathComponent("reply.log")
-        let entry = "\(Date().formatted(date: .omitted, time: .standard)) \(line)\n"
-        if let handle = try? FileHandle(forWritingTo: url) {
-            handle.seekToEndOfFile()
-            handle.write(Data(entry.utf8))
-            try? handle.close()
-        } else {
-            try? Data(entry.utf8).write(to: url)
-        }
-    }
-}
