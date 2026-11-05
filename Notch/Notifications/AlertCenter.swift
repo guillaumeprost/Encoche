@@ -56,6 +56,8 @@ final class AlertCenter {
     private var queue: [NotchAlert] = []
     /// Écrans dont la notification est survolée (une encoche par écran).
     private var hoveringSources: Set<ObjectIdentifier> = []
+    /// La notification affichée est survolée (elle reste alors à l'écran et se déplie).
+    private(set) var isHovered = false
     private var dismissTask: Task<Void, Never>?
 
     init() {
@@ -78,6 +80,7 @@ final class AlertCenter {
         let wasHovering = !hoveringSources.isEmpty
         if hovering { hoveringSources.insert(source) } else { hoveringSources.remove(source) }
         let isHovering = !hoveringSources.isEmpty
+        if isHovered != isHovering { isHovered = isHovering }
         guard isHovering != wasHovering, let current, !current.isPersistent else { return }
         if isHovering {
             dismissTask?.cancel()
@@ -144,6 +147,7 @@ final class AlertCenter {
     func dismiss() {
         dismissTask?.cancel()
         hoveringSources.removeAll()
+        isHovered = false
         current = nil
         // Laisse l'encoche se replier avant d'afficher la suivante.
         Task { [weak self] in

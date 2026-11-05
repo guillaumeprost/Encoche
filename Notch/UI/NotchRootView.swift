@@ -119,9 +119,11 @@ struct NotchRootView: View {
         .animation(spring, value: vm.isOpen)
         .animation(spring, value: settings.tab)
         .animation(spring, value: vm.showsAlert)
+        .animation(spring, value: vm.alertExpanded)
         .animation(spring, value: vm.showsHUD)
         .onChange(of: hud.current, initial: true) { vm.showsHUD = hud.current != nil }
         .onChange(of: alerts.current?.id, initial: true) { updateAlert() }
+        .onChange(of: alerts.isHovered) { updateAlert() }
         .onChange(of: vm.isPrimaryScreen) { updateAlert() }
         .onChange(of: settings.notificationsOnPrimaryScreenOnly) { updateAlert() }
         .animation(spring, value: showsActivity)
@@ -133,6 +135,8 @@ struct NotchRootView: View {
         let allowed = vm.isPrimaryScreen || !settings.notificationsOnPrimaryScreenOnly
         vm.showsAlert = allowed && alerts.current != nil
         vm.alertHasButtons = alerts.current?.isPersistent ?? false
+        // Texte coupé à deux lignes : le survol le déplie.
+        vm.alertExpanded = alerts.isHovered && (alerts.current?.body?.count ?? 0) > 80
     }
 
     /// Une « live activity » occupe les côtés de l'encoche repliée, par priorité : Claude Code qui

@@ -5,6 +5,10 @@ struct AlertBannerView: View {
     @Environment(AlertCenter.self) private var alerts
     let alert: NotchAlert
 
+    private var hovered: Bool { alerts.isHovered }
+    /// Un clic fait quelque chose (ouvre l'app, le lien…).
+    private var isClickable: Bool { alert.action != nil && alert.buttons.isEmpty }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
             content
@@ -30,21 +34,56 @@ struct AlertBannerView: View {
                         .font(.system(size: 12.5, weight: .semibold))
                         .lineLimit(1)
                     Spacer(minLength: 4)
-                    Text(alert.source)
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.primary.opacity(0.45))
-                        .lineLimit(1)
+                    if hovered && alert.buttons.isEmpty {
+                        // Au survol : fermer sans ouvrir.
+                        Button { alerts.dismiss() } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 8.5, weight: .bold))
+                                .foregroundStyle(.primary.opacity(0.7))
+                                .frame(width: 18, height: 18)
+                                .background(Circle().fill(.primary.opacity(0.14)))
+                                .contentShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .help("Fermer")
+                        .transition(.scale.combined(with: .opacity))
+                    } else {
+                        Text(alert.source)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.primary.opacity(0.45))
+                            .lineLimit(1)
+                            .transition(.opacity)
+                    }
                 }
                 if let body = alert.body, !body.isEmpty {
                     Text(body)
                         .font(.system(size: 11.5))
                         .foregroundStyle(.primary.opacity(0.75))
-                        .lineLimit(2)
+                        .lineLimit(hovered ? 5 : 2)
+                        .fixedSize(horizontal: false, vertical: hovered)
                 }
+            }
+            if hovered && isClickable {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(.primary.opacity(0.4))
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }
         .foregroundStyle(.primary)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(.white.opacity(hovered && isClickable ? 0.08 : 0))
+        )
+        .padding(.horizontal, -6)
         .contentShape(Rectangle())
+        .animation(.snappy(duration: 0.2), value: hovered)
+        .onHover { inside in
+            guard isClickable else { return }
+            if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+        }
     }
 }
 

@@ -18,6 +18,8 @@ final class NotchViewModel {
     var showsAlert = false
     /// La notification affichée porte des boutons (demande de permission).
     var alertHasButtons = false
+    /// Notification survolée dont le texte est long : elle se déplie pour l'afficher en entier.
+    var alertExpanded = false
     /// Un indicateur (volume, luminosité, batterie) est affiché sous l'encoche repliée.
     var showsHUD = false
 
@@ -38,8 +40,9 @@ final class NotchViewModel {
         }
     }
     static let alertBodyWidth: CGFloat = 380
-    static let alertContentHeight: CGFloat = 60
+    static let alertContentHeight: CGFloat = 66
     static let alertButtonsHeight: CGFloat = 36
+    static let alertExpandedExtraHeight: CGFloat = 46
     static let hudHeight: CGFloat = 26
 
     var topRadius: CGFloat { isOpen || showsAlert ? 12 : 6 }
@@ -61,6 +64,7 @@ final class NotchViewModel {
         } else if showsAlert {
             bodyWidth = max(alertHasButtons ? 440 : Self.alertBodyWidth, notchSize.width + 2 * activitySlotWidth)
             height = notchSize.height + Self.alertContentHeight + (alertHasButtons ? Self.alertButtonsHeight : 0)
+                + (alertExpanded ? Self.alertExpandedExtraHeight : 0)
         } else if showsHUD {
             bodyWidth = notchSize.width + 2 * activitySlotWidth
             height = notchSize.height + Self.hudHeight

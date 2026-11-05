@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 
 /// Fenêtre transparente, sans bordure, posée au-dessus de la barre de menus.
 final class NotchPanel: NSPanel {
@@ -24,4 +25,10 @@ final class NotchPanel: NSPanel {
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+}
+
+/// Vue SwiftUI de l'encoche qui réagit dès le premier clic : sans ça, l'encoche n'ayant
+/// jamais le focus, un premier clic (sur une notification…) servait seulement à l'activer.
+final class FirstClickHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
