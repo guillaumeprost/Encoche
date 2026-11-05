@@ -6,7 +6,7 @@ import SwiftUI
 @Observable
 @MainActor
 final class TimerController {
-    enum Kind: Equatable {
+    enum Kind: String, Equatable {
         case timer
         /// 25 minutes de travail, suivies d'une pause proposée.
         case pomodoro
@@ -42,6 +42,35 @@ final class TimerController {
     @ObservationIgnored var alerts: AlertCenter?
     @ObservationIgnored private var finishTask: Task<Void, Never>?
 
+    private static let storeKey = "runningTimer"
+
+    /// Reprend un minuteur en cours après un redémarrage d'Encoche (mise à jour…).
+    init() {
+        guard let saved = UserDefaults.standard.dictionary(forKey: Self.storeKey),
+              let kind = (saved["kind"] as? String).flatMap(Kind.init),
+              let duration = saved["duration"] as? Double else { return }
+        self.kind = kind
+        self.duration = duration
+        if let paused = saved["pausedRemaining"] as? Double {
+            pausedRemaining = paused
+        } else if let end = saved["endDate"] as? Date, end > Date() {
+            schedule(endDate: end)
+        } else {
+            UserDefaults.standard.removeObject(forKey: Self.storeKey)
+        }
+    }
+
+    private func save() {
+        guard isActive else {
+            UserDefaults.standard.removeObject(forKey: Self.storeKey)
+            return
+        }
+        var state: [String: Any] = ["kind": kind.rawValue, "duration": duration]
+        if let endDate { state["endDate"] = endDate }
+        if let pausedRemaining { state["pausedRemaining"] = pausedRemaining }
+        UserDefaults.standard.set(state, forKey: Self.storeKey)
+    }
+
     func remaining(at date: Date) -> TimeInterval {
         if let pausedRemaining { return pausedRemaining }
         guard let endDate else { return 0 }
@@ -71,6 +100,7 @@ final class TimerController {
         pausedRemaining = max(endDate.timeIntervalSinceNow, 0)
         self.endDate = nil
         finishTask?.cancel()
+        save()
     }
 
     func resume() {
@@ -83,10 +113,12 @@ final class TimerController {
         finishTask?.cancel()
         endDate = nil
         pausedRemaining = nil
+        save()
     }
 
     private func schedule(endDate: Date) {
         self.endDate = endDate
+        save()
         finishTask?.cancel()
         finishTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(max(endDate.timeIntervalSinceNow, 0)))

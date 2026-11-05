@@ -306,6 +306,10 @@ struct CollapsedTimerView: View {
                         .foregroundStyle(timer.isPaused ? Color.white.opacity(0.45) : tint)
                         .contentTransition(.numericText(countsDown: true))
                         .opacity(finalMinute && seconds % 2 == 0 ? 0.7 : 1)
+                        // Un peu d'air avant le bord arrondi de l'encoche.
+                        .padding(.trailing, 5)
+                        .minimumScaleFactor(0.8)
+                        .lineLimit(1)
                 }
                 // Avancement, sous l'encoche : la barre se vide jusqu'à la fin.
                 GeometryReader { geometry in
