@@ -39,11 +39,15 @@ struct ClaudeTab: View {
                     AskPanel()
                 }
             }
-            ClaudeTabField(
-                session: session,
-                canReply: selectedSession != nil,
-                quickQuestion: $quickQuestion
-            )
+            HStack(spacing: 6) {
+                ClaudeTabField(
+                    session: session,
+                    canReply: selectedSession != nil,
+                    quickQuestion: $quickQuestion
+                )
+                // Quota hebdomadaire de l'abonnement, comme dans l'app Claude.
+                ClaudeQuotaRing()
+            }
         }
         .foregroundStyle(.primary)
     }

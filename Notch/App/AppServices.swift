@@ -24,6 +24,7 @@ struct AppServices {
     let claudeCode: ClaudeCodeMonitor
     let ask: ClaudeAsk
     let claudeUsage: ClaudeUsage
+    let claudeQuota: ClaudeQuota
     let launchAtLogin: LaunchAtLogin
     let systemNotifications: SystemNotificationWatcher
     let bannerSuppressor: BannerSuppressor
@@ -64,6 +65,7 @@ struct AppServices {
         volume.setReplacesSystemHUD(settings.replaceSystemVolumeHUD)
         ask = ClaudeAsk()
         claudeUsage = ClaudeUsage()
+        claudeQuota = ClaudeQuota()
         launchAtLogin = LaunchAtLogin()
         systemNotifications = SystemNotificationWatcher(alerts: alerts, settings: settings)
 
@@ -115,6 +117,7 @@ extension View {
             .environment(services.claudeCode)
             .environment(services.ask)
             .environment(services.claudeUsage)
+            .environment(services.claudeQuota)
             .environment(services.launchAtLogin)
             .environment(services.systemNotifications)
     }
