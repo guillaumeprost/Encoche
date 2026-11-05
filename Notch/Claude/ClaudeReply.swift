@@ -90,14 +90,13 @@ enum ClaudeReply {
         case (claudeAppID, _):
             // App Claude : on ouvre la conversation de la session et on écrit dans son champ.
             // Si on ne peut pas vérifier que c'est la bonne conversation, on colle sans envoyer.
+            // L'app d'abord au premier plan : sur un autre bureau, ses fenêtres sont invisibles
+            // pour l'Accessibilité.
             let appPID = pid_t(app.processIdentifier)
-            let ready = await Task.detached { focusComposer(inAppWith: appPID, conversation: sessionTitle) }.value
             guard app.activate() else { return .failed("Impossible d'ouvrir \(appName)") }
-            try? await Task.sleep(for: .milliseconds(350))
-            if ready {
-                // L'activation peut rendre le focus ailleurs : on le redonne au champ.
-                _ = await Task.detached { focusComposer(inAppWith: appPID, conversation: sessionTitle) }.value
-            }
+            try? await Task.sleep(for: .milliseconds(500))
+            let ready = await Task.detached { focusComposer(inAppWith: appPID, conversation: sessionTitle) }.value
+            try? await Task.sleep(for: .milliseconds(150))
             await paste(message, thenReturn: ready)
             return ready ? .sent(app: appName) : .pasted(app: appName)
 
@@ -174,7 +173,7 @@ enum ClaudeReply {
         AXUIElementSetAttributeValue(app, "AXManualAccessibility" as CFString, kCFBooleanTrue)
 
         for attempt in 0..<10 {
-            guard let window = axChildren(app, kAXWindowsAttribute).first,
+            guard let window = axChildren(app, kAXWindowsAttribute).first ?? axElement(app, kAXFocusedWindowAttribute),
                   let webArea = first(in: window, where: { axString($0, kAXRoleAttribute) == "AXWebArea" }) else {
                 Thread.sleep(forTimeInterval: 0.2)
                 continue
@@ -237,6 +236,12 @@ enum ClaudeReply {
         var value: AnyObject?
         AXUIElementCopyAttributeValue(element, name as CFString, &value)
         return value as? String
+    }
+
+    private nonisolated static func axElement(_ element: AXUIElement, _ name: String) -> AXUIElement? {
+        var value: AnyObject?
+        guard AXUIElementCopyAttributeValue(element, name as CFString, &value) == .success, let value else { return nil }
+        return (value as! AXUIElement)
     }
 
     private nonisolated static func axChildren(_ element: AXUIElement, _ name: String) -> [AXUIElement] {
