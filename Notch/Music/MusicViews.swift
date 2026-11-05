@@ -362,8 +362,8 @@ private struct QueueView: View {
         case .unavailable:
             placeholder(
                 music.source == .spotify
-                    ? "Spotify ne partage pas sa file d'attente"
-                    : "File d'attente disponible pour une playlist ou un album",
+                    ? "Album introuvable dans le catalogue d'Apple"
+                    : "Pas de playlist en cours, et album introuvable dans le catalogue d'Apple",
                 symbol: "list.bullet"
             )
         case .loaded:
@@ -373,7 +373,7 @@ private struct QueueView: View {
                 ScrollView(.vertical) {
                     VStack(alignment: .leading, spacing: 2) {
                         if let title = extras.queueTitle {
-                            Text(title)
+                            Text(extras.queueIsAlbum ? "Suite de l'album · \(title)" : title)
                                 .font(.system(size: 11, weight: .semibold))
                                 .foregroundStyle(.primary.opacity(0.45))
                                 .padding(.bottom, 2)

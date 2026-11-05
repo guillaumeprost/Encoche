@@ -1,11 +1,13 @@
+import AppKit
 import Foundation
 import Observation
 
 /// File d'attente et paroles du morceau en cours, chargées à la demande (onglet Musique).
 ///
-/// - File d'attente : seulement avec Musique, qui expose la playlist en cours par AppleScript
-///   (Spotify ne donne pas accès à sa file). Ce sont les morceaux qui suivent dans la playlist
-///   ou l'album en cours ; la file « À suivre » ajoutée à la main n'est pas accessible.
+/// - File d'attente : la vraie file « À suivre » n'est accessible par aucune API publique.
+///   Avec Musique, on lit les morceaux qui suivent dans la playlist en cours (bibliothèque).
+///   Sinon (Apple Music en streaming, Spotify), on affiche la suite de l'album en cours,
+///   trouvée dans le catalogue public d'Apple (iTunes Search : titre, artiste et album envoyés).
 /// - Paroles : LRCLIB (lrclib.net), service libre et gratuit, avec paroles synchronisées.
 ///   Seuls le titre, l'artiste, l'album et la durée du morceau y sont envoyés.
 @Observable
@@ -13,11 +15,13 @@ import Observation
 final class MusicExtras {
     struct QueueItem: Identifiable, Equatable {
         let id: Int
-        /// Position dans la playlist (pour la lancer).
+        /// Position dans la playlist de la bibliothèque (pour la lancer), ou 0.
         let index: Int
         let title: String
         let artist: String
         let duration: Double
+        /// Page du morceau dans Apple Music (suite d'album).
+        var url: URL? = nil
     }
 
     struct LyricLine: Identifiable, Equatable {
@@ -30,6 +34,8 @@ final class MusicExtras {
 
     private(set) var queue: [QueueItem] = []
     private(set) var queueTitle: String?
+    /// La file est la suite de l'album (et non la playlist en cours).
+    private(set) var queueIsAlbum = false
     private(set) var queueState: LoadState = .idle
     private(set) var lyrics: [LyricLine] = []
     private(set) var lyricsSynced = false
@@ -58,6 +64,13 @@ final class MusicExtras {
 
     /// Lance un morceau de la file.
     func play(_ item: QueueItem) {
+        if item.index == 0 {
+            // Morceau du catalogue : ouvert dans Musique.
+            if let url = item.url, let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.Music") {
+                NSWorkspace.shared.open([url], withApplicationAt: app, configuration: NSWorkspace.OpenConfiguration())
+            }
+            return
+        }
         guard music.source == .music else { return }
         Task {
             _ = await AppleScriptRunner.run(
@@ -76,13 +89,11 @@ final class MusicExtras {
     // MARK: - File d'attente
 
     private func loadQueue(for track: MusicController.Track) {
+        queueState = .loading
         guard music.source == .music else {
-            queue = []
-            queueTitle = nil
-            queueState = .unavailable
+            loadAlbumQueue(for: track)
             return
         }
-        queueState = .loading
         let script = """
         tell application id "com.apple.Music"
             set pl to current playlist
@@ -101,11 +112,11 @@ final class MusicExtras {
             let result = await AppleScriptRunner.run(script, cached: false)
             guard music.track == track else { return }
             guard let result, result.numberOfItems >= 1 else {
-                queue = []
-                queueTitle = nil
-                queueState = .unavailable
+                // Pas de playlist accessible (Apple Music en streaming) : suite de l'album.
+                loadAlbumQueue(for: track)
                 return
             }
+            queueIsAlbum = false
             queueTitle = result.atIndex(1)?.stringValue
             var items: [QueueItem] = []
             if result.numberOfItems >= 2 {
@@ -123,6 +134,89 @@ final class MusicExtras {
             queue = items
             queueState = .loaded
         }
+    }
+
+    private func loadAlbumQueue(for track: MusicController.Track) {
+        Task {
+            let items = await Self.albumTracks(after: track)
+            guard music.track == track else { return }
+            queue = items ?? []
+            queueTitle = items == nil ? nil : track.album
+            queueIsAlbum = true
+            queueState = items == nil ? .unavailable : .loaded
+        }
+    }
+
+    private struct ITunesResults: Decodable {
+        struct Item: Decodable {
+            let wrapperType: String?
+            let collectionId: Int?
+            let collectionName: String?
+            let artistName: String?
+            let trackName: String?
+            let trackNumber: Int?
+            let discNumber: Int?
+            let trackTimeMillis: Double?
+            let trackViewUrl: String?
+        }
+        let results: [Item]
+    }
+
+    /// Morceaux de l'album après le morceau en cours, d'après le catalogue public d'Apple.
+    private nonisolated static func albumTracks(after track: MusicController.Track) async -> [QueueItem]? {
+        guard !track.album.isEmpty else { return nil }
+        let country = Locale.current.region?.identifier ?? "FR"
+        let wantedAlbum = normalized(track.album)
+        let wantedArtist = normalized(track.artist)
+
+        func search(_ term: String, entity: String, attribute: String? = nil) async -> [ITunesResults.Item] {
+            var components = URLComponents(string: "https://itunes.apple.com/search")!
+            components.queryItems = [
+                URLQueryItem(name: "term", value: term), URLQueryItem(name: "entity", value: entity),
+                URLQueryItem(name: "limit", value: "25"), URLQueryItem(name: "country", value: country),
+            ] + (attribute.map { [URLQueryItem(name: "attribute", value: $0)] } ?? [])
+            guard let data = await request(components.url!) else { return [] }
+            return (try? JSONDecoder().decode(ITunesResults.self, from: data))?.results ?? []
+        }
+        func matches(_ item: ITunesResults.Item) -> Bool {
+            normalized(item.collectionName ?? "") == wantedAlbum
+                && normalized(item.artistName ?? "").contains(wantedArtist.prefix(12))
+        }
+
+        // Le morceau d'abord (donne directement son album), puis l'album par son nom.
+        var collection = await search("\(track.artist) \(track.title)", entity: "song").first(where: matches)?.collectionId
+        if collection == nil {
+            collection = await search(track.album, entity: "album", attribute: "albumTerm").first(where: matches)?.collectionId
+        }
+        guard let collection else { return nil }
+
+        var lookup = URLComponents(string: "https://itunes.apple.com/lookup")!
+        lookup.queryItems = [
+            URLQueryItem(name: "id", value: String(collection)), URLQueryItem(name: "entity", value: "song"),
+            URLQueryItem(name: "country", value: country),
+        ]
+        guard let data = await request(lookup.url!),
+              let results = try? JSONDecoder().decode(ITunesResults.self, from: data).results else { return nil }
+        let songs = results
+            .filter { $0.wrapperType == "track" }
+            .sorted { ($0.discNumber ?? 1, $0.trackNumber ?? 0) < ($1.discNumber ?? 1, $1.trackNumber ?? 0) }
+        let current = songs.firstIndex { normalized($0.trackName ?? "") == normalized(track.title) }
+        let following = current.map { Array(songs[($0 + 1)...]) } ?? songs
+        return following.enumerated().map { offset, song in
+            QueueItem(
+                id: offset,
+                index: 0,
+                title: song.trackName ?? "",
+                artist: song.artistName ?? "",
+                duration: (song.trackTimeMillis ?? 0) / 1000,
+                url: song.trackViewUrl.flatMap(URL.init(string:))
+            )
+        }
+    }
+
+    private nonisolated static func normalized(_ text: String) -> String {
+        text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
+            .trimmingCharacters(in: .whitespaces)
     }
 
     // MARK: - Paroles
