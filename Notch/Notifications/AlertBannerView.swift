@@ -27,6 +27,24 @@ struct AlertBannerView: View {
         HStack(alignment: .center, spacing: 11) {
             AlertIcon(icon: alert.icon)
                 .frame(width: 34, height: 34)
+                .overlay(alignment: .topLeading) {
+                    if hovered && alert.buttons.isEmpty {
+                        // Au survol : fermer sans ouvrir, comme dans le Centre de notifications.
+                        Button { alerts.dismiss() } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 7, weight: .heavy))
+                                .foregroundStyle(.white.opacity(0.85))
+                                .frame(width: 16, height: 16)
+                                .background(Circle().fill(Color(white: 0.22)))
+                                .overlay(Circle().strokeBorder(.white.opacity(0.12), lineWidth: 0.5))
+                                .contentShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .help("Fermer")
+                        .offset(x: -6, y: -6)
+                        .transition(.scale(scale: 0.5).combined(with: .opacity))
+                    }
+                }
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -34,26 +52,10 @@ struct AlertBannerView: View {
                         .font(.system(size: 12.5, weight: .semibold))
                         .lineLimit(1)
                     Spacer(minLength: 4)
-                    if hovered && alert.buttons.isEmpty {
-                        // Au survol : fermer sans ouvrir.
-                        Button { alerts.dismiss() } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 8.5, weight: .bold))
-                                .foregroundStyle(.primary.opacity(0.7))
-                                .frame(width: 18, height: 18)
-                                .background(Circle().fill(.primary.opacity(0.14)))
-                                .contentShape(Circle())
-                        }
-                        .buttonStyle(.plain)
-                        .help("Fermer")
-                        .transition(.scale.combined(with: .opacity))
-                    } else {
-                        Text(alert.source)
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(.primary.opacity(0.45))
-                            .lineLimit(1)
-                            .transition(.opacity)
-                    }
+                    Text(alert.source)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.primary.opacity(0.45))
+                        .lineLimit(1)
                 }
                 if let body = alert.body, !body.isEmpty {
                     Text(body)
@@ -62,12 +64,6 @@ struct AlertBannerView: View {
                         .lineLimit(hovered ? 5 : 2)
                         .fixedSize(horizontal: false, vertical: hovered)
                 }
-            }
-            if hovered && isClickable {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundStyle(.primary.opacity(0.4))
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
             }
         }
         .foregroundStyle(.primary)
