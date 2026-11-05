@@ -126,9 +126,11 @@ struct NotchRootView: View {
         // Une deuxième activité en même temps : petite bulle à droite, comme sur iPhone.
         .overlay(alignment: .topTrailing) {
             if showsBubble, let second = activities.dropFirst().first {
+                // Un peu plus petite que l'encoche, et décollée du haut de l'écran.
+                let size = vm.activityHeight - 8
                 ActivityBubble(activity: second)
-                    .frame(width: vm.activityHeight, height: vm.activityHeight)
-                    .offset(x: vm.activityHeight + 6)
+                    .frame(width: size, height: size)
+                    .offset(x: size + 6, y: 4)
                     .id(second)
                     .transition(.scale(scale: 0.4, anchor: .leading).combined(with: .opacity))
             }

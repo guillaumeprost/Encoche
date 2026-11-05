@@ -51,7 +51,7 @@ struct ActivityBubble: View {
                 .foregroundStyle(.green)
         case .claudeWaiting:
             ClaudeMascot(mood: .waiting)
-                .frame(width: 23)
+                .frame(width: 19)
         case .privacy:
             Image(systemName: privacy.isCameraInUse ? "video.fill" : "mic.fill")
                 .font(.system(size: 12, weight: .semibold))
@@ -64,7 +64,7 @@ struct ActivityBubble: View {
             .frame(width: 17, height: 17)
         case .claudeWorking:
             ClaudeMascot(mood: .working)
-                .frame(width: 23)
+                .frame(width: 19)
         case .meeting:
             if let meeting = calendar.upcomingMeeting {
                 TimelineView(.periodic(from: .now, by: 1)) { context in
