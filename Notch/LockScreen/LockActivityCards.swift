@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Activités en direct sur l'écran verrouillé, en cartes empilées au-dessus du lecteur de
-/// musique, comme sur iPhone : minuteur, Claude Code, prochaine réunion, téléchargement.
+/// Activités en direct sur l'écran verrouillé, en cartes empilées sous l'horloge au-dessus du
+/// lecteur de musique, comme sur iPhone : minuteur, Claude Code, prochaine réunion, téléchargement.
 struct LockActivitiesView: View {
     @Environment(LockScreenController.self) private var lock
     @Environment(AppSettings.self) private var settings
@@ -13,7 +13,6 @@ struct LockActivitiesView: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            Spacer(minLength: 0)
             if settings.lockScreenActivities {
                 if timer.isActive { LockTimerCard() }
                 if let session = claudeSession { LockClaudeCard(session: session) }
@@ -24,8 +23,9 @@ struct LockActivitiesView: View {
                 LockMusicCard()
                     .frame(height: LockScreenController.musicCardSize.height)
             }
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .opacity(lock.phase == .locked ? 1 : 0)
         .animation(.easeOut(duration: 0.3), value: lock.phase)
         .animation(.snappy, value: timer.isActive)

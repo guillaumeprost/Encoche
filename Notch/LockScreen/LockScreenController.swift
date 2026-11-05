@@ -19,6 +19,8 @@ final class LockScreenController {
     static let musicCardSize = CGSize(width: 420, height: 124)
     /// Zone des cartes : assez basse pour ne jamais recouvrir le champ du mot de passe.
     static let activitiesSize = CGSize(width: 420, height: 380)
+    /// Part du haut de l'écran prise par la date et l'horloge de l'écran verrouillé.
+    static let clockFraction: CGFloat = 0.31
 
     init(services: AppServices) {
         self.services = services
@@ -55,10 +57,12 @@ final class LockScreenController {
         )
         windows.append(notchWindow)
 
-        // Activités et lecteur de musique, empilés en bas de l'écran ; mis à jour en direct.
+        // Activités et lecteur de musique, empilés sous l'horloge (comme sur iPhone) : le bas de
+        // l'écran reste libre pour l'avatar et le mot de passe. Mis à jour en direct.
         let size = Self.activitiesSize
+        let top = screen.frame.maxY - screen.frame.height * Self.clockFraction
         let activitiesWindow = makeWindow(
-            frame: NSRect(x: screen.frame.midX - size.width / 2, y: screen.frame.minY + 110,
+            frame: NSRect(x: screen.frame.midX - size.width / 2, y: top - size.height,
                           width: size.width, height: size.height),
             content: LockActivitiesView(),
             clickable: true
