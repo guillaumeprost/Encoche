@@ -29,6 +29,13 @@ struct ClaudeCodeSession: Identifiable, Equatable {
     var agents: [SubAgent] = []
     /// Dernière réponse de Claude.
     var lastMessage: String?
+    /// Réponses proposées par Claude à la fin de sa réponse (boutons de l'app Claude).
+    var choices: Choices?
+
+    struct Choices: Equatable {
+        let question: String
+        let options: [String]
+    }
     var transcriptPath: String?
 
     struct PlanItem: Equatable, Identifiable {
@@ -66,8 +73,10 @@ struct ClaudeCodeSession: Identifiable, Equatable {
 /// Demande de permission de Claude Code en attente de ta décision dans l'encoche.
 @MainActor
 final class PendingPermission: Identifiable {
-    enum Decision {
+    enum Decision: Equatable {
         case allow
+        /// Réponse choisie à une question de Claude (outil « AskUserQuestion »).
+        case answer(String)
         /// Autoriser et ajouter la règle suggérée par Claude Code (plus de question la prochaine fois).
         case allowAlways
         case deny
@@ -82,11 +91,14 @@ final class PendingPermission: Identifiable {
     let summary: String
     /// Mises à jour de permissions suggérées par Claude Code (« toujours autoriser »).
     let suggestions: [[String: Any]]
+    /// Paramètres de l'outil (pour y ajouter la réponse d'une question).
+    let input: [String: Any]
     let reply: HookReply
     var alertID: UUID?
 
     init(sessionID: String, projectName: String, toolName: String, summary: String,
-         suggestions: [[String: Any]], reply: HookReply) {
+         suggestions: [[String: Any]], input: [String: Any] = [:], reply: HookReply) {
+        self.input = input
         self.sessionID = sessionID
         self.projectName = projectName
         self.toolName = toolName
@@ -225,6 +237,13 @@ final class ClaudeCodeMonitor {
             output = ["behavior": "allow", "updatedPermissions": permission.suggestions]
         case .deny:
             output = ["behavior": "deny", "message": "Refusé depuis Encoche."]
+        case .answer(let label):
+            // Comme dans le SDK : la question reçoit sa réponse dans « answers ».
+            var input = permission.input
+            if let question = (input["questions"] as? [[String: Any]])?.first?["question"] as? String {
+                input["answers"] = [question: label]
+            }
+            output = ["behavior": "allow", "updatedInput": input]
         case .terminal:
             output = nil
         }
@@ -263,6 +282,7 @@ final class ClaudeCodeMonitor {
             toolName: tool,
             summary: ClaudeActivity.summarize(tool: tool, input: input),
             suggestions: event["permission_suggestions"] as? [[String: Any]] ?? [],
+            input: input,
             reply: reply
         )
         reply.onClosed = { [weak self, weak permission] in
@@ -274,6 +294,13 @@ final class ClaudeCodeMonitor {
         upsert(sessionID, cwd: cwd) { session in
             session.state = .waiting
             session.detail = "\(tool) · \(permission.summary)"
+        }
+
+        // Question à choix : un bouton par réponse.
+        if tool == "AskUserQuestion", let alert = questionAlert(for: permission) {
+            permission.alertID = alert.id
+            alerts?.post(alert)
+            return
         }
 
         var alert = NotchAlert(
@@ -301,6 +328,38 @@ final class ClaudeCodeMonitor {
         alert.buttons = buttons
         permission.alertID = alert.id
         alerts?.post(alert)
+    }
+
+    /// Notification d'une question de Claude à une seule réponse : la question et ses choix.
+    /// Plusieurs questions ou choix multiples : on laisse la réponse au terminal.
+    private func questionAlert(for permission: PendingPermission) -> NotchAlert? {
+        guard let questions = permission.input["questions"] as? [[String: Any]], questions.count == 1,
+              let question = questions.first, question["multiSelect"] as? Bool != true,
+              let text = question["question"] as? String,
+              let options = question["options"] as? [[String: Any]] else { return nil }
+        let labels = options.compactMap { $0["label"] as? String }.prefix(4)
+        guard !labels.isEmpty else { return nil }
+
+        var alert = NotchAlert(
+            icon: .symbol("questionmark.bubble.fill", .claude),
+            source: "Claude Code",
+            title: "\(permission.projectName) te demande",
+            body: text
+        )
+        var buttons: [NotchAlert.Button] = [
+            .init(label: "Autre…", role: .normal) { [weak self, weak permission] in
+                guard let self, let permission else { return }
+                self.decide(permission, .terminal)
+                self.focus(permission.sessionID)
+            },
+        ]
+        for (index, label) in labels.enumerated() {
+            buttons.append(.init(label: label, role: index == 0 ? .primary : .normal) { [weak self, weak permission] in
+                if let permission { self?.decide(permission, .answer(label)) }
+            })
+        }
+        alert.buttons = buttons
+        return alert
     }
 
     private func remove(_ permission: PendingPermission) {
@@ -368,6 +427,7 @@ final class ClaudeCodeMonitor {
                 session.prompt = prompt?.isEmpty == false ? prompt : session.prompt
                 session.agents = []
                 session.lastMessage = nil
+                session.choices = nil
                 // Plan terminé : il appartenait à la demande précédente.
                 if session.plan.allSatisfy({ $0.status == .completed }) { session.plan = [] }
             }
@@ -380,6 +440,7 @@ final class ClaudeCodeMonitor {
                 session.state = .working
                 session.detail = ClaudeActivity.describe(tool: tool, input: input)
                 ClaudeActivity.applyPlan(tool: tool, input: input, to: &session.plan)
+                if let choices = ClaudeActivity.suggestedReplies(tool: tool, input: input) { session.choices = choices }
                 if ClaudeActivity.agentTools.contains(tool) {
                     let name = (input["description"] as? String)
                         ?? (input["subagent_type"] as? String) ?? "Agent"
@@ -463,13 +524,48 @@ final class ClaudeCodeMonitor {
                 if reply == nil { reply = info.lastMessage }
             }
             let session = sessions.first { $0.id == id }
-            alerts?.post(NotchAlert(
+            var alert = NotchAlert(
                 icon: .symbol("checkmark", .green),
                 source: session?.projectName ?? "Claude Code",
                 title: "Terminé · \(session?.title ?? session?.projectName ?? "Claude Code")",
                 body: reply.map(Self.plainSummary),
                 action: .run { [weak self] in self?.focus(id) }
-            ))
+            )
+            // Claude propose des réponses : sa question et un bouton par réponse.
+            if let choices = session?.choices {
+                alert = NotchAlert(
+                    icon: .symbol("questionmark.bubble.fill", .claude),
+                    source: session?.projectName ?? "Claude Code",
+                    title: "\(session?.title ?? session?.projectName ?? "Claude Code") · \(choices.question)",
+                    body: reply.map(Self.plainSummary),
+                    action: .run { [weak self] in self?.focus(id) }
+                )
+                var buttons: [NotchAlert.Button] = [.init(label: "Plus tard", role: .normal) {}]
+                for (index, option) in choices.options.prefix(3).enumerated() {
+                    buttons.append(.init(label: option, role: index == 0 ? .primary : .normal) { [weak self] in
+                        self?.sendChoice(option, to: id)
+                    })
+                }
+                alert.buttons = buttons
+            }
+            alerts?.post(alert)
+        }
+    }
+
+    /// Envoie la réponse choisie dans la notification à la session.
+    private func sendChoice(_ option: String, to id: String) {
+        Task {
+            let outcome = await reply(option, to: id)
+            if case .pasted(let app) = outcome {
+                alerts?.post(NotchAlert(
+                    icon: .symbol("doc.on.clipboard.fill", .claude),
+                    source: "Claude Code",
+                    title: "« \(option) » collé dans \(app)",
+                    body: "Appuie sur Entrée pour l'envoyer."
+                ))
+            } else if case .failed(let reason) = outcome {
+                alerts?.post(NotchAlert(icon: .symbol("exclamationmark.triangle.fill", .orange), source: "Claude Code", title: reason, body: nil))
+            }
         }
     }
 

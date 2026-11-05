@@ -72,6 +72,23 @@ enum ClaudeActivity {
         return shorten(value ?? tool, 140)
     }
 
+    /// Réponses proposées à la fin d'une réponse : la question et les boutons de réponse
+    /// (`wrap_up` dans l'app Claude). Les boutons d'action de l'app (commit…) sont ignorés.
+    static func suggestedReplies(tool: String, input: [String: Any]) -> ClaudeCodeSession.Choices? {
+        guard tool.hasSuffix("wrap_up"), let question = input["ask"] as? String, !question.isEmpty else { return nil }
+        let actions: [[String: Any]]
+        if let list = input["actions"] as? [[String: Any]] {
+            actions = list
+        } else if let text = input["actions"] as? String, let data = text.data(using: .utf8),
+                  let list = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+            actions = list
+        } else {
+            return nil
+        }
+        let labels = actions.filter { $0["action"] == nil }.compactMap { $0["label"] as? String }
+        return labels.isEmpty ? nil : .init(question: question, options: labels)
+    }
+
     /// Met à jour le plan quand Claude écrit sa liste de tâches
     /// (`TodoWrite` dans le terminal, `update_plan` dans l'app Claude).
     static func applyPlan(tool: String, input: [String: Any], to plan: inout [ClaudeCodeSession.PlanItem]) {
