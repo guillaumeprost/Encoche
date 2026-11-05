@@ -8,6 +8,8 @@ struct ClaudeCodeSession: Identifiable, Equatable {
         /// En attente de toi (permission à accorder, question posée…).
         case waiting
         case done
+        /// Session fermée, ou retrouvée dans l'historique au lancement.
+        case inactive
     }
 
     let id: String
@@ -92,6 +94,8 @@ final class PendingPermission: Identifiable {
 @MainActor
 final class ClaudeCodeMonitor {
     private static let staleAfter: TimeInterval = 2 * 3600
+    /// Sessions gardées dans le sélecteur (les plus récentes).
+    static let recentLimit = 5
 
     private(set) var sessions: [ClaudeCodeSession] = []
     private(set) var permissions: [PendingPermission] = []
@@ -117,6 +121,26 @@ final class ClaudeCodeMonitor {
         cleanupTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.removeStale() }
         }
+        loadRecentSessions()
+    }
+
+    /// Retrouve les dernières sessions dans les transcriptions de Claude Code,
+    /// pour que le sélecteur ne soit pas vide après un lancement.
+    private func loadRecentSessions() {
+        let askFolder = ClaudeAsk.workingDirectory.standardizedFileURL.path
+        Task {
+            let found = await ClaudeTranscript.recentSessions(limit: Self.recentLimit + 3)
+            for item in found where !sessions.contains(where: { $0.id == item.id }) {
+                guard let cwd = item.info.cwd, URL(fileURLWithPath: cwd).standardizedFileURL.path != askFolder else { continue }
+                var session = ClaudeCodeSession(id: item.id, cwd: cwd, state: .inactive, detail: nil, updatedAt: item.date)
+                session.title = item.info.title
+                session.prompt = item.info.lastPrompt
+                session.lastMessage = item.info.lastMessage
+                session.transcriptPath = item.path
+                sessions.append(session)
+            }
+            trimSessions()
+        }
     }
 
     /// Session en train de travailler (la plus récente), pour l'activité en direct.
@@ -133,6 +157,7 @@ final class ClaudeCodeMonitor {
     var sortedSessions: [ClaudeCodeSession] {
         sessions.sorted { a, b in
             if (a.state == .waiting) != (b.state == .waiting) { return a.state == .waiting }
+            if (a.state == .inactive) != (b.state == .inactive) { return b.state == .inactive }
             return a.updatedAt > b.updatedAt
         }
     }
@@ -171,9 +196,8 @@ final class ClaudeCodeMonitor {
 
     /// Envoie un message à la session (tapé dans son terminal, ou collé dans son app).
     func reply(_ text: String, to sessionID: String) async -> ClaudeReply.Outcome {
-        guard let pid = sessions.first(where: { $0.id == sessionID })?.pid else {
-            return .failed("Session introuvable")
-        }
+        guard let session = sessions.first(where: { $0.id == sessionID }) else { return .failed("Session introuvable") }
+        guard session.state != .inactive, let pid = session.pid else { return .failed("Session fermée") }
         return await ClaudeReply.send(text, toProcess: pid)
     }
 
@@ -329,7 +353,9 @@ final class ClaudeCodeMonitor {
         }
 
         if name == "SessionEnd" {
-            sessions.removeAll { $0.id == id }
+            // Gardée dans le sélecteur des dernières sessions.
+            update(id) { $0.state = .inactive; $0.detail = nil; $0.pid = nil }
+            trimSessions()
             return
         }
 
@@ -433,6 +459,7 @@ final class ClaudeCodeMonitor {
             sessions[index] = session
         } else {
             sessions.append(session)
+            trimSessions()
         }
     }
 
@@ -455,8 +482,22 @@ final class ClaudeCodeMonitor {
         }
     }
 
+    /// Une session muette depuis longtemps est sans doute fermée : elle devient inactive.
     private func removeStale() {
         let limit = Date().addingTimeInterval(-Self.staleAfter)
-        sessions.removeAll { $0.updatedAt < limit }
+        for index in sessions.indices where sessions[index].updatedAt < limit && sessions[index].state != .inactive {
+            sessions[index].state = .inactive
+        }
+        trimSessions()
+    }
+
+    /// Garde les sessions actives et complète avec les plus récentes, jusqu'à `recentLimit`.
+    private func trimSessions() {
+        let sorted = sessions.sorted { $0.updatedAt > $1.updatedAt }
+        var kept: [ClaudeCodeSession] = []
+        for session in sorted where session.state != .inactive || kept.count < Self.recentLimit {
+            kept.append(session)
+        }
+        if kept.count != sessions.count { sessions = kept }
     }
 }

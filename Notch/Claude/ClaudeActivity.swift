@@ -107,8 +107,9 @@ enum ClaudeActivity {
 
 /// Lecture de la fin d'une transcription de Claude Code (fichier JSONL).
 enum ClaudeTranscript {
-    struct Info {
+    struct Info: Sendable {
         var title: String?
+        var cwd: String?
         var lastPrompt: String?
         var lastMessage: String?
     }
@@ -118,6 +119,35 @@ enum ClaudeTranscript {
 
     static func read(path: String) async -> Info {
         await Task.detached(priority: .utility) { parse(path: path) }.value
+    }
+
+    struct Recent: Sendable {
+        let id: String
+        let path: String
+        let date: Date
+        let info: Info
+    }
+
+    /// Dernières sessions d'après les transcriptions (`~/.claude/projects/<projet>/<session>.jsonl`).
+    static func recentSessions(limit: Int) async -> [Recent] {
+        await Task.detached(priority: .utility) {
+            let fm = FileManager.default
+            let root = fm.homeDirectoryForCurrentUser.appendingPathComponent(".claude/projects")
+            let keys: [URLResourceKey] = [.contentModificationDateKey]
+            let folders = (try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)) ?? []
+            var files: [(URL, Date)] = []
+            for folder in folders {
+                for file in (try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: keys)) ?? []
+                where file.pathExtension == "jsonl" {
+                    let date = (try? file.resourceValues(forKeys: Set(keys)).contentModificationDate) ?? .distantPast
+                    files.append((file, date))
+                }
+            }
+            return files.sorted { $0.1 > $1.1 }.prefix(limit).map { file, date in
+                Recent(id: file.deletingPathExtension().lastPathComponent, path: file.path, date: date,
+                       info: parse(path: file.path))
+            }
+        }.value
     }
 
     private nonisolated static func parse(path: String) -> Info {
@@ -132,8 +162,9 @@ enum ClaudeTranscript {
         var lines = data.split(separator: UInt8(ascii: "\n"))
         if offset > 0, !lines.isEmpty { lines.removeFirst() } // ligne coupée
         for line in lines.reversed() {
-            if info.title != nil && info.lastMessage != nil && info.lastPrompt != nil { break }
+            if info.title != nil && info.lastMessage != nil && info.lastPrompt != nil && info.cwd != nil { break }
             guard let entry = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else { continue }
+            if info.cwd == nil, let cwd = entry["cwd"] as? String { info.cwd = cwd }
             switch entry["type"] as? String {
             case "custom-title" where info.title == nil:
                 info.title = entry["customTitle"] as? String

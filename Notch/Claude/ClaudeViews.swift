@@ -476,16 +476,17 @@ private struct SessionsPanel: View {
     private func chips(selected: String) -> some View {
         ScrollView(.horizontal) {
             HStack(spacing: 4) {
-                ForEach(monitor.sortedSessions) { session in
+                ForEach(monitor.sortedSessions.prefix(ClaudeCodeMonitor.recentLimit)) { session in
                     let isSelected = session.id == selected
                     Button { selectedID = session.id } label: {
                         HStack(spacing: 5) {
                             SessionStateIcon(state: session.state)
                                 .scaleEffect(0.8)
                                 .frame(width: 12)
-                            Text(session.projectName)
+                            Text(session.title ?? session.projectName)
                                 .font(.system(size: 12, weight: .semibold))
                                 .lineLimit(1)
+                                .frame(maxWidth: 130)
                         }
                         .padding(.horizontal, 10)
                         .frame(height: 24)
@@ -589,6 +590,7 @@ private struct SessionDetail: View {
         case .working: return session.detail ?? "Réfléchit…"
         case .waiting: return session.detail ?? "T'attend"
         case .done: return "Terminé"
+        case .inactive: return "Session fermée"
         }
     }
 
@@ -704,6 +706,8 @@ struct SessionStateIcon: View {
                 .symbolEffect(.pulse)
         case .done:
             Image(systemName: "checkmark.circle.fill").foregroundStyle(.green).font(.system(size: 12))
+        case .inactive:
+            Image(systemName: "moon.zzz.fill").foregroundStyle(.primary.opacity(0.35)).font(.system(size: 9))
         }
     }
 }
