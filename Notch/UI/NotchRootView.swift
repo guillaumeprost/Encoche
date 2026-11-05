@@ -68,21 +68,26 @@ struct NotchRootView: View {
                     insertion: .opacity.combined(with: .scale(scale: 0.9, anchor: .top)).animation(spring.delay(0.08)),
                     removal: .opacity.animation(.easeOut(duration: 0.12))
                 ))
-            } else if vm.showsHUD, let kind = hud.current {
+            } else {
+                // L'activité en cours reste affichée quand un indicateur (volume…) s'ajoute dessous.
                 VStack(spacing: 0) {
-                    Color.clear.frame(height: vm.notchSize.height)
-                    HUDView(kind: kind)
-                        .padding(.horizontal, 14 + vm.topRadius)
-                        .frame(height: NotchViewModel.hudHeight)
-                        .padding(.bottom, 2)
+                    ZStack {
+                        if let primary = activities.first {
+                            activityView(primary)
+                                .padding(.horizontal, vm.topRadius)
+                                .id(primary)
+                                .transition(.opacity)
+                        }
+                    }
+                    .frame(height: vm.showsHUD ? vm.notchSize.height : vm.activityHeight)
+                    if vm.showsHUD, let kind = hud.current {
+                        HUDView(kind: kind)
+                            .padding(.horizontal, 14 + vm.topRadius)
+                            .frame(height: NotchViewModel.hudHeight)
+                            .padding(.bottom, 2)
+                            .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
+                    }
                 }
-                .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
-            } else if let primary = activities.first {
-                activityView(primary)
-                    .padding(.horizontal, vm.topRadius)
-                    .frame(height: vm.activityHeight)
-                    .id(primary)
-                    .transition(.opacity)
             }
         }
         // En verre, le contenu suit l'apparence du Mac ; sur fond noir (repliée, ou verre
@@ -138,8 +143,8 @@ struct NotchRootView: View {
         LiveActivity.active(settings: settings, claudeCode: claudeCode, privacy: privacy, downloads: downloads, music: music)
     }
 
-    /// La bulle n'accompagne que l'encoche repliée, sans notification ni indicateur.
-    private var showsBubble: Bool { !vm.isOpen && !vm.showsAlert && !vm.showsHUD && !vm.isRetracted }
+    /// La bulle n'accompagne que l'encoche repliée, sans notification (elle reste avec le volume).
+    private var showsBubble: Bool { !vm.isOpen && !vm.showsAlert && !vm.isRetracted }
 
     @ViewBuilder
     private func activityView(_ activity: LiveActivity) -> some View {
