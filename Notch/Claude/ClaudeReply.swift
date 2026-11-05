@@ -19,7 +19,10 @@ enum ClaudeReply {
     static let claudeAppID = "com.anthropic.claudefordesktop"
     private static let iTermID = "com.googlecode.iterm2"
 
-    static func send(_ text: String, toProcess pid: pid_t) async -> Outcome {
+    /// `sessionTitle` (titre de la session dans l'app Claude) permet d'y viser la bonne conversation.
+    /// `asChoice` : la réponse est un choix proposé (question, réponses) : dans l'app Claude, on
+    /// clique sur le bouton de ce libellé. Jamais pour un texte libre.
+    static func send(_ text: String, toProcess pid: pid_t, sessionTitle: String? = nil, asChoice: Bool = false) async -> Outcome {
         // Une nouvelle ligne enverrait le message trop tôt dans le terminal.
         let message = text
             .replacingOccurrences(of: "\r", with: " ")
@@ -32,7 +35,7 @@ enum ClaudeReply {
 
         // App Claude : si la réponse correspond à un bouton affiché (question, réponses proposées),
         // on clique dessus, exactement comme à la main.
-        if app.bundleIdentifier == claudeAppID,
+        if asChoice, app.bundleIdentifier == claudeAppID,
            await Task.detached(operation: { pressButton(labeled: message, inAppWith: pid_t(app.processIdentifier)) }).value {
             return .sent(app: appName)
         }
@@ -83,6 +86,20 @@ enum ClaudeReply {
             try? await Task.sleep(for: .milliseconds(250))
             await paste(message, thenReturn: true)
             return .sent(app: appName)
+
+        case (claudeAppID, _):
+            // App Claude : on ouvre la conversation de la session et on écrit dans son champ.
+            // Si on ne peut pas vérifier que c'est la bonne conversation, on colle sans envoyer.
+            let appPID = pid_t(app.processIdentifier)
+            let ready = await Task.detached { focusComposer(inAppWith: appPID, conversation: sessionTitle) }.value
+            guard app.activate() else { return .failed("Impossible d'ouvrir \(appName)") }
+            try? await Task.sleep(for: .milliseconds(350))
+            if ready {
+                // L'activation peut rendre le focus ailleurs : on le redonne au champ.
+                _ = await Task.detached { focusComposer(inAppWith: appPID, conversation: sessionTitle) }.value
+            }
+            await paste(message, thenReturn: ready)
+            return ready ? .sent(app: appName) : .pasted(app: appName)
 
         default:
             guard app.activate() else { return .failed("Impossible d'ouvrir \(appName)") }
@@ -146,6 +163,49 @@ enum ClaudeReply {
         for child in axChildren(element, kAXChildrenAttribute) {
             collectButtons(labeled: label, in: child, into: &matches, depth: depth + 1)
         }
+    }
+
+    /// Affiche la conversation de la session dans l'app Claude (au besoin en cliquant sur son
+    /// entrée dans la barre latérale) et donne le focus à son champ de saisie.
+    /// Renvoie `false` si la bonne conversation n'a pas pu être vérifiée.
+    nonisolated static func focusComposer(inAppWith appPID: pid_t, conversation title: String?) -> Bool {
+        guard AXIsProcessTrusted(), let title, !title.isEmpty else { return false }
+        let app = AXUIElementCreateApplication(appPID)
+        AXUIElementSetAttributeValue(app, "AXManualAccessibility" as CFString, kCFBooleanTrue)
+
+        for attempt in 0..<10 {
+            guard let window = axChildren(app, kAXWindowsAttribute).first,
+                  let webArea = first(in: window, where: { axString($0, kAXRoleAttribute) == "AXWebArea" }) else {
+                Thread.sleep(forTimeInterval: 0.2)
+                continue
+            }
+            // Titre de la page : « Titre de la session - Claude Code ».
+            let shown = axString(webArea, kAXTitleAttribute) ?? axString(webArea, kAXDescriptionAttribute) ?? ""
+            if shown == title || shown.hasPrefix(title + " - ") {
+                guard let composer = first(in: webArea, where: {
+                    axString($0, kAXRoleAttribute) == "AXTextArea"
+                }) else { return false }
+                return AXUIElementSetAttributeValue(composer, kAXFocusedAttribute as CFString, kCFBooleanTrue) == .success
+            }
+            // Autre conversation affichée : on clique une fois sur celle de la session.
+            if attempt == 0, let entry = first(in: window, where: {
+                axString($0, kAXRoleAttribute) == "AXButton" && axString($0, kAXTitleAttribute) == title
+            }) {
+                AXUIElementPerformAction(entry, kAXPressAction as CFString)
+            }
+            Thread.sleep(forTimeInterval: 0.3)
+        }
+        return false
+    }
+
+    private nonisolated static func first(in element: AXUIElement, where match: (AXUIElement) -> Bool,
+                                          depth: Int = 0) -> AXUIElement? {
+        if match(element) { return element }
+        guard depth < 60 else { return nil }
+        for child in axChildren(element, kAXChildrenAttribute) {
+            if let found = first(in: child, where: match, depth: depth + 1) { return found }
+        }
+        return nil
     }
 
     /// Bouton « Envoyer » de la question qui contient cette case.

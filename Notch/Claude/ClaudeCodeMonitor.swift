@@ -215,10 +215,10 @@ final class ClaudeCodeMonitor {
     }
 
     /// Envoie un message à la session (tapé dans son terminal, ou collé dans son app).
-    func reply(_ text: String, to sessionID: String) async -> ClaudeReply.Outcome {
+    func reply(_ text: String, to sessionID: String, asChoice: Bool = false) async -> ClaudeReply.Outcome {
         guard let session = sessions.first(where: { $0.id == sessionID }) else { return .failed("Session introuvable") }
         guard session.state != .inactive, let pid = session.pid else { return .failed("Session fermée") }
-        return await ClaudeReply.send(text, toProcess: pid)
+        return await ClaudeReply.send(text, toProcess: pid, sessionTitle: session.title, asChoice: asChoice)
     }
 
     func dismiss(_ session: ClaudeCodeSession) {
@@ -242,7 +242,8 @@ final class ClaudeCodeMonitor {
                 // App Claude : elle affiche sa propre question ; on la laisse faire et on clique
                 // sur la réponse choisie dans l'app.
                 output = nil
-                Task { _ = await ClaudeReply.send(label, toProcess: pid) }
+                let title = sessions.first { $0.id == permission.sessionID }?.title
+                Task { _ = await ClaudeReply.send(label, toProcess: pid, sessionTitle: title, asChoice: true) }
             } else {
                 // Terminal : comme dans le SDK, la question reçoit sa réponse dans « answers ».
                 var input = permission.input
@@ -563,7 +564,7 @@ final class ClaudeCodeMonitor {
     /// Envoie la réponse choisie dans la notification à la session.
     private func sendChoice(_ option: String, to id: String) {
         Task {
-            let outcome = await reply(option, to: id)
+            let outcome = await reply(option, to: id, asChoice: true)
             if case .pasted(let app) = outcome {
                 alerts?.post(NotchAlert(
                     icon: .symbol("doc.on.clipboard.fill", .claude),
