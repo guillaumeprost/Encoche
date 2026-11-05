@@ -181,8 +181,23 @@ struct NotchRootView: View {
             stops: [
                 .init(color: .black, location: 0),
                 .init(color: .black, location: solid),
-                .init(color: .black.opacity(0.6), location: min(solid + 0.2, 1)),
-                .init(color: .black.opacity(0.12), location: 1),
+                .init(color: .black.opacity(0.45), location: min(solid + 0.14, 1)),
+                .init(color: .black.opacity(0.1), location: min(solid + 0.45, 1)),
+                .init(color: .clear, location: 1),
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+
+    /// Liseré du verre : invisible contre l'encoche du Mac, il s'éclaire vers le bas.
+    private var darkGlassRim: LinearGradient {
+        LinearGradient(
+            stops: [
+                .init(color: .white.opacity(0), location: 0),
+                .init(color: .white.opacity(0), location: 0.25),
+                .init(color: .white.opacity(0.14), location: 0.7),
+                .init(color: .white.opacity(0.32), location: 1),
             ],
             startPoint: .top,
             endPoint: .bottom
@@ -204,10 +219,13 @@ struct NotchRootView: View {
 
             // Verre noir : verre sombre sous un dégradé, noir pur sur la hauteur de l'encoche
             // du Mac (elle s'y fond), puis de plus en plus transparent vers le bas.
+            // Le voile noir s'efface vite sous l'encoche pour laisser vivre le verre (flou, reflets),
+            // et un fin liseré lumineux, plus marqué vers le bas, dessine le bord comme sur macOS 26.
             ZStack {
                 Color.clear
-                    .glassEffect(.regular.tint(.black.opacity(0.25)), in: shape)
+                    .glassEffect(.regular.tint(.black.opacity(0.4)), in: shape)
                 shape.fill(darkGlassGradient)
+                shape.stroke(darkGlassRim, lineWidth: 1.5)
             }
             .opacity(darkGlassActive ? 1 : 0)
         }
