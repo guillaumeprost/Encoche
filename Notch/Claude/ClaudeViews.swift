@@ -23,6 +23,9 @@ struct ClaudeTab: View {
     var body: some View {
         let session = quickQuestion ? nil : selectedSession
         VStack(spacing: 10) {
+            if monitor.hooksInstalled, monitor.sessions.count > 1 {
+                SessionChips(selectedID: $selectedID)
+            }
             HStack(spacing: 20) {
                 SessionsPanel(selectedID: $selectedID)
                     .frame(width: 290)
@@ -446,9 +449,6 @@ private struct SessionsPanel: View {
                     }
                 }
             } else if let selected {
-                if monitor.sessions.count > 1 {
-                    chips(selected: selected.id)
-                }
                 SessionDetail(session: selected)
             } else {
                 title
@@ -471,35 +471,40 @@ private struct SessionsPanel: View {
             .font(.system(size: 11, weight: .semibold))
             .foregroundStyle(.primary.opacity(0.55))
     }
+}
 
-    /// Une pastille par session, pour passer de l'une à l'autre.
-    private func chips(selected: String) -> some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 4) {
-                ForEach(monitor.sortedSessions.prefix(ClaudeCodeMonitor.recentLimit)) { session in
-                    let isSelected = session.id == selected
-                    Button { selectedID = session.id } label: {
-                        HStack(spacing: 5) {
-                            SessionStateIcon(state: session.state)
-                                .scaleEffect(0.8)
-                                .frame(width: 12)
-                            Text(session.title ?? session.projectName)
-                                .font(.system(size: 12, weight: .semibold))
-                                .lineLimit(1)
-                                .frame(maxWidth: 130)
-                        }
-                        .padding(.horizontal, 10)
-                        .frame(height: 24)
-                        .background(Capsule().fill(.primary.opacity(isSelected ? 0.16 : 0.06)))
-                        .foregroundStyle(.primary.opacity(isSelected ? 1 : 0.6))
-                        .contentShape(Capsule())
+/// Sélecteur des dernières sessions, sur toute la largeur de l'encoche.
+private struct SessionChips: View {
+    @Environment(ClaudeCodeMonitor.self) private var monitor
+    @Binding var selectedID: String?
+
+    var body: some View {
+        let sessions = Array(monitor.sortedSessions.prefix(ClaudeCodeMonitor.recentLimit))
+        let selected = sessions.first { $0.id == selectedID }?.id ?? sessions.first?.id
+        HStack(spacing: 6) {
+            ForEach(sessions) { session in
+                let isSelected = session.id == selected
+                Button { selectedID = session.id } label: {
+                    HStack(spacing: 6) {
+                        SessionStateIcon(state: session.state)
+                            .scaleEffect(0.85)
+                            .frame(width: 13)
+                        Text(session.title ?? session.projectName)
+                            .font(.system(size: 12, weight: .semibold))
+                            .lineLimit(1)
                     }
-                    .buttonStyle(.plain)
-                    .contextMenu { Button("Masquer") { monitor.dismiss(session) } }
+                    .padding(.horizontal, 10)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 26)
+                    .background(Capsule().fill(.primary.opacity(isSelected ? 0.16 : 0.06)))
+                    .foregroundStyle(.primary.opacity(isSelected ? 1 : 0.6))
+                    .contentShape(Capsule())
                 }
+                .buttonStyle(.plain)
+                .help(session.title.map { "\($0) · \(session.projectName)" } ?? session.projectName)
+                .contextMenu { Button("Masquer") { monitor.dismiss(session) } }
             }
         }
-        .scrollIndicators(.never)
     }
 }
 
