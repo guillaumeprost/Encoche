@@ -536,8 +536,9 @@ final class ClaudeCodeMonitor {
                 alert = NotchAlert(
                     icon: .symbol("questionmark.bubble.fill", .claude),
                     source: session?.projectName ?? "Claude Code",
-                    title: "\(session?.title ?? session?.projectName ?? "Claude Code") · \(choices.question)",
-                    body: reply.map(Self.plainSummary),
+                    // La question en entier : c'est à elle que répondent les boutons.
+                    title: "\(session?.title ?? session?.projectName ?? "Claude Code") te demande",
+                    body: choices.question,
                     action: .run { [weak self] in self?.focus(id) }
                 )
                 var buttons: [NotchAlert.Button] = [.init(label: "Plus tard", role: .normal) {}]
