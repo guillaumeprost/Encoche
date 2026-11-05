@@ -18,17 +18,17 @@ Encoche vit dans l'encoche de l'écran. Noire en haut pour se fondre avec celle 
 ### Dans l'encoche ouverte
 - **Accueil** : le morceau en cours avec ses commandes, l'agenda du jour, et un champ pour poser une question à Claude.
 - **Calendrier** : le mois à gauche, l'agenda du jour choisi à droite, avec les boutons pour rejoindre les visios.
-- **Musique** : le lecteur, et au choix les **paroles synchronisées** (la ligne chantée est mise en avant, un clic y saute) ou la **file d'attente** de Musique.
+- **Musique** : le lecteur (Musique, Spotify, et aussi YouTube dans le navigateur, Deezer, Podcasts…), et au choix les **paroles synchronisées** (la ligne chantée est mise en avant, un clic y saute) ou la **file d'attente** de Musique.
 - **Maison** : une tuile par raccourci du dossier « Encoche » de l'app Raccourcis (allumer une lampe, lancer une scène…).
 - **Étagère** : les dernières captures d'écran, à glisser où tu veux.
 - **Presse-papier** : l'historique de ce que tu as copié. Les mots de passe des gestionnaires sont ignorés.
 - **Notifications** : l'historique des notifications, conservé d'un redémarrage à l'autre.
-- **Claude** : tes 5 dernières sessions Claude Code, avec leur progression, leurs agents et leur conversation, un champ pour **répondre à une session** ou poser une question rapide.
+- **Claude** : ta consommation de tokens du jour et de la semaine, tes 5 dernières sessions Claude Code, avec leur progression, leurs agents et leur conversation, un champ pour **répondre à une session** ou poser une question rapide.
 
-Quand une musique est chargée, une mini-pochette avec lecture/pause et suivant s'affiche en haut à droite.
+Quand une musique est chargée, une mini-pochette avec lecture/pause et suivant s'affiche en haut à droite, à côté du bouton **minuteur** (Pomodoro, pause, 1 à 60 minutes). **Glisse un fichier sur l'encoche** pour le poser sur l'Étagère.
 
 ### Autour de l'encoche fermée
-- **Activités en direct** : musique, Claude Code qui travaille (avec l'avancement de son plan), téléchargements, caméra et micro. L'encoche s'agrandit un peu, et une deuxième activité s'affiche dans une **bulle** à côté, comme sur iPhone.
+- **Activités en direct** : musique, Claude Code qui travaille (le petit personnage de Claude Code trottine), minuteur et Pomodoro, réunion dans moins de 10 minutes, mode Concentration, téléchargements, caméra et micro. L'encoche s'agrandit un peu, et une deuxième activité s'affiche dans une **bulle** à côté, comme sur iPhone.
 - **Notifications façon iPhone** : toutes les notifications du Mac s'affichent dans l'encoche à la place des bannières de macOS, sur l'écran principal. Au survol, elles se déplient et proposent de les fermer ; un clic les ouvre.
 - **Claude Code** : quand Claude demande une autorisation, tu peux **autoriser ou refuser depuis l'encoche**.
 - **Réunions** : un rappel une minute avant, avec un bouton **Rejoindre** pour Meet, Zoom, Teams, Webex, FaceTime ou Whereby.
@@ -83,7 +83,8 @@ Deux fonctions interrogent un service public, sans compte ni clé :
 ### Limites connues
 
 - La **file d'attente** de Musique est lue dans son panneau « File d'attente » : il doit être ouvert dans la fenêtre Musique (Encoche propose un bouton pour l'ouvrir). Spotify ne partage pas sa file.
-- L'affichage sur l'**écran de verrouillage**, la file de Musique et les bannières de macOS reposent sur des mécanismes non documentés : une mise à jour de macOS peut les casser. Encoche échoue alors en silence.
+- L'affichage sur l'**écran de verrouillage**, la file de Musique, le mode Concentration, les lecteurs autres que Musique et Spotify et les bannières de macOS reposent sur des mécanismes non documentés : une mise à jour de macOS peut les casser. Encoche échoue alors en silence.
+- Les lecteurs autres que Musique et Spotify passent par [mediaremote-adapter](https://github.com/ungive/mediaremote-adapter) (licence BSD, copié dans `Vendor/`), qui donne accès au « À l'écoute » de macOS.
 
 ## Développement
 
@@ -129,6 +130,8 @@ swift scripts/make-icon.swift
 | `Notch/HUD` | Activités en direct, téléchargements, Bluetooth, batterie, luminosité, caméra et micro |
 | `Notch/Volume` | Volume et touches du clavier |
 | `Notch/LockScreen` | Écran de verrouillage |
+| `Notch/Timer` | Minuteur et Pomodoro |
 | `Notch/Settings` | Fenêtre de réglages |
+| `Vendor/MediaRemoteAdapter` | Accès au « À l'écoute » de macOS (projet open source) |
 
 Le code s'appelle encore `Notch` en interne (dossiers, cibles, identifiant `com.guillaumeprost.notch`). Garder l'identifiant permet à macOS de conserver les autorisations déjà accordées.

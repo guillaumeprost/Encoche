@@ -173,7 +173,10 @@ struct Artwork: View {
     var body: some View {
         ZStack {
             if let image {
+                // Rempli et recadré : une vignette vidéo (16:9) ne déborde pas du carré.
                 Image(nsImage: image).resizable().scaledToFill()
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                    .clipped()
             } else {
                 Rectangle().fill(.primary.opacity(0.1))
                 Image(systemName: "music.note").foregroundStyle(.primary.opacity(0.5))

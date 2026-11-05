@@ -10,10 +10,41 @@ settings:
     SWIFT_VERSION: "5.0"
     MACOSX_DEPLOYMENT_TARGET: "26.0"
 targets:
+  # « À l'écoute » de macOS (YouTube dans le navigateur, Deezer…) : voir Vendor/MediaRemoteAdapter.
+  MediaRemoteAdapter:
+    type: framework
+    platform: macOS
+    sources:
+      - path: Vendor/MediaRemoteAdapter/src
+      - path: Vendor/MediaRemoteAdapter/include
+        headerVisibility: public
+    settings:
+      base:
+        PRODUCT_NAME: MediaRemoteAdapter
+        PRODUCT_BUNDLE_IDENTIFIER: com.guillaumeprost.notch.MediaRemoteAdapter
+        GENERATE_INFOPLIST_FILE: YES
+        CLANG_ENABLE_OBJC_ARC: YES
+        # Les fonctions doivent rester visibles : le script Perl les appelle par leur nom.
+        GCC_SYMBOLS_PRIVATE_EXTERN: NO
+        OTHER_CFLAGS: ["-fvisibility=default"]
+        HEADER_SEARCH_PATHS: ["$(SRCROOT)/Vendor/MediaRemoteAdapter/src", "$(SRCROOT)/Vendor/MediaRemoteAdapter/include"]
+        CLANG_WARN_STRICT_PROTOTYPES: NO
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "Notch Local Signing"
+        DEVELOPMENT_TEAM: ""
+        SKIP_INSTALL: YES
   Notch:
     type: application
     platform: macOS
-    sources: [Notch]
+    sources:
+      - Notch
+      - path: Vendor/MediaRemoteAdapter/bin/mediaremote-adapter.pl
+        buildPhase: resources
+    dependencies:
+      # Intégré à l'app sans y être lié : seul le script Perl le charge.
+      - target: MediaRemoteAdapter
+        embed: true
+        link: false
     info:
       path: Notch/Info.plist
       properties:

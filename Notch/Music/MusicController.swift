@@ -2,7 +2,8 @@ import AppKit
 import Observation
 import SwiftUI
 
-/// Suit le morceau en cours dans Musique et Spotify.
+/// Suit le morceau en cours : Musique et Spotify en détail, et tout autre lecteur
+/// (YouTube dans le navigateur, Deezer, Podcasts…) par le « À l'écoute » de macOS.
 ///
 /// - Les métadonnées arrivent en push via les notifications distribuées des deux apps
 ///   (pas d'interrogation périodique).
@@ -29,11 +30,16 @@ final class MusicController {
     }
 
     private(set) var source: Source?
+    /// App d'un autre lecteur (navigateur pour YouTube…), suivie par le « À l'écoute » de macOS.
+    private(set) var externalPlayer: String?
     private(set) var track: Track?
     private(set) var isPlaying = false
     private(set) var artwork: NSImage?
     private(set) var accent: Color = .primary
 
+    @ObservationIgnored private let nowPlaying = NowPlayingAdapter()
+    /// Pochette reçue du « À l'écoute », pour ne la redécoder que si elle change.
+    @ObservationIgnored private var artworkData: Data?
     private var basePosition: Double = 0
     private var baseDate = Date()
 
@@ -54,11 +60,14 @@ final class MusicController {
         ) { [weak self] note in
             let bundleID = (note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.bundleIdentifier
             MainActor.assumeIsolated {
-                if let self, bundleID == self.source?.rawValue { self.clear() }
+                guard let self else { return }
+                if bundleID == self.source?.rawValue || bundleID == self.externalPlayer { self.clear() }
             }
         }
 
         Task { await loadInitialState() }
+        nowPlaying.onUpdate = { [weak self] info in self?.handleExternal(info) }
+        nowPlaying.start()
     }
 
     // MARK: - Position
@@ -70,7 +79,8 @@ final class MusicController {
     }
 
     func refreshPosition() {
-        guard let source, source.isRunning else { return }
+        // Lecteur externe : la position arrive avec ses mises à jour.
+        guard externalPlayer == nil, let source, source.isRunning else { return }
         Task {
             guard let value = await AppleScriptRunner.run(
                 "tell application id \"\(source.rawValue)\" to get player position"
@@ -87,6 +97,12 @@ final class MusicController {
     // MARK: - Commandes
 
     func playPause() {
+        if externalPlayer != nil {
+            setPosition(position(at: Date()))
+            isPlaying.toggle()
+            nowPlaying.send(.togglePlayPause)
+            return
+        }
         guard let source, source.isRunning else { return }
         refreshPosition()
         isPlaying.toggle()
@@ -94,16 +110,30 @@ final class MusicController {
         Task { _ = await AppleScriptRunner.run("tell application id \"\(source.rawValue)\" to playpause") }
     }
 
-    func next() { send("next track") }
-    func previous() { send("previous track") }
+    func next() {
+        if externalPlayer != nil { nowPlaying.send(.next) } else { send("next track") }
+    }
+
+    func previous() {
+        if externalPlayer != nil { nowPlaying.send(.previous) } else { send("previous track") }
+    }
 
     func seek(to seconds: Double) {
+        if externalPlayer != nil {
+            setPosition(seconds)
+            nowPlaying.seek(to: seconds)
+            return
+        }
         guard let source, source.isRunning else { return }
         setPosition(seconds)
         Task { _ = await AppleScriptRunner.run("tell application id \"\(source.rawValue)\" to set player position to \(seconds)") }
     }
 
     func openSourceApp() {
+        if let externalPlayer, let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: externalPlayer) {
+            NSWorkspace.shared.openApplication(at: url, configuration: .init())
+            return
+        }
         open(source ?? .music)
     }
 
@@ -146,6 +176,7 @@ final class MusicController {
         )
 
         let changed = newTrack != track || origin != source
+        externalPlayer = nil
         source = origin
         track = newTrack
         isPlaying = state == "Playing"
@@ -195,7 +226,43 @@ final class MusicController {
         ]
     }
 
+    // MARK: - Autres lecteurs
+
+    /// Mise à jour du « À l'écoute » de macOS. Musique et Spotify ont leur propre suivi
+    /// (plus complet) : seuls les autres lecteurs sont pris ici.
+    private func handleExternal(_ info: NowPlayingAdapter.Info?) {
+        guard let info, ![Source.music.rawValue, Source.spotify.rawValue].contains(info.bundleID) else {
+            // Plus rien, ou Musique / Spotify reprend la main.
+            if externalPlayer != nil {
+                clear()
+                Task { await loadInitialState() }
+            }
+            return
+        }
+        // Un lecteur en pause ne vole pas la place de Musique ou Spotify qui joue.
+        if source != nil, isPlaying, !info.playing { return }
+
+        let newTrack = Track(title: info.title, artist: info.artist, album: info.album, duration: info.duration)
+        let changed = newTrack != track || info.bundleID != externalPlayer
+        source = nil
+        externalPlayer = info.bundleID
+        track = newTrack
+        isPlaying = info.playing
+        setPosition(info.elapsed)
+        if let artwork = info.artwork {
+            if changed || artworkData != artwork {
+                artworkData = artwork
+                applyArtwork(NSImage(data: artwork))
+            }
+        } else if changed {
+            artworkData = nil
+            applyArtwork(nil)
+        }
+    }
+
     private func clear() {
+        externalPlayer = nil
+        artworkData = nil
         source = nil
         track = nil
         isPlaying = false
