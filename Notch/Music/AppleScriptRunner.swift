@@ -14,22 +14,23 @@ enum AppleScriptRunner {
 
     /// Renvoie le résultat, ou `nil` en cas d'erreur ou si l'app ne répond pas à temps.
     @discardableResult
-    static func run(_ source: String) async -> NSAppleEventDescriptor? {
+    static func run(_ source: String, cached: Bool = true) async -> NSAppleEventDescriptor? {
         await withCheckedContinuation { continuation in
             queue.async {
-                continuation.resume(returning: execute(source))
+                continuation.resume(returning: execute(source, cached: cached))
             }
         }
     }
 
-    private static func execute(_ source: String) -> NSAppleEventDescriptor? {
+    /// `cached: false` pour les scripts à usage unique (texte variable) : ils ne s'accumulent pas.
+    private static func execute(_ source: String, cached useCache: Bool) -> NSAppleEventDescriptor? {
         let script: NSAppleScript
         if let cached = cache[source] {
             script = cached
         } else {
             let wrapped = "with timeout of \(timeoutSeconds) seconds\n\(source)\nend timeout"
             guard let compiled = NSAppleScript(source: wrapped) else { return nil }
-            cache[source] = compiled
+            if useCache { cache[source] = compiled }
             script = compiled
         }
 

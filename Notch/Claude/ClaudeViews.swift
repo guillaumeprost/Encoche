@@ -9,26 +9,230 @@ extension Color {
 
 struct ClaudeTab: View {
     @Environment(ClaudeCodeMonitor.self) private var monitor
-
     @Environment(ClaudeAsk.self) private var ask
+    @State private var selectedID: String?
+    /// Le champ du bas répond à la session choisie (par défaut) ou pose une question rapide.
+    @State private var quickQuestion = false
 
-    /// Sessions Claude Code à gauche, discussion à droite, champ de question sur toute la largeur en bas.
+    private var selectedSession: ClaudeCodeSession? {
+        let sessions = monitor.sortedSessions
+        return sessions.first { $0.id == selectedID } ?? sessions.first
+    }
+
+    /// Sessions Claude Code à gauche, discussion à droite, champ sur toute la largeur en bas.
     var body: some View {
+        let session = quickQuestion ? nil : selectedSession
         VStack(spacing: 10) {
             HStack(spacing: 20) {
-                SessionsPanel()
+                SessionsPanel(selectedID: $selectedID)
                     .frame(width: 290)
                 Rectangle()
                     .fill(.primary.opacity(0.12))
                     .frame(width: 1)
                     .padding(.vertical, 4)
-                AskPanel()
+                if let session {
+                    SessionConversation(session: session)
+                } else {
+                    AskPanel()
+                }
             }
-            if ask.cliURL != nil {
-                ClaudeAskField()
-            }
+            ClaudeTabField(
+                session: session,
+                canReply: selectedSession != nil,
+                quickQuestion: $quickQuestion
+            )
         }
         .foregroundStyle(.primary)
+    }
+}
+
+/// Champ du bas de l'onglet Claude : répond à une session, ou pose une question rapide.
+private struct ClaudeTabField: View {
+    @Environment(ClaudeCodeMonitor.self) private var monitor
+    @Environment(ClaudeAsk.self) private var ask
+    @Environment(NotchViewModel.self) private var vm
+    let session: ClaudeCodeSession?
+    let canReply: Bool
+    @Binding var quickQuestion: Bool
+
+    @State private var reply = ""
+    @State private var feedback: ClaudeReply.Outcome?
+    @State private var sending = false
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        @Bindable var ask = ask
+        HStack(spacing: 8) {
+            targetMenu
+            Group {
+                if let session {
+                    TextField("Répondre à \(session.title ?? session.projectName)…", text: $reply)
+                } else {
+                    TextField("Demande à Claude…", text: $ask.question)
+                }
+            }
+            .textFieldStyle(.plain)
+            .font(.system(size: 13.5))
+            .focused($focused)
+            .onSubmit(send)
+            .onExitCommand { focused = false }
+
+            if let feedback { feedbackLabel(feedback) }
+
+            if session == nil, ask.isStreaming {
+                Button { ask.cancel() } label: {
+                    Image(systemName: "stop.circle.fill").font(.system(size: 16))
+                }
+                .buttonStyle(.plain)
+                .help("Arrêter")
+            } else if sending {
+                ProgressView().controlSize(.small)
+            } else if !(session == nil ? ask.question : reply).isEmpty {
+                Button(action: send) {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.system(size: 17))
+                        .foregroundStyle(Color.claude)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.leading, 6)
+        .padding(.trailing, 12)
+        .frame(height: 36)
+        .glassEffect(.regular.tint(.primary.opacity(0.08)).interactive(), in: Capsule())
+        .animation(.snappy, value: feedback)
+        .onChange(of: focused) { vm.holdOpen = focused }
+        .onDisappear { vm.holdOpen = false }
+    }
+
+    /// Choix de la cible : la session sélectionnée à gauche, ou une question rapide.
+    private var targetMenu: some View {
+        Menu {
+            if canReply {
+                Button {
+                    quickQuestion = false
+                } label: {
+                    Label("Répondre à la session choisie", systemImage: "arrowshape.turn.up.left")
+                }
+            }
+            Button {
+                quickQuestion = true
+            } label: {
+                Label("Question rapide à Claude", systemImage: "sparkle")
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: session == nil ? "sparkle" : "arrowshape.turn.up.left.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                Text(session?.projectName ?? "Claude")
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .lineLimit(1)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .bold))
+                    .opacity(0.6)
+            }
+            .foregroundStyle(Color.claude)
+            .padding(.horizontal, 9)
+            .frame(height: 24)
+            .background(Capsule().fill(Color.claude.opacity(0.16)))
+        }
+        .menuStyle(.button)
+        .buttonStyle(.plain)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help(session == nil ? "Question rapide, sans lien avec tes sessions" : "Répond à la session choisie à gauche")
+    }
+
+    @ViewBuilder
+    private func feedbackLabel(_ outcome: ClaudeReply.Outcome) -> some View {
+        Group {
+            switch outcome {
+            case .sent(let app):
+                Label("Envoyé dans \(app)", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+            case .pasted(let app):
+                Label("Collé dans \(app) · appuie sur Entrée", systemImage: "doc.on.clipboard.fill").foregroundStyle(.orange)
+            case .failed(let reason):
+                Label(reason, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            }
+        }
+        .font(.system(size: 11, weight: .medium))
+        .lineLimit(1)
+        .transition(.opacity)
+    }
+
+    private func send() {
+        if let session {
+            let text = reply.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !text.isEmpty, !sending else { return }
+            sending = true
+            focused = false
+            Task {
+                let outcome = await monitor.reply(text, to: session.id)
+                sending = false
+                feedback = outcome
+                if case .failed = outcome {} else { reply = "" }
+                try? await Task.sleep(for: .seconds(4))
+                if feedback == outcome { feedback = nil }
+            }
+        } else {
+            guard !ask.question.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+            ask.send()
+        }
+    }
+}
+
+/// Discussion d'une session : ta dernière demande et la réponse de Claude.
+private struct SessionConversation: View {
+    let session: ClaudeCodeSession
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.vertical) {
+                VStack(alignment: .leading, spacing: 10) {
+                    if let prompt = session.prompt {
+                        HStack {
+                            Spacer(minLength: 40)
+                            Text(prompt)
+                                .font(.system(size: 12.5))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 7)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .fill(Color.claude.opacity(0.22))
+                                )
+                                .textSelection(.enabled)
+                        }
+                    }
+                    if let message = session.lastMessage {
+                        Text(claudeMarkdown(message))
+                            .font(.system(size: 13))
+                            .foregroundStyle(.primary.opacity(0.9))
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else if session.state == .working {
+                        HStack(spacing: 8) {
+                            ThinkingDots()
+                            Text(session.detail ?? "Réfléchit…")
+                                .font(.system(size: 12))
+                                .foregroundStyle(.primary.opacity(0.5))
+                                .lineLimit(1)
+                        }
+                    } else if session.prompt == nil {
+                        Text("Pas encore de message dans cette session")
+                            .font(.system(size: 12))
+                            .foregroundStyle(.primary.opacity(0.45))
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.top, 30)
+                    }
+                    Color.clear.frame(height: 1).id("end")
+                }
+                .padding(.horizontal, 2)
+            }
+            .scrollIndicators(.never)
+            .onAppear { proxy.scrollTo("end", anchor: .bottom) }
+            .onChange(of: session.lastMessage) { proxy.scrollTo("end", anchor: .bottom) }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 
@@ -217,7 +421,7 @@ struct ClaudeAskField: View {
 
 private struct SessionsPanel: View {
     @Environment(ClaudeCodeMonitor.self) private var monitor
-    @State private var selectedID: String?
+    @Binding var selectedID: String?
 
     /// Session affichée : celle choisie, sinon la plus urgente.
     private var selected: ClaudeCodeSession? {
@@ -308,18 +512,6 @@ private struct SessionDetail: View {
             header
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 6) {
-                    if let prompt = session.prompt {
-                        HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            Image(systemName: "text.bubble")
-                                .font(.system(size: 11.5))
-                                .foregroundStyle(Color.claude)
-                                .frame(width: 16)
-                            Text(prompt)
-                                .font(.system(size: 12.5))
-                                .foregroundStyle(.primary.opacity(0.65))
-                                .lineLimit(3)
-                        }
-                    }
                     status
                     if let permission = monitor.permission(for: session.id) {
                         permissionButtons(permission)
@@ -343,19 +535,6 @@ private struct SessionDetail: View {
                     }
                     if !session.plan.isEmpty {
                         PlanView(session: session)
-                    }
-                    if let message = session.lastMessage, session.state != .working {
-                        Text(claudeMarkdown(message))
-                            .font(.system(size: 13))
-                            .foregroundStyle(.primary.opacity(0.85))
-                            .lineLimit(10)
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(.primary.opacity(0.07))
-                            )
                     }
                 }
                 .padding(.bottom, 4)

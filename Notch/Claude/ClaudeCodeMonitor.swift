@@ -169,6 +169,14 @@ final class ClaudeCodeMonitor {
         ProcessOwner.activateApp(of: pid)
     }
 
+    /// Envoie un message à la session (tapé dans son terminal, ou collé dans son app).
+    func reply(_ text: String, to sessionID: String) async -> ClaudeReply.Outcome {
+        guard let pid = sessions.first(where: { $0.id == sessionID })?.pid else {
+            return .failed("Session introuvable")
+        }
+        return await ClaudeReply.send(text, toProcess: pid)
+    }
+
     func dismiss(_ session: ClaudeCodeSession) {
         resolvePermissions(of: session.id)
         sessions.removeAll { $0.id == session.id }
