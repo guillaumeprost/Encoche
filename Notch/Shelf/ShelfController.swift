@@ -1,7 +1,8 @@
 import AppKit
 import Observation
 
-/// Étagère : des fichiers gardés sous la main dans l'encoche (ajoutés depuis les captures).
+/// Étagère : des fichiers gardés sous la main dans l'encoche (déposés sur l'encoche, ou
+/// gardés depuis les captures), à rouvrir, glisser ailleurs ou envoyer par AirDrop.
 ///
 /// On garde des références (pas de copie) : un fichier déplacé ou supprimé
 /// disparaît de l'étagère au prochain chargement.

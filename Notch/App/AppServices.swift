@@ -11,6 +11,8 @@ struct AppServices {
     let privacy: PrivacyMonitor
     let downloads: DownloadMonitor
     let bluetooth: BluetoothMonitor
+    let focus: FocusMonitor
+    let timer: TimerController
     let music: MusicController
     let musicExtras: MusicExtras
     let volume: VolumeController
@@ -21,6 +23,7 @@ struct AppServices {
     let home: HomeShortcuts
     let claudeCode: ClaudeCodeMonitor
     let ask: ClaudeAsk
+    let claudeUsage: ClaudeUsage
     let launchAtLogin: LaunchAtLogin
     let systemNotifications: SystemNotificationWatcher
     let bannerSuppressor: BannerSuppressor
@@ -40,6 +43,8 @@ struct AppServices {
         let appSettings = settings
         bluetooth.isEnabled = { appSettings.showBluetoothActivity }
         bluetooth.start()
+        focus = FocusMonitor()
+        timer = TimerController()
         music = MusicController()
         musicExtras = MusicExtras(music: music)
         volume = VolumeController()
@@ -50,6 +55,7 @@ struct AppServices {
         home = HomeShortcuts()
         claudeCode = ClaudeCodeMonitor()
         claudeCode.alerts = alerts
+        timer.alerts = alerts
         volume.alerts = alerts
         volume.hud = hud
         volume.brightness = brightness
@@ -57,6 +63,7 @@ struct AppServices {
         calendar.startMeetingReminders()
         volume.setReplacesSystemHUD(settings.replaceSystemVolumeHUD)
         ask = ClaudeAsk()
+        claudeUsage = ClaudeUsage()
         launchAtLogin = LaunchAtLogin()
         systemNotifications = SystemNotificationWatcher(alerts: alerts, settings: settings)
 
@@ -95,6 +102,8 @@ extension View {
             .environment(services.privacy)
             .environment(services.downloads)
             .environment(services.bluetooth)
+            .environment(services.focus)
+            .environment(services.timer)
             .environment(services.music)
             .environment(services.musicExtras)
             .environment(services.volume)
@@ -105,6 +114,7 @@ extension View {
             .environment(services.home)
             .environment(services.claudeCode)
             .environment(services.ask)
+            .environment(services.claudeUsage)
             .environment(services.launchAtLogin)
             .environment(services.systemNotifications)
     }

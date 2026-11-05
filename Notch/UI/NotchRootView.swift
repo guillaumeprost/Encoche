@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct NotchRootView: View {
     @Environment(NotchViewModel.self) private var vm
@@ -7,6 +8,11 @@ struct NotchRootView: View {
     @Environment(HUDCenter.self) private var hud
     @Environment(PrivacyMonitor.self) private var privacy
     @Environment(DownloadMonitor.self) private var downloads
+    @Environment(ShelfController.self) private var shelf
+    @State private var dropTargeted = false
+    @Environment(CalendarController.self) private var calendar
+    @Environment(TimerController.self) private var timer
+    @Environment(FocusMonitor.self) private var focus
     @Environment(ClaudeCodeMonitor.self) private var claudeCode
     @Environment(AlertCenter.self) private var alerts
     /// Apparence du Mac (clair / sombre).
@@ -47,6 +53,25 @@ struct NotchRootView: View {
                     .padding(.bottom, 18)
                     .padding(.horizontal, 24 + vm.topRadius)
                     .animation(.snappy(duration: 0.25), value: settings.tab)
+                }
+                // Fichiers glissés sur l'encoche ouverte : ils vont sur l'Étagère.
+                .onDrop(of: [.fileURL], isTargeted: $dropTargeted) { providers in
+                    receiveDroppedFiles(providers)
+                }
+                .overlay {
+                    if dropTargeted {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 2, dash: [6, 4]))
+                            .background(RoundedRectangle(cornerRadius: 18, style: .continuous).fill(Color.accentColor.opacity(0.12)))
+                            .overlay {
+                                Label("Déposer sur l'Étagère", systemImage: "tray.and.arrow.down.fill")
+                                    .font(.system(size: 13, weight: .semibold))
+                            }
+                            .padding(.horizontal, 18 + vm.topRadius)
+                            .padding(.top, vm.notchSize.height + 4)
+                            .padding(.bottom, 10)
+                            .allowsHitTesting(false)
+                    }
                 }
                 .transition(.asymmetric(
                     insertion: .opacity.combined(with: .scale(scale: 0.92, anchor: .top))
@@ -132,6 +157,20 @@ struct NotchRootView: View {
         .animation(spring, value: claudeCode.needsAttention)
     }
 
+    /// Ajoute à l'Étagère les fichiers déposés sur l'encoche.
+    private func receiveDroppedFiles(_ providers: [NSItemProvider]) -> Bool {
+        let fileProviders = providers.filter { $0.canLoadObject(ofClass: URL.self) }
+        guard !fileProviders.isEmpty else { return false }
+        settings.tab = .shelf
+        for provider in fileProviders {
+            _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                guard let url, url.isFileURL else { return }
+                Task { @MainActor in shelf.add([url]) }
+            }
+        }
+        return true
+    }
+
     /// Affiche la notification en cours, sur l'écran principal seulement si c'est réglé ainsi.
     private func updateAlert() {
         let allowed = vm.isPrimaryScreen || !settings.notificationsOnPrimaryScreenOnly
@@ -146,7 +185,10 @@ struct NotchRootView: View {
     private var showsActivity: Bool { !activities.isEmpty }
 
     private var activities: [LiveActivity] {
-        LiveActivity.active(settings: settings, claudeCode: claudeCode, privacy: privacy, downloads: downloads, music: music)
+        LiveActivity.active(
+            settings: settings, claudeCode: claudeCode, privacy: privacy, downloads: downloads, music: music,
+            calendar: calendar, timer: timer, focus: focus
+        )
     }
 
     /// La bulle n'accompagne que l'encoche repliée, sans notification (elle reste avec le volume).
@@ -157,6 +199,9 @@ struct NotchRootView: View {
         switch activity {
         case .claudeWaiting: CollapsedClaudeView(slotWidth: vm.activitySlotWidth)
         case .privacy: CollapsedPrivacyView(slotWidth: vm.activitySlotWidth)
+        case .meeting: CollapsedMeetingView(slotWidth: vm.activitySlotWidth)
+        case .timer: CollapsedTimerView(slotWidth: vm.activitySlotWidth)
+        case .focus: CollapsedFocusView(slotWidth: vm.activitySlotWidth)
         case .download: CollapsedDownloadView(slotWidth: vm.activitySlotWidth)
         case .claudeWorking: CollapsedClaudeWorkingView(slotWidth: vm.activitySlotWidth)
         case .music: CollapsedMusicView(slotWidth: vm.activitySlotWidth)

@@ -2,20 +2,24 @@ import SwiftUI
 
 /// Activités en direct autour de l'encoche repliée, par ordre de priorité.
 enum LiveActivity: Hashable {
-    case claudeWaiting, privacy, download, claudeWorking, music
+    case claudeWaiting, privacy, meeting, timer, download, claudeWorking, music, focus
 
     /// Activités en cours, la plus importante d'abord.
     @MainActor
     static func active(
         settings: AppSettings, claudeCode: ClaudeCodeMonitor, privacy: PrivacyMonitor,
-        downloads: DownloadMonitor, music: MusicController
+        downloads: DownloadMonitor, music: MusicController,
+        calendar: CalendarController, timer: TimerController, focus: FocusMonitor
     ) -> [LiveActivity] {
         var list: [LiveActivity] = []
         if claudeCode.needsAttention { list.append(.claudeWaiting) }
         if privacy.isActive { list.append(.privacy) }
+        if settings.showMeetingActivity, calendar.upcomingMeeting != nil { list.append(.meeting) }
+        if timer.isActive { list.append(.timer) }
         if settings.showDownloadActivity, downloads.showsActivity { list.append(.download) }
         if settings.showClaudeActivity, claudeCode.workingSession != nil { list.append(.claudeWorking) }
         if music.showsActivity { list.append(.music) }
+        if settings.showFocusActivity, focus.activeMode != nil { list.append(.focus) }
         return list
     }
 }
@@ -26,6 +30,9 @@ struct ActivityBubble: View {
     @Environment(PrivacyMonitor.self) private var privacy
     @Environment(DownloadMonitor.self) private var downloads
     @Environment(MusicController.self) private var music
+    @Environment(CalendarController.self) private var calendar
+    @Environment(TimerController.self) private var timer
+    @Environment(FocusMonitor.self) private var focus
     let activity: LiveActivity
 
     var body: some View {
@@ -54,6 +61,33 @@ struct ActivityBubble: View {
         case .claudeWorking:
             ClaudeMascot(mood: .working)
                 .frame(width: 23)
+        case .meeting:
+            if let meeting = calendar.upcomingMeeting {
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    ZStack {
+                        ProgressRing(
+                            fraction: max(meeting.start.timeIntervalSince(context.date), 0) / CalendarController.countdownWindow,
+                            tint: meeting.color
+                        )
+                        Text(MeetingCountdown.short(until: meeting.start, now: context.date))
+                            .font(.system(size: 7.5, weight: .bold).monospacedDigit())
+                            .foregroundStyle(.white)
+                    }
+                    .frame(width: 20, height: 20)
+                }
+            }
+        case .timer:
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                ZStack {
+                    ProgressRing(fraction: timer.fraction(at: context.date), tint: .orange)
+                    Image(systemName: timer.kind.symbol).font(.system(size: 7, weight: .bold)).foregroundStyle(.orange)
+                }
+                .frame(width: 18, height: 18)
+            }
+        case .focus:
+            Image(systemName: focus.activeMode?.symbol ?? "moon.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.indigo)
         case .music:
             Artwork(image: music.artwork, cornerRadius: 11)
                 .frame(width: 22, height: 22)
@@ -206,4 +240,82 @@ struct DeviceHUDView: View {
         }
     }
 
+}
+
+// MARK: - Réunion, minuteur, Concentration
+
+/// Temps restant avant une réunion, en version courte (« 8 min », « 45 s »).
+enum MeetingCountdown {
+    static func short(until start: Date, now: Date) -> String {
+        let seconds = max(Int(start.timeIntervalSince(now).rounded(.up)), 0)
+        return seconds >= 60 ? "\((seconds + 59) / 60) min" : "\(seconds) s"
+    }
+}
+
+/// Réunion dans moins de 10 minutes : icône à gauche, compte à rebours à droite.
+struct CollapsedMeetingView: View {
+    @Environment(CalendarController.self) private var calendar
+    let slotWidth: CGFloat
+
+    var body: some View {
+        if let meeting = calendar.upcomingMeeting {
+            CollapsedActivityLayout(slotWidth: slotWidth) {
+                Image(systemName: meeting.meetingURL != nil ? "video.fill" : "calendar")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(meeting.color)
+            } trailing: {
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Text(MeetingCountdown.short(until: meeting.start, now: context.date))
+                        .font(.system(size: 10.5, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(meeting.color)
+                        .contentTransition(.numericText())
+                }
+            }
+            .help("\(meeting.title) à \(meeting.start.formatted(date: .omitted, time: .shortened))")
+        }
+    }
+}
+
+/// Minuteur en cours : anneau qui se vide à gauche, temps restant à droite.
+struct CollapsedTimerView: View {
+    @Environment(TimerController.self) private var timer
+    let slotWidth: CGFloat
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let remaining = Int(timer.remaining(at: context.date).rounded(.up))
+            CollapsedActivityLayout(slotWidth: slotWidth) {
+                ZStack {
+                    ProgressRing(fraction: timer.fraction(at: context.date), tint: .orange)
+                    Image(systemName: timer.kind.symbol)
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundStyle(.orange)
+                }
+                .frame(width: 17, height: 17)
+            } trailing: {
+                Text(String(format: "%d:%02d", remaining / 60, remaining % 60))
+                    .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(timer.isPaused ? .white.opacity(0.5) : .orange)
+                    .contentTransition(.numericText())
+            }
+        }
+        .help(timer.kind.label + (timer.isPaused ? " (en pause)" : ""))
+    }
+}
+
+/// Mode Concentration actif : son symbole à gauche de l'encoche.
+struct CollapsedFocusView: View {
+    @Environment(FocusMonitor.self) private var focus
+    let slotWidth: CGFloat
+
+    var body: some View {
+        CollapsedActivityLayout(slotWidth: slotWidth) {
+            Image(systemName: focus.activeMode?.symbol ?? "moon.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.indigo)
+        } trailing: {
+            Color.clear
+        }
+        .help(focus.activeMode?.name ?? "Concentration")
+    }
 }

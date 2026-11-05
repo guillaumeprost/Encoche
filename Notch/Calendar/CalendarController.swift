@@ -53,6 +53,10 @@ final class CalendarController {
     private(set) var access: Access
     private(set) var selectedDay: Date
     private(set) var events: [CalendarEvent] = []
+    /// Prochaine réunion qui commence dans moins de 10 minutes (activité en direct).
+    private(set) var upcomingMeeting: CalendarEvent?
+    static let countdownWindow: TimeInterval = 10 * 60
+
     /// Premier jour du mois affiché dans l'onglet Calendrier.
     private(set) var displayedMonth: Date
 
@@ -61,6 +65,7 @@ final class CalendarController {
     @ObservationIgnored var alerts: AlertCenter?
     @ObservationIgnored private var remindedIDs: Set<String> = []
     @ObservationIgnored private var reminderTimer: Timer?
+    @ObservationIgnored private var countdownEnd: Task<Void, Never>?
     private let calendar = Calendar.current
 
     init() {
@@ -142,6 +147,7 @@ final class CalendarController {
     private func checkUpcomingMeetings() {
         guard access == .granted else { return }
         let now = Date()
+        updateUpcomingMeeting(now: now)
         // Commence dans la minute (ou vient de commencer, si l'app était occupée).
         let predicate = store.predicateForEvents(
             withStart: now.addingTimeInterval(-60), end: now.addingTimeInterval(75), calendars: nil
@@ -153,6 +159,27 @@ final class CalendarController {
             guard !remindedIDs.contains(key) else { continue }
             remindedIDs.insert(key)
             postReminder(for: event, startsIn: start)
+        }
+    }
+
+    /// Événement (avec horaire) qui commence dans les 10 prochaines minutes.
+    private func updateUpcomingMeeting(now: Date) {
+        let predicate = store.predicateForEvents(
+            withStart: now, end: now.addingTimeInterval(Self.countdownWindow), calendars: nil
+        )
+        let next = store.events(matching: predicate)
+            .filter { !$0.isAllDay && $0.startDate > now && $0.startDate <= now.addingTimeInterval(Self.countdownWindow) }
+            .min { $0.startDate < $1.startDate }
+        let meeting = next.map(Self.makeEvent)
+        if meeting?.id != upcomingMeeting?.id { upcomingMeeting = meeting }
+        // Le compte à rebours s'arrête au début de la réunion.
+        if let start = meeting?.start {
+            countdownEnd?.cancel()
+            countdownEnd = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(max(start.timeIntervalSinceNow, 0) + 1))
+                guard !Task.isCancelled, let self else { return }
+                self.updateUpcomingMeeting(now: Date())
+            }
         }
     }
 
@@ -185,6 +212,19 @@ final class CalendarController {
         }
     }
 
+    private static func makeEvent(_ event: EKEvent) -> CalendarEvent {
+        CalendarEvent(
+            id: "\(event.eventIdentifier ?? UUID().uuidString)-\(event.startDate.timeIntervalSince1970)",
+            itemID: event.calendarItemIdentifier,
+            title: event.title?.isEmpty == false ? event.title : "Sans titre",
+            start: event.startDate,
+            end: event.endDate,
+            isAllDay: event.isAllDay,
+            color: Color(nsColor: event.calendar.color ?? .systemBlue),
+            meetingURL: MeetingLink.find(in: event)
+        )
+    }
+
     // MARK: - Chargement
 
     func reload() {
@@ -200,17 +240,6 @@ final class CalendarController {
                 if a.isAllDay != b.isAllDay { return a.isAllDay }
                 return a.startDate < b.startDate
             }
-            .map { event in
-                CalendarEvent(
-                    id: "\(event.eventIdentifier ?? UUID().uuidString)-\(event.startDate.timeIntervalSince1970)",
-                    itemID: event.calendarItemIdentifier,
-                    title: event.title?.isEmpty == false ? event.title : "Sans titre",
-                    start: event.startDate,
-                    end: event.endDate,
-                    isAllDay: event.isAllDay,
-                    color: Color(nsColor: event.calendar.color ?? .systemBlue),
-                    meetingURL: MeetingLink.find(in: event)
-                )
-            }
+            .map(Self.makeEvent)
     }
 }

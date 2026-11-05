@@ -422,15 +422,7 @@ final class ClaudeCodeMonitor {
                 session.detail = nil
                 for index in session.agents.indices { session.agents[index].isRunning = false }
             }
-            readTranscript(of: id)
-            let project = sessions.first { $0.id == id }?.projectName ?? "Claude Code"
-            alerts?.post(NotchAlert(
-                icon: .symbol("checkmark", .green),
-                source: "Claude Code",
-                title: "Tâche terminée",
-                body: project,
-                action: .run { [weak self] in self?.focus(id) }
-            ))
+            announceDone(id, reply: event["last_assistant_message"] as? String)
         default:
             return
         }
@@ -458,6 +450,41 @@ final class ClaudeCodeMonitor {
     }
 
     /// Relit le titre de la session et la dernière réponse de Claude dans la transcription.
+    /// Notification de fin de tâche, avec le début de la réponse de Claude.
+    private func announceDone(_ id: String, reply: String?) {
+        Task {
+            var reply = reply
+            if let path = sessions.first(where: { $0.id == id })?.transcriptPath {
+                let info = await ClaudeTranscript.read(path: path)
+                update(id) { session in
+                    if let title = info.title { session.title = title }
+                    if let message = info.lastMessage { session.lastMessage = message }
+                }
+                if reply == nil { reply = info.lastMessage }
+            }
+            let session = sessions.first { $0.id == id }
+            alerts?.post(NotchAlert(
+                icon: .symbol("checkmark", .green),
+                source: session?.projectName ?? "Claude Code",
+                title: "Terminé · \(session?.title ?? session?.projectName ?? "Claude Code")",
+                body: reply.map(Self.plainSummary),
+                action: .run { [weak self] in self?.focus(id) }
+            ))
+        }
+    }
+
+    /// Réponse de Claude en texte simple sur une ligne (sans titres, listes ni gras Markdown).
+    private static func plainSummary(_ text: String) -> String {
+        let cleaned = text
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "#>-*• ")) }
+            .filter { !$0.isEmpty && !$0.hasPrefix("```") }
+            .joined(separator: " ")
+            .replacingOccurrences(of: "**", with: "")
+            .replacingOccurrences(of: "`", with: "")
+        return cleaned.count > 400 ? String(cleaned.prefix(400)) + "…" : cleaned
+    }
+
     private func readTranscript(of id: String) {
         guard let path = sessions.first(where: { $0.id == id })?.transcriptPath else { return }
         Task {

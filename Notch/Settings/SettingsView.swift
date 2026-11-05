@@ -96,6 +96,8 @@ struct SettingsView: View {
                 Section {
                     Toggle("Claude Code au travail", isOn: $settings.showClaudeActivity)
                     Toggle("Téléchargements", isOn: $settings.showDownloadActivity)
+                    Toggle("Réunion dans moins de 10 minutes", isOn: $settings.showMeetingActivity)
+                    Toggle("Mode Concentration", isOn: $settings.showFocusActivity)
                     Toggle("Appareils Bluetooth (AirPods…)", isOn: $settings.showBluetoothActivity)
                 } header: {
                     Text("Activités en direct")

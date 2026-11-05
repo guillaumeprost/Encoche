@@ -13,6 +13,8 @@ final class NotchWindowController {
     private let claudeCode: ClaudeCodeMonitor
     private let privacy: PrivacyMonitor
     private let downloads: DownloadMonitor
+    private let timer: TimerController
+    private let focus: FocusMonitor
     private let settings: AppSettings
     private let alerts: AlertCenter
     private let panel: NotchPanel
@@ -24,6 +26,9 @@ final class NotchWindowController {
     private var pendingRetract: Task<Void, Never>?
     /// Un glisser parti de l'encoche (fichier sorti de l'étagère) : elle reste ouverte jusqu'au lâcher.
     private var dragStartedInside = false
+    /// Repère du presse-papier de glisser au début d'un clic : un glisser de fichiers démarré
+    /// ailleurs (Finder…) le change, et l'encoche s'ouvre alors sur l'Étagère pour le recevoir.
+    private var dragChangeCount = NSPasteboard(name: .drag).changeCount
 
     init(screen: NSScreen, services: AppServices) {
         music = services.music
@@ -31,6 +36,8 @@ final class NotchWindowController {
         claudeCode = services.claudeCode
         privacy = services.privacy
         downloads = services.downloads
+        timer = services.timer
+        focus = services.focus
         settings = services.settings
         alerts = services.alerts
         panel = NotchPanel(contentRect: NSRect(origin: .zero, size: Self.panelSize))
@@ -121,7 +128,8 @@ final class NotchWindowController {
     private func hotRect() -> NSRect {
         let size = viewModel.shapeSize(
             showsActivity: !LiveActivity.active(
-                settings: settings, claudeCode: claudeCode, privacy: privacy, downloads: downloads, music: music
+                settings: settings, claudeCode: claudeCode, privacy: privacy, downloads: downloads, music: music,
+                calendar: calendar, timer: timer, focus: focus
             ).isEmpty,
             extraHeight: NotchViewModel.extraHeight(for: settings.tab)
         )
@@ -135,6 +143,9 @@ final class NotchWindowController {
         switch type {
         case .leftMouseDown:
             dragStartedInside = viewModel.isOpen && hotRect().contains(NSEvent.mouseLocation)
+            dragChangeCount = NSPasteboard(name: .drag).changeCount
+        case .leftMouseDragged:
+            openForIncomingFiles()
         case .leftMouseUp:
             dragStartedInside = false
         default:
@@ -211,6 +222,20 @@ final class NotchWindowController {
             }
         }
         return true
+    }
+
+    /// Des fichiers glissés depuis une autre app arrivent sur l'encoche : elle s'ouvre tout de
+    /// suite sur l'Étagère, qui les reçoit.
+    private func openForIncomingFiles() {
+        guard !viewModel.isOpen, !viewModel.isRetracted, hotRect().contains(NSEvent.mouseLocation) else { return }
+        let pasteboard = NSPasteboard(name: .drag)
+        guard pasteboard.changeCount != dragChangeCount,
+              pasteboard.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true])
+        else { return }
+        pendingToggle?.cancel()
+        pendingToggle = nil
+        settings.tab = .shelf
+        setOpen(true)
     }
 
     private func setOpen(_ open: Bool) {

@@ -65,6 +65,14 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(showDownloadActivity, forKey: "showDownloadActivity") }
     }
 
+    var showMeetingActivity: Bool = UserDefaults.standard.object(forKey: "showMeetingActivity") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(showMeetingActivity, forKey: "showMeetingActivity") }
+    }
+
+    var showFocusActivity: Bool = UserDefaults.standard.object(forKey: "showFocusActivity") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(showFocusActivity, forKey: "showFocusActivity") }
+    }
+
     var showBluetoothActivity: Bool = UserDefaults.standard.object(forKey: "showBluetoothActivity") as? Bool ?? true {
         didSet { UserDefaults.standard.set(showBluetoothActivity, forKey: "showBluetoothActivity") }
     }

@@ -38,7 +38,7 @@ private struct DropHintTile: View {
         VStack(spacing: 6) {
             Image(systemName: "tray")
                 .font(.system(size: 20))
-            Text("Clic droit sur une capture → Garder")
+            Text("Dépose un fichier sur l'encoche, ou garde une capture")
                 .font(.system(size: 10.5))
                 .multilineTextAlignment(.center)
         }
