@@ -97,6 +97,9 @@ final class PendingPermission: Identifiable {
     let input: [String: Any]
     let reply: HookReply
     var alertID: UUID?
+    /// Pour vérifier dans la conversation si la demande a été tranchée ailleurs (app Claude, terminal).
+    var toolUseID: String?
+    var transcriptPath: String?
 
     init(sessionID: String, projectName: String, toolName: String, summary: String,
          suggestions: [[String: Any]], input: [String: Any] = [:], reply: HookReply) {
@@ -122,6 +125,9 @@ final class ClaudeCodeMonitor {
 
     private(set) var sessions: [ClaudeCodeSession] = []
     private(set) var permissions: [PendingPermission] = []
+    /// Dernier appel d'outil annoncé par session (PreToolUse), pour relier la demande qui suit.
+    @ObservationIgnored private var lastToolUse: [String: (tool: String, id: String)] = [:]
+    @ObservationIgnored private var answerCheck: Timer?
     private(set) var hooksInstalled = ClaudeHooksInstaller.isInstalled
     private(set) var hooksError: String?
 
@@ -297,7 +303,10 @@ final class ClaudeCodeMonitor {
             guard let self, let permission else { return }
             self.remove(permission)
         }
+        if let last = lastToolUse[sessionID], last.tool == tool { permission.toolUseID = last.id }
+        permission.transcriptPath = event["transcript_path"] as? String
         permissions.append(permission)
+        startAnswerCheck()
 
         upsert(sessionID, cwd: cwd) { session in
             session.state = .waiting
@@ -387,6 +396,53 @@ final class ClaudeCodeMonitor {
     private func remove(_ permission: PendingPermission) {
         permissions.removeAll { $0 === permission }
         if let alertID = permission.alertID { alerts?.dismiss(alertID: alertID) }
+        if permissions.isEmpty { answerCheck?.invalidate(); answerCheck = nil }
+    }
+
+    /// Filet de sécurité : si l'événement « réponse donnée » de Claude Code se perd (Encoche occupé
+    /// au mauvais moment), on retrouve la réponse dans la conversation et on retire la notification.
+    private func startAnswerCheck() {
+        guard answerCheck == nil else { return }
+        answerCheck = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.checkAnswers() }
+        }
+    }
+
+    private func checkAnswers() {
+        let pending = permissions.compactMap { permission -> (PendingPermission, String, String)? in
+            guard let id = permission.toolUseID, let path = permission.transcriptPath else { return nil }
+            return (permission, id, path)
+        }
+        guard !pending.isEmpty else { return }
+        let checks = pending.map { (id: $0.1, path: $0.2) }
+        Task { [weak self] in
+            // Lecture des fichiers hors du fil principal.
+            let answered = await Task.detached(priority: .utility) {
+                Set(checks.filter { Self.transcript(at: $0.path, hasResultFor: $0.id) }.map(\.id))
+            }.value
+            guard let self, !answered.isEmpty else { return }
+            for (permission, id, _) in pending where answered.contains(id) && self.permissions.contains(where: { $0 === permission }) {
+                permission.reply.send(nil)
+                self.remove(permission)
+            }
+        }
+    }
+
+    /// La fin de la conversation contient-elle le résultat de cet appel d'outil ?
+    nonisolated static func transcript(at path: String, hasResultFor toolUseID: String) -> Bool {
+        guard let handle = FileHandle(forReadingAtPath: path) else { return false }
+        defer { try? handle.close() }
+        let size = (try? handle.seekToEnd()) ?? 0
+        try? handle.seek(toOffset: size > 262_144 ? size - 262_144 : 0)
+        guard let data = try? handle.readToEnd(), let text = String(data: data, encoding: .utf8) else { return false }
+        return containsResult(in: text, for: toolUseID)
+    }
+
+    /// Une ligne de la conversation est le résultat (tool_result) de cet appel d'outil.
+    nonisolated static func containsResult(in text: String, for toolUseID: String) -> Bool {
+        text.split(separator: "\n").contains { line in
+            line.contains("\"tool_result\"") && line.contains("\"tool_use_id\":\"\(toolUseID)\"")
+        }
     }
 
     /// La session a avancé sans nous (réponse dans le terminal, annulation…) :
@@ -458,6 +514,7 @@ final class ClaudeCodeMonitor {
             let tool = event["tool_name"] as? String ?? ""
             let input = event["tool_input"] as? [String: Any] ?? [:]
             let toolUseID = event["tool_use_id"] as? String
+            if let toolUseID { lastToolUse[id] = (tool, toolUseID) }
             upsert(id, cwd: cwd) { session in
                 session.state = .working
                 session.detail = ClaudeActivity.describe(tool: tool, input: input)
@@ -641,3 +698,4 @@ final class ClaudeCodeMonitor {
         if kept.count != sessions.count { sessions = kept }
     }
 }
+

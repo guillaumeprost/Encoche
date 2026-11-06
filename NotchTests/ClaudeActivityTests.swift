@@ -103,3 +103,21 @@ struct ClaudeActivityTests {
         #expect(session.planFraction == 0.5)
     }
 }
+
+struct QuestionAnsweredElsewhereTests {
+    @Test func findsToolResultForTheQuestion() {
+        let transcript = """
+        {"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_A","name":"AskUserQuestion"}]}}
+        {"type":"user","message":{"content":[{"tool_use_id":"toolu_A","type":"tool_result","content":"Oui"}]}}
+        """
+        #expect(ClaudeCodeMonitor.containsResult(in: transcript, for: "toolu_A"))
+    }
+
+    @Test func ignoresTheQuestionItselfAndOtherResults() {
+        let transcript = """
+        {"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_A","name":"AskUserQuestion"}]}}
+        {"type":"user","message":{"content":[{"tool_use_id":"toolu_B","type":"tool_result","content":"ok"}]}}
+        """
+        #expect(!ClaudeCodeMonitor.containsResult(in: transcript, for: "toolu_A"))
+    }
+}
