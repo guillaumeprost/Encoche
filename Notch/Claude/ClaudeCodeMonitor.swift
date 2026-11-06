@@ -128,6 +128,8 @@ final class ClaudeCodeMonitor {
     /// Dernier appel d'outil annoncé par session (PreToolUse), pour relier la demande qui suit.
     @ObservationIgnored private var lastToolUse: [String: (tool: String, id: String)] = [:]
     @ObservationIgnored private var answerCheck: Timer?
+    /// Alerte qui attend ta réponse (« … t'attend », « … te demande »), retirée dès que la session reprend.
+    @ObservationIgnored private var waitingAlerts: [String: UUID] = [:]
     private(set) var hooksInstalled = ClaudeHooksInstaller.isInstalled
     private(set) var hooksError: String?
 
@@ -475,6 +477,7 @@ final class ClaudeCodeMonitor {
         // Tout événement qui suit montre que la demande a été tranchée ailleurs.
         if ["PreToolUse", "PostToolUse", "UserPromptSubmit", "Stop", "SessionEnd"].contains(name) {
             resolvePermissions(of: id)
+            if let alertID = waitingAlerts.removeValue(forKey: id) { alerts?.dismiss(alertID: alertID) }
         }
 
         if name == "SessionEnd" {
@@ -549,13 +552,16 @@ final class ClaudeCodeMonitor {
             guard previousState != .waiting, previousState != .done else { return }
             upsert(id, cwd: cwd) { $0.state = .waiting; $0.detail = message.isEmpty ? nil : message }
             let project = sessions.first { $0.id == id }?.projectName ?? "Claude Code"
-            postClaudeAlert(NotchAlert(
+            let alert = NotchAlert(
                 icon: .symbol("hand.raised.fill", .claude),
                 source: "Claude Code",
                 title: "\(project) t'attend",
                 body: message.isEmpty ? nil : message,
                 action: .run { [weak self] in self?.focus(id) }
-            ))
+            )
+            if let previous = waitingAlerts[id] { alerts?.dismiss(alertID: previous) }
+            waitingAlerts[id] = alert.id
+            postClaudeAlert(alert)
         case "Stop":
             upsert(id, cwd: cwd) { session in
                 session.state = .done
@@ -594,6 +600,8 @@ final class ClaudeCodeMonitor {
         Task { [weak self] in
             guard let self else { return }
             let info = await loadTranscript(of: id)
+            // La session a déjà repris pendant la lecture de la transcription.
+            guard sessions.first(where: { $0.id == id })?.state == .done else { return }
             let reply = reply ?? info?.lastMessage
             let session = sessions.first { $0.id == id }
             var alert = NotchAlert(
@@ -620,6 +628,9 @@ final class ClaudeCodeMonitor {
                     })
                 }
                 alert.buttons = buttons
+                // Retirée si tu réponds directement dans Claude.
+                if let previous = waitingAlerts[id] { alerts?.dismiss(alertID: previous) }
+                waitingAlerts[id] = alert.id
             }
             postClaudeAlert(alert)
         }
