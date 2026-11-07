@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Activités en direct sur l'écran verrouillé, en cartes empilées sous l'horloge au-dessus du
-/// lecteur de musique, comme sur iPhone : minuteur, Claude Code, prochaine réunion, téléchargement.
+/// Activités en direct sur l'écran verrouillé, en cartes empilées sous l'horloge, comme sur
+/// iPhone : minuteur, Claude Code, prochaine réunion, téléchargement.
 struct LockActivitiesView: View {
     @Environment(LockScreenController.self) private var lock
     @Environment(AppSettings.self) private var settings
@@ -9,8 +9,6 @@ struct LockActivitiesView: View {
     @Environment(ClaudeCodeMonitor.self) private var claudeCode
     @Environment(CalendarController.self) private var calendar
     @Environment(DownloadMonitor.self) private var downloads
-    @Environment(MusicController.self) private var music
-
     var body: some View {
         VStack(spacing: 10) {
             if settings.lockScreenActivities {
@@ -18,10 +16,6 @@ struct LockActivitiesView: View {
                 if let session = claudeSession { LockClaudeCard(session: session) }
                 if settings.showMeetingActivity, let meeting = calendar.upcomingMeeting { LockMeetingCard(meeting: meeting) }
                 if settings.showDownloadActivity, downloads.showsActivity { LockDownloadCard() }
-            }
-            if settings.lockScreenMusic, music.track != nil {
-                LockMusicCard()
-                    .frame(height: LockScreenController.musicCardSize.height)
             }
             Spacer(minLength: 0)
         }
@@ -35,6 +29,24 @@ struct LockActivitiesView: View {
     private var claudeSession: ClaudeCodeSession? {
         if let waiting = claudeCode.sortedSessions.first(where: { $0.state == .waiting }) { return waiting }
         return settings.showClaudeActivity ? claudeCode.workingSession : nil
+    }
+}
+
+/// Lecteur de musique en bas de l'écran verrouillé, juste au-dessus de la photo de profil.
+struct LockMusicArea: View {
+    @Environment(LockScreenController.self) private var lock
+    @Environment(AppSettings.self) private var settings
+    @Environment(MusicController.self) private var music
+
+    var body: some View {
+        ZStack {
+            if settings.lockScreenMusic, music.track != nil {
+                LockMusicCard()
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .opacity(lock.phase == .locked ? 1 : 0)
+        .animation(.easeOut(duration: 0.3), value: lock.phase)
     }
 }
 

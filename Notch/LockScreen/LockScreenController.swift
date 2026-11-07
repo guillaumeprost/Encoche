@@ -2,7 +2,8 @@ import AppKit
 import Observation
 import SwiftUI
 
-/// Encoche sur l'écran de verrouillage : un cadenas dans l'encoche, le lecteur de musique en bas,
+/// Encoche sur l'écran de verrouillage : un cadenas dans l'encoche, les activités sous l'horloge,
+/// le lecteur de musique en bas au-dessus de la photo de profil,
 /// et un son au verrouillage / déverrouillage si c'est réglé.
 @Observable
 @MainActor
@@ -21,6 +22,8 @@ final class LockScreenController {
     static let activitiesSize = CGSize(width: 420, height: 380)
     /// Part du haut de l'écran prise par la date et l'horloge de l'écran verrouillé.
     static let clockFraction: CGFloat = 0.31
+    /// Part du bas de l'écran prise par la photo de profil, le nom et le mot de passe.
+    static let loginFraction: CGFloat = 0.21
 
     init(services: AppServices) {
         self.services = services
@@ -31,6 +34,12 @@ final class LockScreenController {
         center.addObserver(forName: .init("com.apple.screenIsUnlocked"), object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.didUnlock() }
         }
+        // Écran branché ou débranché pendant le verrouillage : on replace tout.
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.screensDidChange() }
+        }
     }
 
     private var settings: AppSettings { services.settings }
@@ -39,9 +48,24 @@ final class LockScreenController {
 
     private func didLock() {
         settings.lockSound.play()
-        guard settings.showOnLockScreen, let space = LockScreenSpace.shared, let screen = NSScreen.screens.first else { return }
+        guard settings.showOnLockScreen else { return }
         hideTask?.cancel()
+        showWindows()
+    }
+
+    private func screensDidChange() {
+        guard phase == .locked else { return }
+        showWindows()
+    }
+
+    /// Écran de l'encoche : celui du Mac quand il est ouvert (sa vraie encoche), sinon l'écran principal.
+    static func lockScreen() -> NSScreen? {
+        NSScreen.screens.first(where: \.hasNotch) ?? NSScreen.screens.first
+    }
+
+    private func showWindows() {
         closeWindows()
+        guard let space = LockScreenSpace.shared, let screen = Self.lockScreen() else { return }
         notchSize = screen.notchSize
         phase = .locked
 
@@ -57,8 +81,7 @@ final class LockScreenController {
         )
         windows.append(notchWindow)
 
-        // Activités et lecteur de musique, empilés sous l'horloge (comme sur iPhone) : le bas de
-        // l'écran reste libre pour l'avatar et le mot de passe. Mis à jour en direct.
+        // Activités empilées sous l'horloge (comme sur iPhone), mises à jour en direct.
         let size = Self.activitiesSize
         let top = screen.frame.maxY - screen.frame.height * Self.clockFraction
         let activitiesWindow = makeWindow(
@@ -68,6 +91,17 @@ final class LockScreenController {
             clickable: true
         )
         windows.append(activitiesWindow)
+
+        // Lecteur en bas, juste au-dessus de la photo de profil.
+        let music = Self.musicCardSize
+        let musicWindow = makeWindow(
+            frame: NSRect(x: screen.frame.midX - music.width / 2,
+                          y: screen.frame.minY + screen.frame.height * Self.loginFraction,
+                          width: music.width, height: music.height),
+            content: LockMusicArea(),
+            clickable: true
+        )
+        windows.append(musicWindow)
         windows.forEach(space.add)
     }
 
