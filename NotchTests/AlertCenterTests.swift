@@ -19,7 +19,7 @@ struct AlertCenterTests {
     }
 
     @Test func showsOneAtATimeAndKeepsHistory() {
-        let center = AlertCenter(savesHistory: false)
+        let center = AlertCenter(historyURL: nil)
         center.post(alert("A"))
         center.post(alert("B"))
         #expect(center.current?.title == "A")
@@ -30,7 +30,7 @@ struct AlertCenterTests {
     }
 
     @Test func nextAlertShowsAfterTheNotchFolds() async throws {
-        let center = AlertCenter(savesHistory: false)
+        let center = AlertCenter(historyURL: nil)
         center.post(alert("A"))
         center.post(alert("B"))
         center.dismiss()
@@ -40,7 +40,7 @@ struct AlertCenterTests {
     }
 
     @Test func requestsSkipHistoryAndJumpTheQueue() async throws {
-        let center = AlertCenter(savesHistory: false)
+        let center = AlertCenter(historyURL: nil)
         center.post(alert("A"))
         center.post(alert("B"))
         center.post(withButton("Question"))
@@ -51,7 +51,7 @@ struct AlertCenterTests {
     }
 
     @Test func mutedAppsAreDroppedAndRecentDuplicatesRemoved() {
-        let center = AlertCenter(savesHistory: false)
+        let center = AlertCenter(historyURL: nil)
         center.post(alert("Relayée", app: "com.anthropic.claudefordesktop"))
         center.post(alert("Autre", app: "com.apple.mail"))
         center.muteRelayedNotifications(from: "com.anthropic.claudefordesktop")
@@ -62,7 +62,7 @@ struct AlertCenterTests {
     }
 
     @Test func dismissByIDRemovesShownOrQueuedAlerts() {
-        let center = AlertCenter(savesHistory: false)
+        let center = AlertCenter(historyURL: nil)
         let shown = alert("A")
         let queued = alert("B")
         center.post(shown)
@@ -73,7 +73,7 @@ struct AlertCenterTests {
     }
 
     @Test func clickRunsTheActionAndCloses() {
-        let center = AlertCenter(savesHistory: false)
+        let center = AlertCenter(historyURL: nil)
         var ran = false
         center.post(alert("A", action: .run { ran = true }))
         center.activate()
@@ -82,14 +82,14 @@ struct AlertCenterTests {
     }
 
     @Test func clickWithoutActionDoesNothing() {
-        let center = AlertCenter(savesHistory: false)
+        let center = AlertCenter(historyURL: nil)
         center.post(alert("A"))
         center.activate()
         #expect(center.current?.title == "A")
     }
 
     @Test func buttonsRunAndClose() {
-        let center = AlertCenter(savesHistory: false)
+        let center = AlertCenter(historyURL: nil)
         var pressed = false
         center.post(withButton("Question") { pressed = true })
         let button = try! #require(center.current?.buttons.first)
@@ -99,7 +99,7 @@ struct AlertCenterTests {
     }
 
     @Test func recentTitlesAndHistoryEditing() {
-        let center = AlertCenter(savesHistory: false)
+        let center = AlertCenter(historyURL: nil)
         let a = alert("A")
         center.post(a)
         #expect(center.hasRecent(title: "A"))

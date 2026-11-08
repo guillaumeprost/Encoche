@@ -42,14 +42,16 @@ enum ClaudeHooksInstaller {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/settings.json")
     }
 
-    static var isInstalled: Bool {
+    static var isInstalled: Bool { isInstalled(at: settingsURL) }
+
+    static func isInstalled(at settingsURL: URL) -> Bool {
         guard let data = try? Data(contentsOf: settingsURL) else { return false }
         return String(decoding: data, as: UTF8.self).contains(marker)
     }
 
     /// Ajoute les hooks manquants (idempotent : n'écrit rien si tout est déjà là).
-    static func install() throws {
-        var root = try readSettings()
+    static func install(at settingsURL: URL = settingsURL) throws {
+        var root = try readSettings(at: settingsURL)
         var hooks = root["hooks"] as? [String: Any] ?? [:]
         var changed = false
         for event in events {
@@ -70,11 +72,11 @@ enum ClaudeHooksInstaller {
         }
         guard changed else { return }
         root["hooks"] = hooks
-        try writeSettings(root)
+        try writeSettings(root, to: settingsURL)
     }
 
-    static func uninstall() throws {
-        var root = try readSettings()
+    static func uninstall(at settingsURL: URL = settingsURL) throws {
+        var root = try readSettings(at: settingsURL)
         guard var hooks = root["hooks"] as? [String: Any] else { return }
         for (event, value) in hooks {
             guard let groups = value as? [[String: Any]] else { continue }
@@ -82,7 +84,7 @@ enum ClaudeHooksInstaller {
             hooks[event] = kept.isEmpty ? nil : kept
         }
         root["hooks"] = hooks.isEmpty ? nil : hooks
-        try writeSettings(root)
+        try writeSettings(root, to: settingsURL)
     }
 
     private static func commandOf(_ group: [String: Any]) -> String? {
@@ -96,16 +98,16 @@ enum ClaudeHooksInstaller {
         return String(decoding: data, as: UTF8.self).contains(marker)
     }
 
-    private static func readSettings() throws -> [String: Any] {
+    private static func readSettings(at settingsURL: URL) throws -> [String: Any] {
         guard FileManager.default.fileExists(atPath: settingsURL.path) else { return [:] }
         let data = try Data(contentsOf: settingsURL)
-        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        guard let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
             throw InstallError.unreadableSettings
         }
         return root
     }
 
-    private static func writeSettings(_ root: [String: Any]) throws {
+    private static func writeSettings(_ root: [String: Any], to settingsURL: URL) throws {
         let fm = FileManager.default
         try fm.createDirectory(at: settingsURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         if fm.fileExists(atPath: settingsURL.path) {

@@ -8,7 +8,7 @@ import Testing
 @MainActor
 struct ClaudeCodeMonitorTests {
     private let monitor: ClaudeCodeMonitor
-    private let alerts = AlertCenter(savesHistory: false)
+    private let alerts = AlertCenter(historyURL: nil)
 
     init() {
         monitor = ClaudeCodeMonitor(listens: false)

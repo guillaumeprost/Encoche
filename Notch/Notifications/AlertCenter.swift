@@ -60,16 +60,16 @@ final class AlertCenter {
     private(set) var isHovered = false
     private var dismissTask: Task<Void, Never>?
 
-    /// Historique enregistré sur le disque (pas dans les tests).
-    private let savesHistory: Bool
+    /// Fichier de l'historique ; `nil` : rien n'est lu ni écrit (tests).
+    private let historyURL: URL?
 
-    init(savesHistory: Bool = true) {
-        self.savesHistory = savesHistory
-        if savesHistory { history = HistoryStore.load() }
+    init(historyURL: URL? = HistoryStore.defaultURL) {
+        self.historyURL = historyURL
+        if let historyURL { history = HistoryStore.load(from: historyURL) }
     }
 
     private func saveHistory() {
-        if savesHistory { HistoryStore.save(history) }
+        if let historyURL { HistoryStore.save(history, to: historyURL) }
     }
 
     /// Apps dont les notifications relayées sont ignorées jusqu'à une date (doublons).
@@ -208,7 +208,7 @@ final class AlertCenter {
 /// Historique des notifications enregistré dans Application Support, pour le retrouver
 /// après un redémarrage. Les actions internes (ex. ramener une session Claude) ne sont pas
 /// enregistrables : seules l'ouverture d'une app ou d'une URL survivent.
-private enum HistoryStore {
+enum HistoryStore {
     private struct Stored: Codable {
         var id: UUID
         var appBundleID: String?
@@ -225,9 +225,9 @@ private enum HistoryStore {
         "claude": .claude, "green": .green, "red": .red, "blue": .blue, "gray": .gray, "orange": .orange,
     ]
 
-    private static var url: URL { URL.appSupport.appendingPathComponent("notifications.json") }
+    static var defaultURL: URL { URL.appSupport.appendingPathComponent("notifications.json") }
 
-    static func save(_ alerts: [NotchAlert]) {
+    static func save(_ alerts: [NotchAlert], to url: URL) {
         let stored = alerts.map { alert -> Stored in
             var item = Stored(id: alert.id, source: alert.source, title: alert.title, body: alert.body, date: alert.date)
             switch alert.icon {
@@ -247,7 +247,7 @@ private enum HistoryStore {
         try? data.write(to: url, options: .atomic)
     }
 
-    static func load() -> [NotchAlert] {
+    static func load(from url: URL) -> [NotchAlert] {
         guard let data = try? Data(contentsOf: url),
             let stored = try? JSONDecoder().decode([Stored].self, from: data)
         else { return [] }
