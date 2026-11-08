@@ -68,8 +68,9 @@ struct RemindersColumn: View {
                 RemindersList(large: false)
             } else {
                 let notAsked = reminders.access == .notDetermined
-                Button(notAsked ? "Afficher" : "Autoriser",
-                       action: notAsked ? reminders.requestAccess : reminders.openPrivacySettings)
+                Button(notAsked ? "Afficher" : "Autoriser") {
+                    if notAsked { reminders.requestAccess() } else { reminders.openPrivacySettings() }
+                }
                     .buttonStyle(.glass)
                     .controlSize(.small)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)

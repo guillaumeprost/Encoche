@@ -54,11 +54,13 @@ final class MusicController {
     init() {
         let center = DistributedNotificationCenter.default()
         center.addObserver(forName: Notification.Name("com.apple.Music.playerInfo"), object: nil, queue: .main) { [weak self] note in
-            let info = note.userInfo ?? [:]
+            // Reçue sur le fil principal (queue: .main) : le dictionnaire n'en sort pas.
+            nonisolated(unsafe) let info = note.userInfo ?? [:]
             MainActor.assumeIsolated { self?.handle(info, from: .music) }
         }
         center.addObserver(forName: Notification.Name("com.spotify.client.PlaybackStateChanged"), object: nil, queue: .main) { [weak self] note in
-            let info = note.userInfo ?? [:]
+            // Reçue sur le fil principal (queue: .main) : le dictionnaire n'en sort pas.
+            nonisolated(unsafe) let info = note.userInfo ?? [:]
             MainActor.assumeIsolated { self?.handle(info, from: .spotify) }
         }
         NSWorkspace.shared.notificationCenter.addObserver(

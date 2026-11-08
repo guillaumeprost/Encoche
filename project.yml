@@ -7,7 +7,9 @@ options:
   createIntermediateGroups: true
 settings:
   base:
-    SWIFT_VERSION: "5.0"
+    # Swift 6 : le compilateur vérifie l'accès concurrent aux données (fil principal, tâches).
+    SWIFT_VERSION: "6.0"
+    SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
     MACOSX_DEPLOYMENT_TARGET: "26.0"
 targets:
   # « À l'écoute » de macOS (YouTube dans le navigateur, Deezer…) : voir Vendor/MediaRemoteAdapter.

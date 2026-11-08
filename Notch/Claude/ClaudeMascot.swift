@@ -25,8 +25,8 @@ struct ClaudeMascot: View {
     static let aspectRatio = CGFloat(columns) / CGFloat(rows * 2)
 
     /// Au repos, un clignement toutes les 4 secondes ; ailleurs, une image toutes les 0,12 s.
-    fileprivate static let blinkPeriod: TimeInterval = 4
-    fileprivate static let blinkLength: TimeInterval = 0.15
+    nonisolated fileprivate static let blinkPeriod: TimeInterval = 4
+    nonisolated fileprivate static let blinkLength: TimeInterval = 0.15
     private static let step: TimeInterval = 0.12
 
     var body: some View {

@@ -138,7 +138,7 @@ final class ClaudeCodeMonitor {
     private var cleanupTimer: Timer?
 
     /// L'app de la session (terminal, app Claude) est au premier plan : pas besoin de notification.
-    @ObservationIgnored var isSessionAppInFront: (pid_t?) -> Bool = ClaudeCodeMonitor.isAppInFront
+    @ObservationIgnored var isSessionAppInFront: @MainActor (pid_t?) -> Bool = ClaudeCodeMonitor.isAppInFront
 
     /// `listens: false` (tests) : ni serveur de hooks, ni minuteurs, ni lecture des transcriptions.
     init(listens: Bool = true) {

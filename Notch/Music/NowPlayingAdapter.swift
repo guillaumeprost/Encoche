@@ -83,12 +83,14 @@ final class NowPlayingAdapter: @unchecked Sendable {
         process.standardError = FileHandle.nullDevice
         output.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
-            self?.queue.async { self?.consume(data) }
+            guard let self else { return }
+            self.queue.async { self.consume(data) }
         }
         // S'il s'arrête (mise en veille, plantage…), on le relance un peu plus tard.
         process.terminationHandler = { [weak self] _ in
             output.fileHandleForReading.readabilityHandler = nil
-            self?.queue.asyncAfter(deadline: .now() + 5) { self?.launchStream() }
+            guard let self else { return }
+            self.queue.asyncAfter(deadline: .now() + 5) { [weak self] in self?.launchStream() }
         }
         do {
             try process.run()

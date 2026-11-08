@@ -26,7 +26,8 @@ final class VolumeKeyInterceptor {
 
     /// Demande l'autorisation Accessibilité (fenêtre système), puis démarre dès qu'elle est accordée.
     func requestAccessAndStart() {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        // Clé « kAXTrustedCheckOptionPrompt », écrite en toutes lettres (la constante C n'est pas sûre en Swift 6).
+        let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(options)
         start()
     }
@@ -73,7 +74,8 @@ final class VolumeKeyInterceptor {
             callback: { _, type, event, refcon in
                 guard let refcon else { return Unmanaged.passUnretained(event) }
                 let interceptor = Unmanaged<VolumeKeyInterceptor>.fromOpaque(refcon).takeUnretainedValue()
-                return MainActor.assumeIsolated { interceptor.handle(type: type, event: event) }
+                let passes = MainActor.assumeIsolated { interceptor.passes(type: type, event: event) }
+                return passes ? Unmanaged.passUnretained(event) : nil
             },
             userInfo: refcon
         ) else { return false }
@@ -86,16 +88,17 @@ final class VolumeKeyInterceptor {
         return true
     }
 
-    private func handle(type: CGEventType, event: CGEvent) -> Unmanaged<CGEvent>? {
+    /// `false` : la touche est absorbée (retirée du flux).
+    private func passes(type: CGEventType, event: CGEvent) -> Bool {
         // macOS coupe un tap trop lent ou après certaines saisies sécurisées : on le relance.
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
             if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
-            return Unmanaged.passUnretained(event)
+            return true
         }
 
         guard let nsEvent = NSEvent(cgEvent: event),
               nsEvent.type == .systemDefined, nsEvent.subtype.rawValue == 8 else {
-            return Unmanaged.passUnretained(event)
+            return true
         }
 
         let data = nsEvent.data1
@@ -110,7 +113,7 @@ final class VolumeKeyInterceptor {
         case 7: key = .mute     // NX_KEYTYPE_MUTE
         case 2: key = .brightnessUp    // NX_KEYTYPE_BRIGHTNESS_UP
         case 3: key = .brightnessDown  // NX_KEYTYPE_BRIGHTNESS_DOWN
-        default: return Unmanaged.passUnretained(event)
+        default: return true
         }
 
         // Option + Maj : pas fin, comme sur macOS.
@@ -118,12 +121,12 @@ final class VolumeKeyInterceptor {
         if isDown {
             guard onKey?(key, fine) == true else {
                 swallowedKeys.remove(keyCode)
-                return Unmanaged.passUnretained(event)
+                return true
             }
             swallowedKeys.insert(keyCode)
-            return nil
+            return false
         }
         // Relâchement : absorbé seulement si l'appui l'a été, pour que macOS reçoive toujours des paires complètes.
-        return swallowedKeys.remove(keyCode) != nil ? nil : Unmanaged.passUnretained(event)
+        return swallowedKeys.remove(keyCode) == nil
     }
 }
