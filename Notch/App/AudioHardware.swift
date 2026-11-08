@@ -21,11 +21,6 @@ enum AudioHardware {
         AudioObjectPropertyAddress(mSelector: selector, mScope: scope.value, mElement: kAudioObjectPropertyElementMain)
     }
 
-    static func has(_ selector: AudioObjectPropertySelector, _ scope: Scope = .global, on object: AudioObjectID) -> Bool {
-        var address = address(selector, scope)
-        return AudioObjectHasProperty(object, &address)
-    }
-
     static func isSettable(_ selector: AudioObjectPropertySelector, _ scope: Scope = .global, on object: AudioObjectID) -> Bool {
         var address = address(selector, scope)
         var settable = DarwinBoolean(false)
@@ -43,6 +38,11 @@ enum AudioHardware {
         var size = UInt32(MemoryLayout<Value>.size)
         guard AudioObjectGetPropertyData(object, &address, 0, nil, &size, &value) == noErr else { return nil }
         return value
+    }
+
+    /// Propriété oui/non (muet, appareil utilisé…), ou `nil` si absente.
+    static func flag(_ selector: AudioObjectPropertySelector, _ scope: Scope = .global, on object: AudioObjectID) -> Bool? {
+        (get(selector, scope, on: object) as UInt32?).map { $0 != 0 }
     }
 
     /// Écrit la propriété ; `false` si l'appareil ne la propose pas ou la refuse.

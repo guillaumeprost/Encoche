@@ -7,16 +7,15 @@ import Testing
 @MainActor
 final class ClipboardTests {
     private let pasteboard = NSPasteboard(name: .init("encoche-test-\(UUID().uuidString)"))
-    private let folder = FileManager.default.temporaryDirectory.appendingPathComponent("encoche-clip-\(UUID().uuidString)")
+    private let folder = TemporaryFolder()
     private var frontmost: String? = "com.apple.Safari"
 
     isolated deinit {
         pasteboard.releaseGlobally()
-        try? FileManager.default.removeItem(at: folder)
     }
 
     private func makeController() -> ClipboardController {
-        ClipboardController(pasteboard: pasteboard, folder: folder, frontmostApp: { [unowned self] in frontmost }, polls: false)
+        ClipboardController(pasteboard: pasteboard, folder: folder.url, frontmostApp: { [unowned self] in frontmost }, polls: false)
     }
 
     private func copy(_ text: String, extraType: String? = nil) {

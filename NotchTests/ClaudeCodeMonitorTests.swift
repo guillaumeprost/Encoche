@@ -1,5 +1,4 @@
 import Foundation
-import Network
 import Testing
 
 @testable import Encoche
@@ -24,11 +23,6 @@ struct ClaudeCodeMonitorTests {
 
     private func state(of id: String = "s1") -> ClaudeCodeSession.State? {
         monitor.sessions.first { $0.id == id }?.state
-    }
-
-    /// Réponse à une demande de permission (connexion jamais ouverte : rien n'est envoyé).
-    private func reply() -> HookReply {
-        HookReply(connection: NWConnection(host: "127.0.0.1", port: 9, using: .tcp))
     }
 
     /// Attend la notification de fin de tâche, postée après la lecture de la transcription.
@@ -149,7 +143,7 @@ struct ClaudeCodeMonitorTests {
             [
                 "session_id": "s1", "cwd": "/p/Encoche", "tool_name": tool, "tool_input": input,
                 "permission_suggestions": suggestions,
-            ], reply: reply())
+            ], reply: testReply())
     }
 
     @Test func permissionRequestWaitsForYourDecision() {
@@ -257,7 +251,7 @@ struct ClaudeAlertsTests {
         var focused = false
         let permission = PendingPermission(
             sessionID: "s", projectName: "Encoche", toolName: "Bash", summary: "ls", suggestions: [],
-            reply: HookReply(connection: NWConnection(host: "127.0.0.1", port: 9, using: .tcp)))
+            reply: testReply())
         let alert = ClaudeAlerts.permission(permission, decide: { decisions.append($0) }, focus: { focused = true })
         for button in alert.buttons { button.action() }
         #expect(decisions == [.deny, .terminal, .allow])
@@ -269,7 +263,7 @@ struct ClaudeAlertsTests {
         let permission = PendingPermission(
             sessionID: "s", projectName: "Encoche", toolName: "AskUserQuestion", summary: "", suggestions: [],
             input: ["questions": [["question": "1", "options": [["label": "A"]]], ["question": "2", "options": [["label": "B"]]]]],
-            reply: HookReply(connection: NWConnection(host: "127.0.0.1", port: 9, using: .tcp)))
+            reply: testReply())
         #expect(ClaudeAlerts.question(permission, decide: { _ in }, focus: {}) == nil)
     }
 }

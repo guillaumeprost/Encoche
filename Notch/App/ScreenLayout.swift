@@ -21,7 +21,12 @@ enum ScreenLayout {
 
     /// Rectangle de cette taille, centré en haut de l'écran (collé au bord).
     static func topCenter(_ size: CGSize, in screen: CGRect) -> CGRect {
-        CGRect(x: screen.midX - size.width / 2, y: screen.maxY - size.height, width: size.width, height: size.height)
+        centered(size, in: screen, y: screen.maxY - size.height)
+    }
+
+    /// Rectangle de cette taille, centré horizontalement sur l'écran, à cette hauteur.
+    private static func centered(_ size: CGSize, in screen: CGRect, y: CGFloat) -> CGRect {
+        CGRect(x: screen.midX - size.width / 2, y: y, width: size.width, height: size.height)
     }
 
     /// Écran de l'écran verrouillé : celui du Mac quand il est ouvert (sa vraie encoche),
@@ -50,17 +55,13 @@ enum ScreenLayout {
     static let lockSpacing: CGFloat = 12
 
     static func lockFrames(screen: CGRect, notchWidth: CGFloat, notchHeight: CGFloat) -> LockFrames {
-        let music = CGRect(
-            x: screen.midX - lockMusicSize.width / 2, y: screen.minY + screen.height * lockLoginFraction,
-            width: lockMusicSize.width, height: lockMusicSize.height)
+        let music = centered(lockMusicSize, in: screen, y: screen.minY + screen.height * lockLoginFraction)
         // Sous l'horloge, sans descendre sur le lecteur (petits écrans).
         let clockBottom = screen.maxY - screen.height * lockClockFraction
         let height = max(0, min(lockActivitiesSize.height, clockBottom - music.maxY - lockSpacing))
         return LockFrames(
             notch: topCenter(CGSize(width: notchWidth, height: notchHeight), in: screen),
-            activities: CGRect(
-                x: screen.midX - lockActivitiesSize.width / 2, y: clockBottom - height,
-                width: lockActivitiesSize.width, height: height),
+            activities: centered(CGSize(width: lockActivitiesSize.width, height: height), in: screen, y: clockBottom - height),
             music: music
         )
     }

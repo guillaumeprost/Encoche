@@ -3,15 +3,6 @@ import Testing
 
 @testable import Encoche
 
-/// Dossier temporaire propre à chaque test, supprimé à la fin.
-private final class TemporaryFolder {
-    let url = FileManager.default.temporaryDirectory.appendingPathComponent("encoche-test-\(UUID().uuidString)")
-
-    func file(_ name: String) -> URL { url.appendingPathComponent(name) }
-
-    deinit { try? FileManager.default.removeItem(at: url) }
-}
-
 /// Installation des hooks dans un `settings.json` de test (jamais le vrai `~/.claude`).
 struct ClaudeHooksInstallerTests {
     private let folder = TemporaryFolder()

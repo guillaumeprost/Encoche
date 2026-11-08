@@ -42,10 +42,8 @@ final class MeetingController {
     var isCameraOn: Bool { privacy?.isCameraInUse ?? false }
 
     /// Icône, couleur et bulle d'aide du bouton caméra.
-    static func cameraButton(isOn: Bool, app: String) -> (symbol: String, isOff: Bool, help: String) {
-        isOn
-            ? ("video.fill", false, "Couper la caméra (\(app))")
-            : ("video.slash.fill", true, "Activer la caméra (\(app))")
+    static func cameraButton(isOn: Bool, app: String) -> (symbol: String, help: String) {
+        isOn ? ("video.fill", "Couper la caméra (\(app))") : ("video.slash.fill", "Activer la caméra (\(app))")
     }
 
     init() {
@@ -64,9 +62,9 @@ final class MeetingController {
         }
         // Pas de « mute » sur cet appareil : on passe par le volume d'entrée.
         if target {
-            savedVolume = Self.inputVolume(of: device) ?? 1
-            if Self.setInputVolume(0, on: device) { isMuted = true }
-        } else if Self.setInputVolume(savedVolume ?? 1, on: device) {
+            savedVolume = AudioHardware.get(kAudioDevicePropertyVolumeScalar, .input, on: device) ?? 1
+            if AudioHardware.set(Float32(0), kAudioDevicePropertyVolumeScalar, .input, on: device) { isMuted = true }
+        } else if AudioHardware.set(savedVolume ?? 1, kAudioDevicePropertyVolumeScalar, .input, on: device) {
             isMuted = false
             savedVolume = nil
         }
@@ -96,14 +94,7 @@ final class MeetingController {
         case .teams:
             press(key: 31, flags: [.maskCommand, .maskShift], bundleIDs: Self.teamsIDs) // ⇧⌘O
         }
-        // L'app met un instant à allumer ou libérer la caméra : on relit son état sans
-        // attendre la prochaine lecture (toutes les 3 s).
-        Task { [weak self] in
-            for delay in [400, 800, 1_500] {
-                try? await Task.sleep(for: .milliseconds(delay))
-                self?.privacy?.refresh()
-            }
-        }
+        privacy?.refreshSoon()
     }
 
     func leave() {
@@ -186,23 +177,12 @@ final class MeetingController {
     // MARK: - CoreAudio
 
     private static func inputMuted() -> Bool? {
-        guard let device = AudioHardware.defaultDevice(.input),
-            let muted: UInt32 = AudioHardware.get(kAudioDevicePropertyMute, .input, on: device)
-        else { return nil }
-        return muted != 0
+        AudioHardware.defaultDevice(.input).flatMap { AudioHardware.flag(kAudioDevicePropertyMute, .input, on: $0) }
     }
 
     private static func setMute(_ muted: Bool, on device: AudioDeviceID) -> Bool {
         AudioHardware.isSettable(kAudioDevicePropertyMute, .input, on: device)
             && AudioHardware.set(UInt32(muted ? 1 : 0), kAudioDevicePropertyMute, .input, on: device)
-    }
-
-    private static func inputVolume(of device: AudioDeviceID) -> Float32? {
-        AudioHardware.get(kAudioDevicePropertyVolumeScalar, .input, on: device)
-    }
-
-    private static func setInputVolume(_ volume: Float32, on device: AudioDeviceID) -> Bool {
-        AudioHardware.set(volume, kAudioDevicePropertyVolumeScalar, .input, on: device)
     }
 }
 
@@ -222,7 +202,8 @@ struct MeetingControls: View {
                 if let app = meeting.app {
                     let camera = MeetingController.cameraButton(isOn: meeting.isCameraOn, app: app.name)
                     MeetingButton(
-                        symbol: camera.symbol, tint: camera.isOff ? .red : .primary, filled: camera.isOff, help: camera.help
+                        symbol: camera.symbol, tint: meeting.isCameraOn ? .primary : .red, filled: !meeting.isCameraOn,
+                        help: camera.help
                     ) { meeting.toggleCamera() }
                     MeetingButton(symbol: "phone.down.fill", tint: .red, filled: true, help: "Quitter l'appel (\(app.name))") {
                         meeting.leave()

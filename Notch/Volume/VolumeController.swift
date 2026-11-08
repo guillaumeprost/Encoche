@@ -58,7 +58,7 @@ final class VolumeController {
         guard isAdjustable else { return }
         let newValue = min(max(value, 0), 1)
         isSettingVolume = true
-        AudioHardware.set(Float32(newValue), Self.volumeSelector, .output, on: device)
+        AudioHardware.set(newValue, Self.volumeSelector, .output, on: device)
         if isMuted, newValue > 0 { setMuted(false) }
         volume = newValue
         isSettingVolume = false

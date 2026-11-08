@@ -16,7 +16,7 @@ final class ClaudeCodeMonitor {
     @ObservationIgnored private var answerCheck: Timer?
     /// Alerte qui attend ta réponse (« … t'attend », « … te demande »), retirée dès que la session reprend.
     @ObservationIgnored private var waitingAlerts: [String: UUID] = [:]
-    private(set) var hooksInstalled = ClaudeHooksInstaller.isInstalled
+    private(set) var hooksInstalled = ClaudeHooksInstaller.isInstalled()
     private(set) var hooksError: String?
 
     private var server: HookServer?
@@ -96,7 +96,7 @@ final class ClaudeCodeMonitor {
         } catch {
             hooksError = error.localizedDescription
         }
-        hooksInstalled = ClaudeHooksInstaller.isInstalled
+        hooksInstalled = ClaudeHooksInstaller.isInstalled()
     }
 
     func uninstallHooks() {
@@ -106,7 +106,7 @@ final class ClaudeCodeMonitor {
         } catch {
             hooksError = error.localizedDescription
         }
-        hooksInstalled = ClaudeHooksInstaller.isInstalled
+        hooksInstalled = ClaudeHooksInstaller.isInstalled()
     }
 
     /// Ramène au premier plan l'app où tourne la session (terminal, éditeur, app Claude…).
@@ -444,7 +444,7 @@ final class ClaudeCodeMonitor {
                 choose: { [weak self] option in self?.sendChoice(option, to: id) },
                 focus: { [weak self] in self?.focus(id) })
             // Réponses proposées : retirée si tu réponds directement dans Claude.
-            if !alert.buttons.isEmpty { trackWaitingAlert(alert, of: id) }
+            if session.choices != nil { trackWaitingAlert(alert, of: id) }
             postClaudeAlert(alert, of: id)
         }
     }

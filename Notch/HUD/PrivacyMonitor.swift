@@ -13,6 +13,7 @@ final class PrivacyMonitor {
     var isActive: Bool { isCameraInUse || isMicrophoneInUse }
 
     @ObservationIgnored private var timer: Timer?
+    @ObservationIgnored private var soonTask: Task<Void, Never>?
 
     init() {
         // Les deux API ont des écouteurs, mais leur liste d'appareils change (casque, webcam
@@ -23,8 +24,20 @@ final class PrivacyMonitor {
         }
     }
 
-    /// Relit l'état tout de suite (ex. après avoir coupé la caméra depuis l'encoche).
-    func refresh() {
+    /// Après une action sur la caméra ou le micro : l'app met un instant à les allumer ou
+    /// les libérer, on relit l'état plusieurs fois sans attendre la lecture régulière (3 s).
+    func refreshSoon() {
+        soonTask?.cancel()
+        soonTask = Task { [weak self] in
+            for delay in [400, 800, 1_500] {
+                try? await Task.sleep(for: .milliseconds(delay))
+                guard !Task.isCancelled else { return }
+                self?.refresh()
+            }
+        }
+    }
+
+    private func refresh() {
         let camera = Self.cameraInUse()
         let microphone = Self.microphoneInUse()
         if camera != isCameraInUse { isCameraInUse = camera }
@@ -70,7 +83,7 @@ final class PrivacyMonitor {
         // Seulement les appareils d'entrée (micros).
         AudioHardware.devices().contains { device in
             AudioHardware.hasInput(device)
-                && AudioHardware.get(kAudioDevicePropertyDeviceIsRunningSomewhere, on: device) ?? UInt32(0) != 0
+                && AudioHardware.flag(kAudioDevicePropertyDeviceIsRunningSomewhere, on: device) == true
         }
     }
 }

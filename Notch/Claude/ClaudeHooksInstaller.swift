@@ -42,9 +42,7 @@ enum ClaudeHooksInstaller {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".claude/settings.json")
     }
 
-    static var isInstalled: Bool { isInstalled(at: settingsURL) }
-
-    static func isInstalled(at settingsURL: URL) -> Bool {
+    static func isInstalled(at settingsURL: URL = settingsURL) -> Bool {
         guard let data = try? Data(contentsOf: settingsURL) else { return false }
         return String(decoding: data, as: UTF8.self).contains(marker)
     }

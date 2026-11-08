@@ -20,14 +20,11 @@ final class BannerSuppressor {
     /// Appelé juste avant de fermer une bannière, pour lire la notification dans la base
     /// tant qu'elle y est encore (fermer la bannière l'en retire).
     var beforeClosing: (() -> Void)?
-    /// Filet de sécurité : la bannière est fermée avant que la notification n'ait été lue
-    /// dans la base. On transmet ce qu'elle affiche (app, titre, texte).
-    var onUnreadBanner: ((_ app: String, _ title: String, _ body: String?) -> Void)?
+    /// Relaie ce qu'affiche une bannière (app, titre, texte ; titre `nil` s'il est illisible)
+    /// et dit si elle peut être fermée : `false` tant que son contenu n'est relayé nulle part.
+    var relay: (_ app: String, _ title: String?, _ body: String?) -> Bool = { _, _, _ in false }
     /// Faut-il fermer les bannières maintenant ? (relais actif)
     var isEnabled: () -> Bool = { false }
-    /// La base des notifications est lisible. Sinon, seules les bannières dont on lit le
-    /// contenu sont fermées (elles sont relayées par `onUnreadBanner`).
-    var canReadDatabase: () -> Bool = { false }
     /// Alertes d'appel affichées (appel de l'iPhone sur le Mac), à chaque passage, même vide :
     /// elles ne sont jamais fermées (ce serait refuser l'appel).
     var onCallAlerts: (([CallAlert]) -> Void)?
@@ -110,16 +107,10 @@ final class BannerSuppressor {
 
         guard isEnabled(), !banners.isEmpty else { return }
         beforeClosing?()
-        let fromDatabase = canReadDatabase()
         for banner in banners {
             guard let action = closeAction(of: banner) else { continue }
             let content = content(of: banner)
-            if let title = content.title {
-                onUnreadBanner?(content.app, title, content.body)
-            } else if !fromDatabase {
-                // Contenu illisible et pas de base : on laisse la bannière, pour ne rien perdre.
-                continue
-            }
+            guard relay(content.app, content.title, content.body) else { continue }
             AXUIElementPerformAction(banner, action as CFString)
         }
     }

@@ -39,16 +39,11 @@ enum ClaudeAlerts {
             body: text,
             action: .run(focus)
         )
-        var buttons: [NotchAlert.Button] = [
-            .init(label: "Autre…", role: .normal) {
-                decide(.terminal)
-                focus()
-            }
-        ]
-        for (index, label) in labels.enumerated() {
-            buttons.append(.init(label: label, role: index == 0 ? .primary : .normal) { decide(.answer(label)) })
+        let other = NotchAlert.Button(label: "Autre…", role: .normal) {
+            decide(.terminal)
+            focus()
         }
-        alert.buttons = buttons
+        alert.buttons = [other] + optionButtons(labels) { decide(.answer($0)) }
         return alert
     }
 
@@ -86,11 +81,16 @@ enum ClaudeAlerts {
             body: choices.question,
             action: .run(focus)
         )
-        var buttons: [NotchAlert.Button] = [.init(label: "Plus tard", role: .normal) {}]
-        for (index, option) in choices.options.prefix(3).enumerated() {
-            buttons.append(.init(label: option, role: index == 0 ? .primary : .normal) { choose(option) })
-        }
-        alert.buttons = buttons
+        alert.buttons = [.init(label: "Plus tard", role: .normal) {}] + optionButtons(Array(choices.options.prefix(3)), choose)
         return alert
+    }
+
+    /// Un bouton par réponse proposée, la première mise en avant.
+    private static func optionButtons(
+        _ labels: [String], _ choose: @escaping @MainActor (String) -> Void
+    ) -> [NotchAlert.Button] {
+        labels.enumerated().map { index, label in
+            .init(label: label, role: index == 0 ? .primary : .normal) { choose(label) }
+        }
     }
 }

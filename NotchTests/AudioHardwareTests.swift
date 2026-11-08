@@ -30,7 +30,7 @@ struct AudioHardwareTests {
     @Test func missingPropertiesGiveNothing() {
         let volume: Float32? = AudioHardware.get(kAudioDevicePropertyVolumeScalar, .output, on: AudioHardware.system)
         #expect(volume == nil)
-        #expect(!AudioHardware.has(kAudioDevicePropertyVolumeScalar, .output, on: AudioHardware.system))
+        #expect(AudioHardware.flag(kAudioDevicePropertyMute, .output, on: AudioHardware.system) == nil)
         #expect(!AudioHardware.isSettable(kAudioDevicePropertyMute, .output, on: AudioObjectID(kAudioObjectUnknown)))
         #expect(!AudioHardware.set(Float32(0.5), kAudioDevicePropertyVolumeScalar, .output, on: AudioObjectID(kAudioObjectUnknown)))
     }

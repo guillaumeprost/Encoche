@@ -136,9 +136,7 @@ final class NotchWindowController {
             ).isEmpty,
             tab: settings.tab
         )
-        let rect = NSRect(
-            x: screenFrame.midX - size.width / 2, y: screenFrame.maxY - size.height,
-            width: size.width, height: size.height)
+        let rect = ScreenLayout.topCenter(size, in: screenFrame)
         // Un peu de tolérance quand c'est replié, pour attraper la souris facilement.
         return viewModel.isOpen ? rect.insetBy(dx: -4, dy: -4) : rect.insetBy(dx: -8, dy: -2)
     }

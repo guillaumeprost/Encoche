@@ -95,13 +95,15 @@ struct AppServices {
         let settings = settings
         let watcher = systemNotifications
         bannerSuppressor.isEnabled = { settings.hideSystemBanners && settings.mirrorSystemNotifications }
-        bannerSuppressor.canReadDatabase = { watcher.access == .granted }
         bannerSuppressor.beforeClosing = { watcher.pollNow() }
         let callMonitor = calls
         bannerSuppressor.onCallAlerts = { callMonitor.update($0) }
         let alertCenter = alerts
-        bannerSuppressor.onUnreadBanner = { appName, title, body in
-            guard !alertCenter.hasRecent(title: title) else { return }
+        // Ce que la base n'a pas déjà relayé est lu dans la bannière. Bannière illisible :
+        // fermée seulement si la base l'a relayée, pour ne rien perdre.
+        bannerSuppressor.relay = { appName, title, body in
+            guard let title else { return watcher.access == .granted }
+            guard !alertCenter.hasRecent(title: title) else { return true }
             let bundleID = AppDirectory.bundleID(forName: appName)
             alertCenter.post(
                 NotchAlert(
@@ -111,6 +113,7 @@ struct AppServices {
                     body: body,
                     action: bundleID.map { .openApp(bundleID: $0) }
                 ))
+            return true
         }
         bannerSuppressor.start()
     }
