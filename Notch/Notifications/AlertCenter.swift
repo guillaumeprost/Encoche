@@ -60,8 +60,16 @@ final class AlertCenter {
     private(set) var isHovered = false
     private var dismissTask: Task<Void, Never>?
 
-    init() {
-        history = HistoryStore.load()
+    /// Historique enregistré sur le disque (pas dans les tests).
+    private let savesHistory: Bool
+
+    init(savesHistory: Bool = true) {
+        self.savesHistory = savesHistory
+        if savesHistory { history = HistoryStore.load() }
+    }
+
+    private func saveHistory() {
+        if savesHistory { HistoryStore.save(history) }
     }
 
     /// Apps dont les notifications relayées sont ignorées jusqu'à une date (doublons).
@@ -79,7 +87,7 @@ final class AlertCenter {
         queue.removeAll(where: isDuplicate)
         let before = history.count
         history.removeAll(where: isDuplicate)
-        if history.count != before { HistoryStore.save(history) }
+        if history.count != before { saveHistory() }
         if let current, isDuplicate(current) { dismiss() }
     }
 
@@ -90,7 +98,7 @@ final class AlertCenter {
             history.insert(alert, at: 0)
             if history.count > Self.historyLimit { history.removeLast(history.count - Self.historyLimit) }
             unreadCount += 1
-            HistoryStore.save(history)
+            saveHistory()
         }
         queue.append(alert)
         if current == nil { showNext() }
@@ -121,12 +129,12 @@ final class AlertCenter {
     func clearHistory() {
         history.removeAll()
         unreadCount = 0
-        HistoryStore.save(history)
+        saveHistory()
     }
 
     func removeFromHistory(_ alert: NotchAlert) {
         history.removeAll { $0.id == alert.id }
-        HistoryStore.save(history)
+        saveHistory()
     }
 
     /// Clic sur la notification : on exécute son action (ouvrir l'app…) et on la retire.

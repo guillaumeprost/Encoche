@@ -137,7 +137,12 @@ final class ClaudeCodeMonitor {
     var alerts: AlertCenter?
     private var cleanupTimer: Timer?
 
-    init() {
+    /// L'app de la session (terminal, app Claude) est au premier plan : pas besoin de notification.
+    @ObservationIgnored var isSessionAppInFront: (pid_t?) -> Bool = ClaudeCodeMonitor.isAppInFront
+
+    /// `listens: false` (tests) : ni serveur de hooks, ni minuteurs, ni lecture des transcriptions.
+    init(listens: Bool = true) {
+        guard listens else { return }
         let server = HookServer(
             onEvent: { [weak self] event in self?.handle(event) },
             onPermission: { [weak self] event, reply in self?.handlePermission(event, reply: reply) }
@@ -276,7 +281,7 @@ final class ClaudeCodeMonitor {
 
     typealias Decision = PendingPermission.Decision
 
-    private func handlePermission(_ event: [String: Any], reply: HookReply) {
+    func handlePermission(_ event: [String: Any], reply: HookReply) {
         currentPID = event["_claude_pid"] as? pid_t
         defer { currentPID = nil }
         guard let sessionID = event["session_id"] as? String else {
@@ -453,8 +458,6 @@ final class ClaudeCodeMonitor {
         }
     }
 
-    /// La session a avancé sans nous (réponse dans le terminal, annulation…) :
-    /// les demandes en attente n'ont plus lieu d'être.
     /// Retient l'alerte qui attend ta réponse (et retire la précédente de la session).
     private func trackWaitingAlert(_ alert: NotchAlert, of sessionID: String) {
         clearWaitingAlert(of: sessionID)
@@ -465,6 +468,8 @@ final class ClaudeCodeMonitor {
         if let alertID = waitingAlerts.removeValue(forKey: sessionID) { alerts?.dismiss(alertID: alertID) }
     }
 
+    /// La session a avancé sans nous (réponse dans le terminal, annulation…) :
+    /// les demandes en attente n'ont plus lieu d'être.
     private func resolvePermissions(of sessionID: String) {
         for permission in permissions where permission.sessionID == sessionID {
             permission.reply.send(nil)
@@ -482,7 +487,7 @@ final class ClaudeCodeMonitor {
     /// PID de l'événement en cours de traitement (lu par `upsert`).
     @ObservationIgnored private var currentPID: pid_t?
 
-    private func handle(_ event: [String: Any]) {
+    func handle(_ event: [String: Any]) {
         currentPID = event["_claude_pid"] as? pid_t
         defer { currentPID = nil }
         guard let id = event["session_id"] as? String,
@@ -616,23 +621,23 @@ final class ClaudeCodeMonitor {
             guard let self else { return }
             let info = await loadTranscript(of: id)
             // La session a déjà repris pendant la lecture de la transcription.
-            guard sessions.first(where: { $0.id == id })?.state == .done else { return }
+            guard let session = sessions.first(where: { $0.id == id }), session.state == .done else { return }
             let reply = reply ?? info?.lastMessage
-            let session = sessions.first { $0.id == id }
+            let name = session.title ?? session.projectName
             var alert = NotchAlert(
                 icon: .symbol("checkmark", .green),
-                source: session?.projectName ?? "Claude Code",
-                title: "Terminé · \(session?.title ?? session?.projectName ?? "Claude Code")",
+                source: session.projectName,
+                title: "Terminé · \(name)",
                 body: reply.map(Self.plainSummary),
                 action: .run { [weak self] in self?.focus(id) }
             )
             // Claude propose des réponses : sa question et un bouton par réponse.
-            if let choices = session?.choices {
+            if let choices = session.choices {
                 alert = NotchAlert(
                     icon: .symbol("questionmark.bubble.fill", .claude),
-                    source: session?.projectName ?? "Claude Code",
+                    source: session.projectName,
                     // La question en entier : c'est à elle que répondent les boutons.
-                    title: "\(session?.title ?? session?.projectName ?? "Claude Code") te demande",
+                    title: "\(name) te demande",
                     body: choices.question,
                     action: .run { [weak self] in self?.focus(id) }
                 )
@@ -655,13 +660,14 @@ final class ClaudeCodeMonitor {
     /// Pas de notification quand tu es déjà dans l'app de la session (app Claude, terminal).
     private func postClaudeAlert(_ alert: NotchAlert, of sessionID: String) {
         alerts?.muteRelayedNotifications(from: ClaudeReply.claudeAppID)
-        guard !isSessionAppFrontmost(sessionID) else { return }
+        guard !isSessionAppInFront(sessions.first { $0.id == sessionID }?.pid) else { return }
         alerts?.post(alert)
     }
 
-    private func isSessionAppFrontmost(_ sessionID: String) -> Bool {
+    /// L'app qui fait tourner ce processus est au premier plan (l'app Claude, à défaut de processus connu).
+    private static func isAppInFront(_ pid: pid_t?) -> Bool {
         guard let frontmost = NSWorkspace.shared.frontmostApplication else { return false }
-        if let pid = sessions.first(where: { $0.id == sessionID })?.pid, let app = ProcessOwner.app(of: pid) {
+        if let pid, let app = ProcessOwner.app(of: pid) {
             return app.processIdentifier == frontmost.processIdentifier
         }
         return frontmost.bundleIdentifier == ClaudeReply.claudeAppID

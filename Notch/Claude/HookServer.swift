@@ -127,11 +127,12 @@ final class HookServer {
         }
     }
 
-    /// Chemin et corps si la requête HTTP est complète (en-têtes + Content-Length octets).
     /// En-tête ajouté par nos hooks : PID du processus Claude Code (pour retrouver son app).
     nonisolated static let pidHeader = "X-Claude-PID"
 
-    private static func parse(_ buffer: Data) -> (String, [String: String], Data)? {
+    /// Chemin, en-têtes (en minuscules) et corps si la requête HTTP est complète
+    /// (en-têtes + Content-Length octets).
+    nonisolated static func parse(_ buffer: Data) -> (String, [String: String], Data)? {
         guard let headerEnd = buffer.range(of: Data("\r\n\r\n".utf8)) else { return nil }
         let headers = String(decoding: buffer[..<headerEnd.lowerBound], as: UTF8.self)
         let requestLine = headers.split(separator: "\r\n").first.map(String.init) ?? ""
