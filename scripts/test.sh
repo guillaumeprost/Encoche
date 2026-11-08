@@ -5,4 +5,4 @@ cd "$(dirname "$0")/.."
 
 xcodegen generate --quiet
 xcodebuild -project Notch.xcodeproj -scheme Notch -configuration Debug \
-  -destination 'platform=macOS,arch=arm64' -derivedDataPath build test
+  -destination "platform=macOS,arch=$(uname -m)" -derivedDataPath build test
