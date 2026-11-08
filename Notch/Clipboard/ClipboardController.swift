@@ -26,8 +26,8 @@ struct ClipItem: Identifiable, Codable, Equatable {
 @Observable
 @MainActor
 final class ClipboardController {
-    private static let maxUnpinned = 60
-    private static let maxTextLength = 20_000
+    static let maxUnpinned = 60
+    static let maxTextLength = 20_000
 
     /// Types posés par les gestionnaires de mots de passe et les copies automatiques.
     private static let ignoredTypes: Set<NSPasteboard.PasteboardType> = [
@@ -43,7 +43,9 @@ final class ClipboardController {
 
     private(set) var items: [ClipItem] = []
 
-    private let pasteboard = NSPasteboard.general
+    private let pasteboard: NSPasteboard
+    /// App d'où vient la copie (celle au premier plan).
+    private let frontmostApp: () -> String?
     private var lastChangeCount: Int
     private var timer: Timer?
     private var thumbnails: [UUID: NSImage] = [:]
@@ -52,15 +54,23 @@ final class ClipboardController {
     private let storeURL: URL
     private let imagesURL: URL
 
-    init() {
-        let base = URL.appSupport
-        storeURL = base.appendingPathComponent("clipboard.json")
-        imagesURL = base.appendingPathComponent("ClipboardImages", isDirectory: true)
+    /// Les tests passent leur presse-papier, leur dossier et appellent `poll()` eux-mêmes.
+    init(
+        pasteboard: NSPasteboard = .general,
+        folder: URL = .appSupport,
+        frontmostApp: @escaping () -> String? = { NSWorkspace.shared.frontmostApplication?.bundleIdentifier },
+        polls: Bool = true
+    ) {
+        self.pasteboard = pasteboard
+        self.frontmostApp = frontmostApp
+        storeURL = folder.appendingPathComponent("clipboard.json")
+        imagesURL = folder.appendingPathComponent("ClipboardImages", isDirectory: true)
         try? FileManager.default.createDirectory(at: imagesURL, withIntermediateDirectories: true)
 
         lastChangeCount = pasteboard.changeCount
         load()
 
+        guard polls else { return }
         timer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.poll() }
         }
@@ -107,8 +117,10 @@ final class ClipboardController {
 
     /// Vide l'historique, en gardant les éléments épinglés.
     func clearUnpinned() {
-        items.filter { !$0.pinned }.forEach(discardFiles)
+        let removed = items.filter { !$0.pinned }
         items.removeAll { !$0.pinned }
+        // Après le retrait : une image encore listée garderait son fichier.
+        removed.forEach(discardFiles)
         save()
     }
 
@@ -131,14 +143,20 @@ final class ClipboardController {
         return icon
     }
 
-    private func fullImage(for item: ClipItem) -> NSImage? {
+    /// Fichier de l'image d'un élément.
+    func imageURL(of item: ClipItem) -> URL? {
         guard case .image(let fileName) = item.content else { return nil }
-        return NSImage(contentsOf: imagesURL.appendingPathComponent(fileName))
+        return imagesURL.appendingPathComponent(fileName)
+    }
+
+    private func fullImage(for item: ClipItem) -> NSImage? {
+        imageURL(of: item).flatMap(NSImage.init(contentsOf:))
     }
 
     // MARK: - Capture
 
-    private func poll() {
+    /// Enregistre la copie si le presse-papier a changé.
+    func poll() {
         let changeCount = pasteboard.changeCount
         guard changeCount != lastChangeCount else { return }
         lastChangeCount = changeCount
@@ -146,7 +164,7 @@ final class ClipboardController {
         let types = Set(pasteboard.types ?? [])
         guard types.isDisjoint(with: Self.ignoredTypes) else { return }
 
-        let source = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        let source = frontmostApp()
         if let source, Self.ignoredApps.contains(source) { return }
 
         guard let (content, hash) = readContent() else { return }
@@ -196,8 +214,8 @@ final class ClipboardController {
         guard unpinned.count > Self.maxUnpinned else { return }
         let overflow = unpinned.suffix(unpinned.count - Self.maxUnpinned)
         let ids = Set(overflow.map(\.id))
-        overflow.forEach(discardFiles)
         items.removeAll { ids.contains($0.id) }
+        overflow.forEach(discardFiles)
     }
 
     private func discardFiles(of item: ClipItem) {
