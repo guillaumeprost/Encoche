@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 import Observation
 
 struct ClaudeCodeSession: Identifiable, Equatable {
@@ -317,7 +317,7 @@ final class ClaudeCodeMonitor {
         // Question à choix : un bouton par réponse.
         if tool == "AskUserQuestion", let alert = questionAlert(for: permission) {
             permission.alertID = alert.id
-            postClaudeAlert(alert)
+            postClaudeAlert(alert, of: sessionID)
             return
         }
 
@@ -346,7 +346,7 @@ final class ClaudeCodeMonitor {
         })
         alert.buttons = buttons
         permission.alertID = alert.id
-        postClaudeAlert(alert)
+        postClaudeAlert(alert, of: sessionID)
     }
 
     /// Notification d'une question de Claude à une seule réponse : la question et ses choix.
@@ -576,7 +576,7 @@ final class ClaudeCodeMonitor {
                 action: .run { [weak self] in self?.focus(id) }
             )
             trackWaitingAlert(alert, of: id)
-            postClaudeAlert(alert)
+            postClaudeAlert(alert, of: id)
         case "Stop":
             upsert(id, cwd: cwd) { session in
                 session.state = .done
@@ -646,15 +646,25 @@ final class ClaudeCodeMonitor {
                 // Retirée si tu réponds directement dans Claude.
                 trackWaitingAlert(alert, of: id)
             }
-            postClaudeAlert(alert)
+            postClaudeAlert(alert, of: id)
         }
     }
 
     /// Une seule notification par événement : celles de l'app Claude (relayées comme toutes les
     /// notifications du Mac) disent la même chose, on les ignore un moment.
-    private func postClaudeAlert(_ alert: NotchAlert) {
+    /// Pas de notification quand tu es déjà dans l'app de la session (app Claude, terminal).
+    private func postClaudeAlert(_ alert: NotchAlert, of sessionID: String) {
         alerts?.muteRelayedNotifications(from: ClaudeReply.claudeAppID)
+        guard !isSessionAppFrontmost(sessionID) else { return }
         alerts?.post(alert)
+    }
+
+    private func isSessionAppFrontmost(_ sessionID: String) -> Bool {
+        guard let frontmost = NSWorkspace.shared.frontmostApplication else { return false }
+        if let pid = sessions.first(where: { $0.id == sessionID })?.pid, let app = ProcessOwner.app(of: pid) {
+            return app.processIdentifier == frontmost.processIdentifier
+        }
+        return frontmost.bundleIdentifier == ClaudeReply.claudeAppID
     }
 
     /// Envoie la réponse choisie dans la notification à la session.
