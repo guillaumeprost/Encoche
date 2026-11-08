@@ -1,3 +1,4 @@
+import EventKit
 import SwiftUI
 
 /// Services partagés par toutes les encoches (un seul exemplaire pour tous les écrans).
@@ -59,8 +60,10 @@ struct AppServices {
         music = MusicController()
         musicExtras = MusicExtras(music: music)
         volume = VolumeController()
-        calendar = CalendarController()
-        reminders = RemindersController()
+        // Une seule base EventKit pour le calendrier et les rappels.
+        let eventStore = EKEventStore()
+        calendar = CalendarController(store: eventStore)
+        reminders = RemindersController(store: eventStore)
         clipboard = ClipboardController()
         shelf = ShelfController()
         screenshots = ScreenshotWatcher()

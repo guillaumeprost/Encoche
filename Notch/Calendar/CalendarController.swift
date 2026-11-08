@@ -60,7 +60,8 @@ final class CalendarController {
     /// Premier jour du mois affiché dans l'onglet Calendrier.
     private(set) var displayedMonth: Date
 
-    private let store = EKEventStore()
+    /// Base EventKit partagée avec les rappels.
+    private let store: EKEventStore
     /// Pour les rappels de réunion dans l'encoche.
     @ObservationIgnored var alerts: AlertCenter?
     @ObservationIgnored private var remindedIDs: Set<String> = []
@@ -68,7 +69,8 @@ final class CalendarController {
     @ObservationIgnored private var countdownEnd: Task<Void, Never>?
     private let calendar = Calendar.current
 
-    init() {
+    init(store: EKEventStore) {
+        self.store = store
         selectedDay = Calendar.current.startOfDay(for: Date())
         displayedMonth = Calendar.current.dateInterval(of: .month, for: Date())?.start ?? Date()
         switch EKEventStore.authorizationStatus(for: .event) {

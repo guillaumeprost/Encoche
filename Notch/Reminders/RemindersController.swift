@@ -30,9 +30,11 @@ final class RemindersController {
     private(set) var access: Access
     private(set) var reminders: [TodayReminder] = []
 
-    private let store = EKEventStore()
+    /// Base EventKit partagée avec le calendrier.
+    private let store: EKEventStore
 
-    init() {
+    init(store: EKEventStore) {
+        self.store = store
         switch EKEventStore.authorizationStatus(for: .reminder) {
         case .fullAccess: access = .granted
         case .notDetermined: access = .notDetermined
