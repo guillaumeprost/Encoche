@@ -1,121 +1,6 @@
 import AppKit
 import Observation
 
-struct ClaudeCodeSession: Identifiable, Equatable {
-    enum State: Equatable {
-        case idle
-        case working
-        /// En attente de toi (permission à accorder, question posée…).
-        case waiting
-        case done
-        /// Session fermée, ou retrouvée dans l'historique au lancement.
-        case inactive
-    }
-
-    let id: String
-    var cwd: String
-    var state: State
-    var detail: String?
-    var updatedAt: Date
-    /// Processus Claude Code (envoyé par les hooks) : sert à retrouver son app.
-    var pid: pid_t?
-    /// Titre donné à la session par Claude Code (lu dans la transcription).
-    var title: String?
-    /// Dernière demande envoyée à Claude.
-    var prompt: String?
-    /// Plan de la tâche en cours (liste de tâches de Claude).
-    var plan: [PlanItem] = []
-    /// Agents lancés pendant la demande en cours.
-    var agents: [SubAgent] = []
-    /// Dernière réponse de Claude.
-    var lastMessage: String?
-    /// Réponses proposées par Claude à la fin de sa réponse (boutons de l'app Claude).
-    var choices: Choices?
-
-    struct Choices: Equatable {
-        let question: String
-        let options: [String]
-    }
-    var transcriptPath: String?
-
-    struct PlanItem: Equatable, Identifiable {
-        enum Status: Equatable { case pending, inProgress, completed }
-        let id: Int
-        var content: String
-        var status: Status
-    }
-
-    struct SubAgent: Equatable, Identifiable {
-        let id: String
-        var name: String
-        var isRunning: Bool
-    }
-
-    var planProgress: (done: Int, total: Int) {
-        (plan.filter { $0.status == .completed }.count, plan.count)
-    }
-
-    var projectName: String { Self.projectName(for: cwd) }
-
-    /// Nom du projet : le dossier de travail de la session.
-    static func projectName(for cwd: String) -> String {
-        // Un chemin vide désignerait le dossier courant de l'app.
-        guard !cwd.isEmpty else { return "Claude Code" }
-        let name = URL(fileURLWithPath: cwd).lastPathComponent
-        return name.isEmpty ? "Claude Code" : name
-    }
-
-    /// Avancement du plan entre 0 et 1, ou `nil` sans plan.
-    var planFraction: Double? {
-        let progress = planProgress
-        return progress.total > 0 ? Double(progress.done) / Double(progress.total) : nil
-    }
-}
-
-/// Demande de permission de Claude Code en attente de ta décision dans l'encoche.
-@MainActor
-final class PendingPermission: Identifiable {
-    enum Decision: Equatable {
-        case allow
-        /// Réponse choisie à une question de Claude (outil « AskUserQuestion »).
-        case answer(String)
-        /// Autoriser et ajouter la règle suggérée par Claude Code (plus de question la prochaine fois).
-        case allowAlways
-        case deny
-        /// Ne rien décider ici : Claude Code poursuit avec sa demande habituelle dans le terminal.
-        case terminal
-    }
-
-    let id = UUID()
-    let sessionID: String
-    let projectName: String
-    let toolName: String
-    let summary: String
-    /// Mises à jour de permissions suggérées par Claude Code (« toujours autoriser »).
-    let suggestions: [[String: Any]]
-    /// Paramètres de l'outil (pour y ajouter la réponse d'une question).
-    let input: [String: Any]
-    let reply: HookReply
-    var alertID: UUID?
-    /// Pour vérifier dans la conversation si la demande a été tranchée ailleurs (app Claude, terminal).
-    var toolUseID: String?
-
-    init(
-        sessionID: String, projectName: String, toolName: String, summary: String,
-        suggestions: [[String: Any]], input: [String: Any] = [:], reply: HookReply
-    ) {
-        self.input = input
-        self.sessionID = sessionID
-        self.projectName = projectName
-        self.toolName = toolName
-        self.summary = summary
-        self.suggestions = suggestions
-        self.reply = reply
-    }
-
-    var canAllowAlways: Bool { !suggestions.isEmpty }
-}
-
 /// État des sessions Claude Code, alimenté par les hooks.
 @Observable
 @MainActor
@@ -326,90 +211,16 @@ final class ClaudeCodeMonitor {
             if let path = event["transcript_path"] as? String, !path.isEmpty { session.transcriptPath = path }
         }
 
+        let decide: @MainActor (Decision) -> Void = { [weak self, weak permission] decision in
+            if let permission { self?.decide(permission, decision) }
+        }
+        let focus: @MainActor () -> Void = { [weak self] in self?.focus(sessionID) }
         // Question à choix : un bouton par réponse.
-        if tool == "AskUserQuestion", let alert = questionAlert(for: permission) {
-            permission.alertID = alert.id
-            postClaudeAlert(alert, of: sessionID)
-            return
-        }
-
-        var alert = NotchAlert(
-            icon: .symbol("hand.raised.fill", .claude),
-            source: "Claude Code",
-            title: "\(permission.projectName) demande : \(tool)",
-            body: permission.summary,
-            action: .run { [weak self] in self?.focus(sessionID) }
-        )
-        var buttons: [NotchAlert.Button] = [
-            .init(label: "Refuser", role: .destructive) { [weak self, weak permission] in
-                if let permission { self?.decide(permission, .deny) }
-            },
-            .init(label: "Terminal", role: .normal) { [weak self, weak permission] in
-                if let permission { self?.decide(permission, .terminal) }
-            },
-        ]
-        if permission.canAllowAlways {
-            buttons.append(
-                .init(label: "Toujours", role: .normal) { [weak self, weak permission] in
-                    if let permission { self?.decide(permission, .allowAlways) }
-                })
-        }
-        buttons.append(
-            .init(label: "Autoriser", role: .primary) { [weak self, weak permission] in
-                if let permission { self?.decide(permission, .allow) }
-            })
-        alert.buttons = buttons
+        let alert =
+            (tool == "AskUserQuestion" ? ClaudeAlerts.question(permission, decide: decide, focus: focus) : nil)
+            ?? ClaudeAlerts.permission(permission, decide: decide, focus: focus)
         permission.alertID = alert.id
         postClaudeAlert(alert, of: sessionID)
-    }
-
-    /// Notification d'une question de Claude à une seule réponse : la question et ses choix.
-    /// Plusieurs questions ou choix multiples : on laisse la réponse au terminal.
-    private func questionAlert(for permission: PendingPermission) -> NotchAlert? {
-        guard let (text, labels) = Self.singleQuestion(in: permission.input) else { return nil }
-
-        var alert = NotchAlert(
-            icon: .symbol("questionmark.bubble.fill", .claude),
-            source: "Claude Code",
-            title: "\(permission.projectName) te demande",
-            body: text,
-            action: .run { [weak self, sessionID = permission.sessionID] in self?.focus(sessionID) }
-        )
-        var buttons: [NotchAlert.Button] = [
-            .init(label: "Autre…", role: .normal) { [weak self, weak permission] in
-                guard let self, let permission else { return }
-                self.decide(permission, .terminal)
-                self.focus(permission.sessionID)
-            }
-        ]
-        for (index, label) in labels.enumerated() {
-            buttons.append(
-                .init(label: label, role: index == 0 ? .primary : .normal) { [weak self, weak permission] in
-                    if let permission { self?.decide(permission, .answer(label)) }
-                })
-        }
-        alert.buttons = buttons
-        return alert
-    }
-
-    /// Question à une seule réponse d'« AskUserQuestion » : son texte et ses choix (4 au plus).
-    nonisolated static func singleQuestion(in input: [String: Any]) -> (text: String, options: [String])? {
-        guard let questions = input["questions"] as? [[String: Any]], questions.count == 1,
-            let question = questions.first, question["multiSelect"] as? Bool != true,
-            let text = question["question"] as? String,
-            let options = question["options"] as? [[String: Any]]
-        else { return nil }
-        let labels = Array(options.compactMap { $0["label"] as? String }.prefix(4))
-        return labels.isEmpty ? nil : (text, labels)
-    }
-
-    /// Paramètres d'« AskUserQuestion » complétés par la réponse choisie (comme dans le SDK).
-    nonisolated static func answeredInput(_ input: [String: Any], label: String) -> [String: Any] {
-        var input = input
-        if let question = (input["questions"] as? [[String: Any]])?.first?["question"] as? String {
-            input["answers"] = [question: label]
-        }
-        return input
     }
 
     private func remove(_ permission: PendingPermission) {
@@ -453,22 +264,6 @@ final class ClaudeCodeMonitor {
                 permission.reply.send(nil)
                 self.remove(permission)
             }
-        }
-    }
-
-    /// Fin de la conversation (256 Ko), où se trouvent les derniers résultats d'outils.
-    nonisolated static func transcriptTail(at path: String) -> String? {
-        guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
-        defer { try? handle.close() }
-        let size = (try? handle.seekToEnd()) ?? 0
-        try? handle.seek(toOffset: size > 262_144 ? size - 262_144 : 0)
-        return (try? handle.readToEnd()).flatMap { String(decoding: $0, as: UTF8.self) }
-    }
-
-    /// Une ligne de la conversation est le résultat (tool_result) de cet appel d'outil.
-    nonisolated static func containsResult(in text: String, for toolUseID: String) -> Bool {
-        text.split(separator: "\n").contains { line in
-            line.contains("\"tool_result\"") && line.contains("\"tool_use_id\":\"\(toolUseID)\"")
         }
     }
 
@@ -600,13 +395,7 @@ final class ClaudeCodeMonitor {
                 $0.detail = message.isEmpty ? nil : message
             }
             let project = sessions.first { $0.id == id }?.projectName ?? "Claude Code"
-            let alert = NotchAlert(
-                icon: .symbol("hand.raised.fill", .claude),
-                source: "Claude Code",
-                title: "\(project) t'attend",
-                body: message.isEmpty ? nil : message,
-                action: .run { [weak self] in self?.focus(id) }
-            )
+            let alert = ClaudeAlerts.waiting(project: project, message: message) { [weak self] in self?.focus(id) }
             trackWaitingAlert(alert, of: id)
             postClaudeAlert(alert, of: id)
         case "Stop":
@@ -650,36 +439,12 @@ final class ClaudeCodeMonitor {
             let info = await loadTranscript(of: id)
             // La session a déjà repris pendant la lecture de la transcription.
             guard let session = sessions.first(where: { $0.id == id }), session.state == .done else { return }
-            let reply = reply ?? info?.lastMessage
-            let name = session.title ?? session.projectName
-            var alert = NotchAlert(
-                icon: .symbol("checkmark", .green),
-                source: session.projectName,
-                title: "Terminé · \(name)",
-                body: reply.map(Self.plainSummary),
-                action: .run { [weak self] in self?.focus(id) }
-            )
-            // Claude propose des réponses : sa question et un bouton par réponse.
-            if let choices = session.choices {
-                alert = NotchAlert(
-                    icon: .symbol("questionmark.bubble.fill", .claude),
-                    source: session.projectName,
-                    // La question en entier : c'est à elle que répondent les boutons.
-                    title: "\(name) te demande",
-                    body: choices.question,
-                    action: .run { [weak self] in self?.focus(id) }
-                )
-                var buttons: [NotchAlert.Button] = [.init(label: "Plus tard", role: .normal) {}]
-                for (index, option) in choices.options.prefix(3).enumerated() {
-                    buttons.append(
-                        .init(label: option, role: index == 0 ? .primary : .normal) { [weak self] in
-                            self?.sendChoice(option, to: id)
-                        })
-                }
-                alert.buttons = buttons
-                // Retirée si tu réponds directement dans Claude.
-                trackWaitingAlert(alert, of: id)
-            }
+            let alert = ClaudeAlerts.done(
+                session, reply: reply ?? info?.lastMessage,
+                choose: { [weak self] option in self?.sendChoice(option, to: id) },
+                focus: { [weak self] in self?.focus(id) })
+            // Réponses proposées : retirée si tu réponds directement dans Claude.
+            if !alert.buttons.isEmpty { trackWaitingAlert(alert, of: id) }
             postClaudeAlert(alert, of: id)
         }
     }
@@ -719,19 +484,6 @@ final class ClaudeCodeMonitor {
                     NotchAlert(icon: .symbol("exclamationmark.triangle.fill", .orange), source: "Claude Code", title: reason, body: nil))
             }
         }
-    }
-
-    /// Réponse de Claude en texte simple sur une ligne (sans titres, listes ni gras Markdown).
-    nonisolated static func plainSummary(_ text: String) -> String {
-        let cleaned =
-            text
-            .components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "#>-*• ")) }
-            .filter { !$0.isEmpty && !$0.hasPrefix("```") }
-            .joined(separator: " ")
-            .replacingOccurrences(of: "**", with: "")
-            .replacingOccurrences(of: "`", with: "")
-        return cleaned.count > 400 ? String(cleaned.prefix(400)) + "…" : cleaned
     }
 
     private func readTranscript(of id: String) {

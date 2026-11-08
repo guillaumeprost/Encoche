@@ -223,3 +223,53 @@ struct HookServerTests {
         #expect(body.isEmpty)
     }
 }
+
+/// Contenu des notifications Claude.
+@MainActor
+struct ClaudeAlertsTests {
+    private func session(title: String? = nil, choices: ClaudeCodeSession.Choices? = nil) -> ClaudeCodeSession {
+        var session = ClaudeCodeSession(id: "s", cwd: "/p/Encoche", state: .done, detail: nil, updatedAt: .now)
+        session.title = title
+        session.choices = choices
+        return session
+    }
+
+    @Test func doneUsesTheSessionTitle() {
+        let alert = ClaudeAlerts.done(session(title: "Ménage"), reply: "## Fait", choose: { _ in }, focus: {})
+        #expect(alert.title == "Terminé · Ménage")
+        #expect(alert.body == "Fait")
+        #expect(alert.source == "Encoche")
+        #expect(alert.buttons.isEmpty)
+    }
+
+    @Test func doneOffersAtMostThreeReplies() {
+        var chosen: String?
+        let choices = ClaudeCodeSession.Choices(question: "Laquelle ?", options: ["A", "B", "C", "D"])
+        let alert = ClaudeAlerts.done(session(choices: choices), reply: nil, choose: { chosen = $0 }, focus: {})
+        #expect(alert.title == "Encoche te demande")
+        #expect(alert.buttons.map(\.label) == ["Plus tard", "A", "B", "C"])
+        alert.buttons[2].action()
+        #expect(chosen == "B")
+    }
+
+    @Test func permissionButtonsDecide() throws {
+        var decisions: [PendingPermission.Decision] = []
+        var focused = false
+        let permission = PendingPermission(
+            sessionID: "s", projectName: "Encoche", toolName: "Bash", summary: "ls", suggestions: [],
+            reply: HookReply(connection: NWConnection(host: "127.0.0.1", port: 9, using: .tcp)))
+        let alert = ClaudeAlerts.permission(permission, decide: { decisions.append($0) }, focus: { focused = true })
+        for button in alert.buttons { button.action() }
+        #expect(decisions == [.deny, .terminal, .allow])
+        if case .run(let block) = alert.action { block() }
+        #expect(focused)
+    }
+
+    @Test func multipleQuestionsStayInTheTerminal() {
+        let permission = PendingPermission(
+            sessionID: "s", projectName: "Encoche", toolName: "AskUserQuestion", summary: "", suggestions: [],
+            input: ["questions": [["question": "1", "options": [["label": "A"]]], ["question": "2", "options": [["label": "B"]]]]],
+            reply: HookReply(connection: NWConnection(host: "127.0.0.1", port: 9, using: .tcp)))
+        #expect(ClaudeAlerts.question(permission, decide: { _ in }, focus: {}) == nil)
+    }
+}
