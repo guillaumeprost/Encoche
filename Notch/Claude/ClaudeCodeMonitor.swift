@@ -325,7 +325,8 @@ final class ClaudeCodeMonitor {
             icon: .symbol("hand.raised.fill", .claude),
             source: "Claude Code",
             title: "\(permission.projectName) demande : \(tool)",
-            body: permission.summary
+            body: permission.summary,
+            action: .run { [weak self] in self?.focus(sessionID) }
         )
         var buttons: [NotchAlert.Button] = [
             .init(label: "Refuser", role: .destructive) { [weak self, weak permission] in
@@ -357,7 +358,8 @@ final class ClaudeCodeMonitor {
             icon: .symbol("questionmark.bubble.fill", .claude),
             source: "Claude Code",
             title: "\(permission.projectName) te demande",
-            body: text
+            body: text,
+            action: .run { [weak self, sessionID = permission.sessionID] in self?.focus(sessionID) }
         )
         var buttons: [NotchAlert.Button] = [
             .init(label: "Autre…", role: .normal) { [weak self, weak permission] in

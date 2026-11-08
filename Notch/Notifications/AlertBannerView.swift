@@ -7,7 +7,7 @@ struct AlertBannerView: View {
 
     private var hovered: Bool { alerts.isHovered }
     /// Un clic fait quelque chose (ouvre l'app, le lien…).
-    private var isClickable: Bool { alert.action != nil && alert.buttons.isEmpty }
+    private var isClickable: Bool { alert.action != nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {

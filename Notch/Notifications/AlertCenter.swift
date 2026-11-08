@@ -129,9 +129,9 @@ final class AlertCenter {
         HistoryStore.save(history)
     }
 
-    /// Clic sur la notification : on exécute son action et on la retire.
+    /// Clic sur la notification : on exécute son action (ouvrir l'app…) et on la retire.
     func activate() {
-        guard let alert = current, !alert.isPersistent else { return }
+        guard let alert = current, alert.action != nil else { return }
         perform(alert)
         dismiss()
     }
