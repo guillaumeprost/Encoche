@@ -23,7 +23,8 @@ final class PrivacyMonitor {
         }
     }
 
-    private func refresh() {
+    /// Relit l'état tout de suite (ex. après avoir coupé la caméra depuis l'encoche).
+    func refresh() {
         let camera = Self.cameraInUse()
         let microphone = Self.microphoneInUse()
         if camera != isCameraInUse { isCameraInUse = camera }

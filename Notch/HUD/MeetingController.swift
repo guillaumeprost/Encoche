@@ -38,6 +38,15 @@ final class MeetingController {
 
     /// Un appel semble en cours : caméra ou micro utilisé, ou micro coupé par Encoche.
     var isInCall: Bool { (privacy?.isActive ?? false) || isMuted }
+    /// La caméra filme : l'app de visio la libère quand on la coupe.
+    var isCameraOn: Bool { privacy?.isCameraInUse ?? false }
+
+    /// Icône, couleur et bulle d'aide du bouton caméra.
+    static func cameraButton(isOn: Bool, app: String) -> (symbol: String, isOff: Bool, help: String) {
+        isOn
+            ? ("video.fill", false, "Couper la caméra (\(app))")
+            : ("video.slash.fill", true, "Activer la caméra (\(app))")
+    }
 
     init() {
         isMuted = Self.inputMuted() ?? false
@@ -86,6 +95,14 @@ final class MeetingController {
             press(key: 9, flags: [.maskCommand, .maskShift], bundleIDs: [Self.zoomID]) // ⇧⌘V
         case .teams:
             press(key: 31, flags: [.maskCommand, .maskShift], bundleIDs: Self.teamsIDs) // ⇧⌘O
+        }
+        // L'app met un instant à allumer ou libérer la caméra : on relit son état sans
+        // attendre la prochaine lecture (toutes les 3 s).
+        Task { [weak self] in
+            for delay in [400, 800, 1_500] {
+                try? await Task.sleep(for: .milliseconds(delay))
+                self?.privacy?.refresh()
+            }
         }
     }
 
@@ -203,9 +220,10 @@ struct MeetingControls: View {
                     help: meeting.isMuted ? "Réactiver le micro" : "Couper le micro"
                 ) { meeting.toggleMute() }
                 if let app = meeting.app {
-                    MeetingButton(symbol: "video.fill", tint: .primary, filled: false, help: "Caméra (\(app.name))") {
-                        meeting.toggleCamera()
-                    }
+                    let camera = MeetingController.cameraButton(isOn: meeting.isCameraOn, app: app.name)
+                    MeetingButton(
+                        symbol: camera.symbol, tint: camera.isOff ? .red : .primary, filled: camera.isOff, help: camera.help
+                    ) { meeting.toggleCamera() }
                     MeetingButton(symbol: "phone.down.fill", tint: .red, filled: true, help: "Quitter l'appel (\(app.name))") {
                         meeting.leave()
                     }
