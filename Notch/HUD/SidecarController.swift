@@ -24,8 +24,9 @@ final class SidecarController {
 
     init() {
         guard dlopen("/System/Library/PrivateFrameworks/SidecarCore.framework/SidecarCore", RTLD_NOW) != nil,
-              let type = NSClassFromString("SidecarDisplayManager") as? NSObject.Type,
-              type.responds(to: NSSelectorFromString("sharedManager")) else { return }
+            let type = NSClassFromString("SidecarDisplayManager") as? NSObject.Type,
+            type.responds(to: NSSelectorFromString("sharedManager"))
+        else { return }
         manager = type.perform(NSSelectorFromString("sharedManager"))?.takeUnretainedValue() as? NSObject
         refresh()
     }
@@ -55,7 +56,10 @@ final class SidecarController {
         guard let manager, let object = objects[device.id], !busy else { return }
         busy = true
         let selector = NSSelectorFromString(isConnected(device) ? "disconnectFromDevice:completion:" : "connectToDevice:completion:")
-        guard manager.responds(to: selector) else { busy = false; return }
+        guard manager.responds(to: selector) else {
+            busy = false
+            return
+        }
 
         typealias Method = @convention(c) (NSObject, Selector, NSObject, @escaping @convention(block) (NSError?) -> Void) -> Void
         let call = unsafeBitCast(manager.method(for: selector), to: Method.self)
@@ -85,17 +89,25 @@ struct SidecarButton: View {
         Group {
             if sidecar.isAvailable {
                 if sidecar.devices.count == 1, let device = sidecar.devices.first {
-                    Button { sidecar.toggle(device) } label: { label }
-                        .buttonStyle(.plain)
-                        .help(sidecar.isConnected(device) ? "Arrêter Sidecar sur \(device.name)" : "Utiliser \(device.name) comme écran")
+                    Button {
+                        sidecar.toggle(device)
+                    } label: {
+                        label
+                    }
+                    .buttonStyle(.plain)
+                    .help(sidecar.isConnected(device) ? "Arrêter Sidecar sur \(device.name)" : "Utiliser \(device.name) comme écran")
                 } else {
                     Menu {
                         ForEach(sidecar.devices) { device in
-                            Button(sidecar.isConnected(device) ? "Arrêter Sidecar sur \(device.name)" : "Utiliser \(device.name) comme écran") {
+                            Button(
+                                sidecar.isConnected(device) ? "Arrêter Sidecar sur \(device.name)" : "Utiliser \(device.name) comme écran"
+                            ) {
                                 sidecar.toggle(device)
                             }
                         }
-                    } label: { label }
+                    } label: {
+                        label
+                    }
                     .plainMenu()
                 }
             }

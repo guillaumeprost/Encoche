@@ -112,12 +112,13 @@ private struct ProgressBar: View {
                     .frame(height: dragFraction == nil ? 4 : 6)
                     .frame(maxHeight: .infinity)
                     .contentShape(Rectangle())
-                    .gesture(DragGesture(minimumDistance: 0)
-                        .onChanged { dragFraction = min(max($0.location.x / geo.size.width, 0), 1) }
-                        .onEnded { _ in
-                            if let f = dragFraction { music.seek(to: f * duration) }
-                            dragFraction = nil
-                        })
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { dragFraction = min(max($0.location.x / geo.size.width, 0), 1) }
+                            .onEnded { _ in
+                                if let f = dragFraction { music.seek(to: f * duration) }
+                                dragFraction = nil
+                            })
                 }
                 .frame(height: 12)
                 Text("-" + format(max(duration - current, 0)))
@@ -332,11 +333,15 @@ private struct LyricsView: View {
                         .padding(.vertical, 40)
                     }
                     .scrollIndicators(.never)
-                    .mask(LinearGradient(
-                        stops: [.init(color: .clear, location: 0), .init(color: .black, location: 0.15),
-                                .init(color: .black, location: 0.85), .init(color: .clear, location: 1)],
-                        startPoint: .top, endPoint: .bottom
-                    ))
+                    .mask(
+                        LinearGradient(
+                            stops: [
+                                .init(color: .clear, location: 0), .init(color: .black, location: 0.15),
+                                .init(color: .black, location: 0.85), .init(color: .clear, location: 1),
+                            ],
+                            startPoint: .top, endPoint: .bottom
+                        )
+                    )
                     .onChange(of: current) {
                         guard let current else { return }
                         withAnimation(.easeInOut(duration: 0.4)) { proxy.scrollTo(current, anchor: .center) }
@@ -456,7 +461,9 @@ struct MiniMusicControls: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            Button { settings.tab = .music } label: {
+            Button {
+                settings.tab = .music
+            } label: {
                 Artwork(image: music.artwork, cornerRadius: 4)
                     .frame(width: 18, height: 18)
             }
@@ -533,10 +540,12 @@ private struct VideoPlayerView: View {
                         }
                     }
                     if case .needsJavaScriptPermission(let browser) = pipOutcome {
-                        Text("Pour l'image dans l'image, active « Autoriser le JavaScript des Apple Events » dans \(browser) › Réglages › Développeur.")
-                            .font(.system(size: 10.5))
-                            .foregroundStyle(.orange)
-                            .fixedSize(horizontal: false, vertical: true)
+                        Text(
+                            "Pour l'image dans l'image, active « Autoriser le JavaScript des Apple Events » dans \(browser) › Réglages › Développeur."
+                        )
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
                     }
                 }
             }
@@ -547,7 +556,8 @@ private struct VideoPlayerView: View {
 
     private var appName: String? {
         guard let bundleID = music.externalPlayer,
-              let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return nil }
+            let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
+        else { return nil }
         return FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
     }
 

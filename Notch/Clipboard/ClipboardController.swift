@@ -166,12 +166,14 @@ final class ClipboardController {
 
     private func readContent() -> (ClipItem.Content, String)? {
         if let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL],
-           !urls.isEmpty {
+            !urls.isEmpty
+        {
             return (.files(urls), Self.digest(Data(urls.map(\.path).joined(separator: "\n").utf8)))
         }
 
         if let string = pasteboard.string(forType: .string),
-           !string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            !string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        {
             let text = String(string.prefix(Self.maxTextLength))
             return (.text(text), Self.digest(Data(text.utf8)))
         }
@@ -217,7 +219,8 @@ final class ClipboardController {
 
     private func load() {
         guard let data = try? Data(contentsOf: storeURL),
-              let decoded = try? JSONDecoder().decode([ClipItem].self, from: data) else { return }
+            let decoded = try? JSONDecoder().decode([ClipItem].self, from: data)
+        else { return }
         items = decoded
     }
 
@@ -227,13 +230,13 @@ final class ClipboardController {
     }
 }
 
-private extension NSImage {
-    var pngData: Data? {
+extension NSImage {
+    fileprivate var pngData: Data? {
         guard let tiff = tiffRepresentation, let rep = NSBitmapImageRep(data: tiff) else { return nil }
         return rep.representation(using: .png, properties: [:])
     }
 
-    func downscaled(maxSide: CGFloat) -> NSImage {
+    fileprivate func downscaled(maxSide: CGFloat) -> NSImage {
         let scale = min(1, maxSide / max(size.width, size.height, 1))
         guard scale < 1 else { return self }
         let target = NSSize(width: size.width * scale, height: size.height * scale)

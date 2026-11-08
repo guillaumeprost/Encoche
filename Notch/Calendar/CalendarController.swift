@@ -234,7 +234,8 @@ final class CalendarController {
         }
         let all = store.events(matching: store.predicateForEvents(withStart: selectedDay, end: dayEnd, calendars: nil))
 
-        events = all
+        events =
+            all
             .filter { $0.startDate < dayEnd && $0.endDate > selectedDay }
             .sorted { a, b in
                 if a.isAllDay != b.isAllDay { return a.isAllDay }

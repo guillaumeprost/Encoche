@@ -134,5 +134,7 @@ final class AppSettings {
 
 extension UserDefaults {
     /// Exposé en KVO pour être notifié des changements faits dans les Réglages.
+    /// Le nom doit être celui de la clé de macOS.
+    // swift-format-ignore: AlwaysUseLowerCamelCase
     @objc dynamic var NSGlassTintAmount: Double { double(forKey: "NSGlassTintAmount") }
 }

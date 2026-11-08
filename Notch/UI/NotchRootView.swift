@@ -75,11 +75,12 @@ struct NotchRootView: View {
                             .allowsHitTesting(false)
                     }
                 }
-                .transition(.asymmetric(
-                    insertion: .opacity.combined(with: .scale(scale: 0.92, anchor: .top))
-                        .animation(spring.delay(0.06)),
-                    removal: .opacity.animation(.easeOut(duration: 0.12))
-                ))
+                .transition(
+                    .asymmetric(
+                        insertion: .opacity.combined(with: .scale(scale: 0.92, anchor: .top))
+                            .animation(spring.delay(0.06)),
+                        removal: .opacity.animation(.easeOut(duration: 0.12))
+                    ))
             } else {
                 // L'activité en cours reste affichée en haut quand une notification ou un
                 // indicateur (volume…) s'ajoute dessous, comme la Dynamic Island.
@@ -105,10 +106,11 @@ struct NotchRootView: View {
                             .contentShape(Rectangle())
                             .onTapGesture { alerts.activate() }
                             .id(alert.id)
-                            .transition(.asymmetric(
-                                insertion: .opacity.combined(with: .scale(scale: 0.9, anchor: .top)).animation(spring.delay(0.08)),
-                                removal: .opacity.animation(.easeOut(duration: 0.12))
-                            ))
+                            .transition(
+                                .asymmetric(
+                                    insertion: .opacity.combined(with: .scale(scale: 0.9, anchor: .top)).animation(spring.delay(0.08)),
+                                    removal: .opacity.animation(.easeOut(duration: 0.12))
+                                ))
                     } else if vm.showsHUD, let kind = hud.current {
                         HUDView(kind: kind)
                             .padding(.horizontal, 14 + vm.topRadius)
@@ -281,10 +283,11 @@ struct NotchRootView: View {
                     .glassEffect(.regular.tint(.black.opacity(0.22)), in: shape)
                 shape.fill(darkGlassGradient)
                 // Léger reflet clair dans le bas du verre.
-                shape.fill(LinearGradient(
-                    stops: [.init(color: .white.opacity(0), location: 0.55), .init(color: .white.opacity(0.07), location: 1)],
-                    startPoint: .top, endPoint: .bottom
-                ))
+                shape.fill(
+                    LinearGradient(
+                        stops: [.init(color: .white.opacity(0), location: 0.55), .init(color: .white.opacity(0.07), location: 1)],
+                        startPoint: .top, endPoint: .bottom
+                    ))
                 shape.stroke(darkGlassRim, lineWidth: 1.5)
             }
             .opacity(darkGlassActive ? 1 : 0)

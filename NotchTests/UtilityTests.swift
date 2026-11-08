@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import Encoche
 
 /// Paroles, minuteur, réunions, consommation, Concentration, raccourcis Maison.

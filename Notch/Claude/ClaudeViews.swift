@@ -23,10 +23,11 @@ struct ClaudeTab: View {
     var body: some View {
         VStack(spacing: 10) {
             if monitor.hooksInstalled, monitor.sessions.count > 1 {
-                SessionChips(selectedID: Binding(
-                    get: { selectedSession?.id },
-                    set: { id in ask.target = id.map { .session($0) } }
-                ))
+                SessionChips(
+                    selectedID: Binding(
+                        get: { selectedSession?.id },
+                        set: { id in ask.target = id.map { .session($0) } }
+                    ))
             }
             HStack(spacing: 20) {
                 SessionsPanel(session: selectedSession)
@@ -93,8 +94,10 @@ struct ClaudeTabField: View {
         case quickQuestion
     }
 
-    static func resolve(_ target: ClaudeAsk.Target?, default session: ClaudeCodeSession?,
-                        among sessions: [ClaudeCodeSession]) -> Resolved {
+    static func resolve(
+        _ target: ClaudeAsk.Target?, default session: ClaudeCodeSession?,
+        among sessions: [ClaudeCodeSession]
+    ) -> Resolved {
         switch target {
         case .session(let id):
             if let chosen = sessions.first(where: { $0.id == id }) { return .session(chosen) }
@@ -131,7 +134,9 @@ struct ClaudeTabField: View {
             if let feedback { feedbackLabel(feedback) }
 
             if case .quickQuestion = resolved, ask.isStreaming {
-                Button { ask.cancel() } label: {
+                Button {
+                    ask.cancel()
+                } label: {
                     Image(systemName: "stop.circle.fill").font(.system(size: 16))
                 }
                 .buttonStyle(.plain)
@@ -171,8 +176,9 @@ struct ClaudeTabField: View {
                         Button {
                             target = .session(session.id)
                         } label: {
-                            Label(session.title ?? session.projectName,
-                                  systemImage: session.state == .inactive ? "moon.zzz" : "bubble.left.and.text.bubble.right")
+                            Label(
+                                session.title ?? session.projectName,
+                                systemImage: session.state == .inactive ? "moon.zzz" : "bubble.left.and.text.bubble.right")
                         }
                     }
                 }
@@ -335,11 +341,11 @@ private struct AskPanel: View {
     var body: some View {
         if ask.cliURL != nil {
             responseArea
-            .contextMenu {
-                if !ask.askedQuestion.isEmpty {
-                    Button("Nouvelle conversation") { ask.reset() }
+                .contextMenu {
+                    if !ask.askedQuestion.isEmpty {
+                        Button("Nouvelle conversation") { ask.reset() }
+                    }
                 }
-            }
         } else {
             VStack(alignment: .leading, spacing: 6) {
                 Label("Claude Code introuvable", systemImage: "terminal")
@@ -366,7 +372,7 @@ private struct AskPanel: View {
                         .foregroundStyle(.primary.opacity(0.6))
                 }
             }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         } else if ask.askedQuestion.isEmpty {
             VStack(spacing: 6) {
                 Image(systemName: "sparkle")
@@ -419,7 +425,9 @@ private struct AskPanel: View {
             }
             .overlay(alignment: .topTrailing) {
                 if !ask.history.isEmpty || !ask.answer.isEmpty {
-                    Button { ask.reset() } label: {
+                    Button {
+                        ask.reset()
+                    } label: {
                         Label("Nouvelle", systemImage: "square.and.pencil")
                             .font(.system(size: 10, weight: .medium))
                             .padding(.horizontal, 7)
@@ -433,7 +441,6 @@ private struct AskPanel: View {
             }
         }
     }
-
 
 }
 
@@ -453,7 +460,6 @@ private struct ThinkingDots: View {
         }
     }
 }
-
 
 // MARK: - Sessions Claude Code
 
@@ -514,7 +520,9 @@ private struct SessionChips: View {
         HStack(spacing: 6) {
             ForEach(sessions) { session in
                 let isSelected = session.id == selected
-                Button { selectedID = session.id } label: {
+                Button {
+                    selectedID = session.id
+                } label: {
                     HStack(spacing: 6) {
                         SessionStateIcon(state: session.state)
                             .scaleEffect(0.85)
@@ -594,7 +602,9 @@ private struct SessionDetail: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
-            Button { monitor.focus(session.id) } label: {
+            Button {
+                monitor.focus(session.id)
+            } label: {
                 Image(systemName: "arrow.up.forward.app")
                     .font(.system(size: 12))
                     .foregroundStyle(.primary.opacity(0.6))

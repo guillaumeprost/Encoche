@@ -73,13 +73,15 @@ final class NotchViewModel {
         if isOpen {
             // Avec une encoche physique, les onglets se répartissent de chaque côté de la caméra :
             // un peu plus de largeur pour que les boutons de gauche et de droite tiennent à côté.
-            bodyWidth = hasPhysicalNotch
+            bodyWidth =
+                hasPhysicalNotch
                 ? max(Self.expandedBodyWidth + extraWidth, notchSize.width + Self.sideSpaceAroundNotch)
                 : Self.expandedBodyWidth + extraWidth
             height = notchSize.height + Self.expandedContentHeight + extraHeight
         } else if showsAlert {
             bodyWidth = max(alertHasButtons ? 440 : Self.alertBodyWidth, notchSize.width + 2 * activitySlotWidth)
-            height = notchSize.height + Self.alertContentHeight + (alertHasButtons ? Self.alertButtonsHeight : 0)
+            height =
+                notchSize.height + Self.alertContentHeight + (alertHasButtons ? Self.alertButtonsHeight : 0)
                 + (alertExpanded ? Self.alertExpandedExtraHeight : 0)
         } else if showsHUD {
             bodyWidth = notchSize.width + 2 * activitySlotWidth

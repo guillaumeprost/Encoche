@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import Encoche
 
 /// Réponses à Claude, questions, quotas, file d'attente et « À l'écoute ».
@@ -29,15 +30,23 @@ struct RepliesAndPlayersTests {
     }
 
     @Test func singleQuestionsOnly() {
-        let input: [String: Any] = ["questions": [[
-            "question": "Laquelle ?", "multiSelect": false,
-            "options": [["label": "A"], ["label": "B"], ["label": "C"], ["label": "D"], ["label": "E"]],
-        ]]]
+        let input: [String: Any] = [
+            "questions": [
+                [
+                    "question": "Laquelle ?", "multiSelect": false,
+                    "options": [["label": "A"], ["label": "B"], ["label": "C"], ["label": "D"], ["label": "E"]],
+                ]
+            ]
+        ]
         let question = ClaudeCodeMonitor.singleQuestion(in: input)
         #expect(question?.text == "Laquelle ?")
         #expect(question?.options == ["A", "B", "C", "D"])
-        #expect(ClaudeCodeMonitor.singleQuestion(in: ["questions": [["question": "?", "multiSelect": true, "options": [["label": "A"]]]]]) == nil)
-        #expect(ClaudeCodeMonitor.singleQuestion(in: ["questions": [["question": "1", "options": []], ["question": "2", "options": []]]]) == nil)
+        #expect(
+            ClaudeCodeMonitor.singleQuestion(in: ["questions": [["question": "?", "multiSelect": true, "options": [["label": "A"]]]]])
+                == nil)
+        #expect(
+            ClaudeCodeMonitor.singleQuestion(in: ["questions": [["question": "1", "options": []], ["question": "2", "options": []]]]) == nil
+        )
     }
 
     @Test func answersAreAddedToTheQuestion() {
@@ -79,21 +88,23 @@ struct RepliesAndPlayersTests {
     @Test func nowPlayingPayloads() {
         let now = Date(timeIntervalSince1970: 1_000_010)
         let stamp = ISO8601DateFormatter().string(from: Date(timeIntervalSince1970: 1_000_000))
-        let info = NowPlayingAdapter.parse([
-            "title": "Me at the zoo", "artist": "jawed", "bundleIdentifier": "com.apple.WebKit.GPU",
-            "parentApplicationBundleIdentifier": "com.apple.Safari", "playing": true,
-            "elapsedTime": 5.0, "duration": 19.0, "timestamp": stamp,
-        ], now: now)
+        let info = NowPlayingAdapter.parse(
+            [
+                "title": "Me at the zoo", "artist": "jawed", "bundleIdentifier": "com.apple.WebKit.GPU",
+                "parentApplicationBundleIdentifier": "com.apple.Safari", "playing": true,
+                "elapsedTime": 5.0, "duration": 19.0, "timestamp": stamp,
+            ], now: now)
         #expect(info?.bundleID == "com.apple.Safari")
         #expect(info?.elapsed == 15)
         #expect(NowPlayingAdapter.parse(["title": ""]) == nil)
     }
 
     @Test func nowPlayingAcceptsFractionalTimestamps() {
-        let info = NowPlayingAdapter.parse([
-            "title": "A", "bundleIdentifier": "x", "playing": true, "elapsedTime": 1.0,
-            "timestamp": "2026-11-05T08:57:43.500Z",
-        ], now: ISO8601DateFormatter().date(from: "2026-11-05T08:57:45Z")!)
+        let info = NowPlayingAdapter.parse(
+            [
+                "title": "A", "bundleIdentifier": "x", "playing": true, "elapsedTime": 1.0,
+                "timestamp": "2026-11-05T08:57:43.500Z",
+            ], now: ISO8601DateFormatter().date(from: "2026-11-05T08:57:45Z")!)
         #expect(info?.elapsed == 2.5)
     }
 

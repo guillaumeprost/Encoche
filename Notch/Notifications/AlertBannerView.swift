@@ -30,7 +30,9 @@ struct AlertBannerView: View {
                 .overlay(alignment: .topLeading) {
                     if hovered && alert.buttons.isEmpty {
                         // Au survol : fermer sans ouvrir, comme dans le Centre de notifications.
-                        Button { alerts.dismiss() } label: {
+                        Button {
+                            alerts.dismiss()
+                        } label: {
                             Image(systemName: "xmark")
                                 .font(.system(size: 7, weight: .heavy))
                                 .foregroundStyle(.white.opacity(0.85))

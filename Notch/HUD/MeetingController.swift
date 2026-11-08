@@ -32,7 +32,9 @@ final class MeetingController {
 
     static let zoomID = "us.zoom.xos"
     static let teamsIDs = ["com.microsoft.teams2", "com.microsoft.teams"]
-    static let browsers = ["com.apple.Safari", "com.google.Chrome", "com.brave.Browser", "com.microsoft.edgemac", "company.thebrowser.Browser"]
+    static let browsers = [
+        "com.apple.Safari", "com.google.Chrome", "com.brave.Browser", "com.microsoft.edgemac", "company.thebrowser.Browser",
+    ]
 
     /// Un appel semble en cours : caméra ou micro utilisé, ou micro coupé par Encoche.
     var isInCall: Bool { (privacy?.isActive ?? false) || isMuted }
@@ -65,7 +67,10 @@ final class MeetingController {
 
     /// Retrouve l'app de visio en cours (à l'ouverture de l'encoche pendant un appel).
     func refresh() {
-        guard isInCall else { app = nil; return }
+        guard isInCall else {
+            app = nil
+            return
+        }
         Task {
             let found = await Self.detectApp()
             if found != app { app = found }
@@ -112,15 +117,15 @@ final class MeetingController {
     /// Un onglet Google Meet est ouvert dans ce navigateur.
     private static func hasMeetTab(in browser: String) async -> Bool {
         let script = """
-        tell application id "\(browser)"
-            repeat with w in windows
-                repeat with t in tabs of w
-                    if URL of t contains "meet.google.com/" then return "yes"
+            tell application id "\(browser)"
+                repeat with w in windows
+                    repeat with t in tabs of w
+                        if URL of t contains "meet.google.com/" then return "yes"
+                    end repeat
                 end repeat
-            end repeat
-        end tell
-        return "no"
-        """
+            end tell
+            return "no"
+            """
         return await AppleScriptRunner.run(script, cached: true)?.stringValue == "yes"
     }
 
@@ -131,14 +136,17 @@ final class MeetingController {
     /// Clique sur un bouton de la page Meet (par l'Accessibilité, sans changer d'onglet).
     nonisolated static func pressMeetButton(in browser: String, labels: [String]) -> Bool {
         guard AXIsProcessTrusted(),
-              let pid = NSRunningApplication.runningApplications(withBundleIdentifier: browser).first?.processIdentifier
+            let pid = NSRunningApplication.runningApplications(withBundleIdentifier: browser).first?.processIdentifier
         else { return false }
         let app = AX.app(pid, manual: true)
         for window in AX.elements(app, kAXWindowsAttribute) {
             for area in AX.collect(in: window, where: { AX.role($0) == "AXWebArea" }) {
-                if let button = AX.first(in: area, maxDepth: 40, where: { element in
-                    AX.role(element) == "AXButton" && matchesMeetButton(AX.label(of: element), labels: labels)
-                }) {
+                if let button = AX.first(
+                    in: area, maxDepth: 40,
+                    where: { element in
+                        AX.role(element) == "AXButton" && matchesMeetButton(AX.label(of: element), labels: labels)
+                    })
+                {
                     return AX.press(button)
                 }
             }
@@ -169,7 +177,8 @@ final class MeetingController {
         var device = AudioDeviceID(0)
         var size = UInt32(MemoryLayout<AudioDeviceID>.size)
         guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &device) == noErr,
-              device != 0 else { return nil }
+            device != 0
+        else { return nil }
         return device
     }
 
@@ -191,7 +200,8 @@ final class MeetingController {
         var address = inputAddress(kAudioDevicePropertyMute)
         var settable = DarwinBoolean(false)
         guard AudioObjectHasProperty(device, &address),
-              AudioObjectIsPropertySettable(device, &address, &settable) == noErr, settable.boolValue else { return false }
+            AudioObjectIsPropertySettable(device, &address, &settable) == noErr, settable.boolValue
+        else { return false }
         var value = UInt32(muted ? 1 : 0)
         return AudioObjectSetPropertyData(device, &address, 0, nil, UInt32(MemoryLayout<UInt32>.size), &value) == noErr
     }

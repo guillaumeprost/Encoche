@@ -94,8 +94,9 @@ final class LockScreenController {
         let size = Self.activitiesSize
         let top = screen.frame.maxY - screen.frame.height * Self.clockFraction
         let activitiesWindow = makeWindow(
-            frame: NSRect(x: screen.frame.midX - size.width / 2, y: top - size.height,
-                          width: size.width, height: size.height),
+            frame: NSRect(
+                x: screen.frame.midX - size.width / 2, y: top - size.height,
+                width: size.width, height: size.height),
             content: LockActivitiesView(),
             clickable: true
         )
@@ -104,9 +105,10 @@ final class LockScreenController {
         // Lecteur en bas, juste au-dessus de la photo de profil.
         let music = Self.musicCardSize
         let musicWindow = makeWindow(
-            frame: NSRect(x: screen.frame.midX - music.width / 2,
-                          y: screen.frame.minY + screen.frame.height * Self.loginFraction,
-                          width: music.width, height: music.height),
+            frame: NSRect(
+                x: screen.frame.midX - music.width / 2,
+                y: screen.frame.minY + screen.frame.height * Self.loginFraction,
+                width: music.width, height: music.height),
             content: LockMusicArea(),
             clickable: true
         )
@@ -146,7 +148,8 @@ final class LockScreenController {
         window.isReleasedWhenClosed = false
         window.canBecomeVisibleWithoutLogin = true
         window.collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle]
-        let root = content
+        let root =
+            content
             .environment(self)
             .environment(services)
             .environment(\.colorScheme, .dark)
@@ -156,16 +159,24 @@ final class LockScreenController {
     }
 
     private func closeWindows() {
-        windows.forEach { $0.orderOut(nil); $0.close() }
+        for window in windows {
+            window.orderOut(nil)
+            window.close()
+        }
         windows.removeAll()
     }
-
 
 }
 
 /// Sons proposés au verrouillage et au déverrouillage (sons système de macOS).
 enum LockSound: String, CaseIterable, Identifiable {
-    case none, pop = "Pop", glass = "Glass", tink = "Tink", purr = "Purr", bottle = "Bottle", morse = "Morse"
+    case none
+    case pop = "Pop"
+    case glass = "Glass"
+    case tink = "Tink"
+    case purr = "Purr"
+    case bottle = "Bottle"
+    case morse = "Morse"
 
     var id: String { rawValue }
     var label: String { self == .none ? "Aucun" : rawValue }

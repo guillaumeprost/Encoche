@@ -80,7 +80,8 @@ enum ClaudeActivity {
         if let list = input["actions"] as? [[String: Any]] {
             actions = list
         } else if let text = input["actions"] as? String, let data = text.data(using: .utf8),
-                  let list = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]] {
+            let list = try? JSONSerialization.jsonObject(with: data) as? [[String: Any]]
+        {
             actions = list
         } else {
             return nil
@@ -181,8 +182,9 @@ enum ClaudeTranscript {
                 }
             }
             return files.sorted { $0.1 > $1.1 }.prefix(limit).map { file, date in
-                Recent(id: file.deletingPathExtension().lastPathComponent, path: file.path, date: date,
-                       info: parse(path: file.path))
+                Recent(
+                    id: file.deletingPathExtension().lastPathComponent, path: file.path, date: date,
+                    info: parse(path: file.path))
             }
         }.value
     }
@@ -212,9 +214,11 @@ enum ClaudeTranscript {
             case "assistant" where info.lastMessage == nil:
                 // Les réponses des sous-agents ne sont pas celles de la session.
                 guard entry["isSidechain"] as? Bool != true,
-                      let message = entry["message"] as? [String: Any],
-                      let content = message["content"] as? [[String: Any]] else { continue }
-                let text = content
+                    let message = entry["message"] as? [String: Any],
+                    let content = message["content"] as? [[String: Any]]
+                else { continue }
+                let text =
+                    content
                     .filter { $0["type"] as? String == "text" }
                     .compactMap { $0["text"] as? String }
                     .joined(separator: "\n")

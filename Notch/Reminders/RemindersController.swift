@@ -95,8 +95,11 @@ final class RemindersController {
 
     func reload() {
         guard access == .granted,
-              let dayEnd = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: Date()))
-        else { reminders = []; return }
+            let dayEnd = Calendar.current.date(byAdding: .day, value: 1, to: Calendar.current.startOfDay(for: Date()))
+        else {
+            reminders = []
+            return
+        }
         // Sans date de début : aussi les rappels en retard.
         let predicate = store.predicateForIncompleteReminders(withDueDateStarting: nil, ending: dayEnd, calendars: nil)
         store.fetchReminders(matching: predicate) { [weak self] items in
@@ -128,9 +131,12 @@ final class RemindersController {
     }
 
     /// Les rappels en retard d'abord, puis ceux de la journée sans heure, puis par heure.
-    nonisolated static func order(_ a: TodayReminder, _ b: TodayReminder,
-                                  today: Date = Calendar.current.startOfDay(for: Date())) -> Bool {
-        let aLate = (a.due ?? today) < today, bLate = (b.due ?? today) < today
+    nonisolated static func order(
+        _ a: TodayReminder, _ b: TodayReminder,
+        today: Date = Calendar.current.startOfDay(for: Date())
+    ) -> Bool {
+        let aLate = (a.due ?? today) < today
+        let bLate = (b.due ?? today) < today
         if aLate != bLate { return aLate }
         if a.hasTime != b.hasTime { return !a.hasTime }
         return (a.due ?? .distantPast) < (b.due ?? .distantPast)

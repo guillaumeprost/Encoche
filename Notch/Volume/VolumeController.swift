@@ -133,13 +133,14 @@ final class VolumeController {
         let key = "volumeAccessibilityOnboardingShown"
         guard !UserDefaults.standard.bool(forKey: key) else { return }
         UserDefaults.standard.set(true, forKey: key)
-        alerts?.post(NotchAlert(
-            icon: .symbol("speaker.wave.2.fill", .gray),
-            source: "Encoche",
-            title: "Remplacer l'indicateur de volume de macOS ?",
-            body: "Clique pour autoriser Encoche dans « Accessibilité ».",
-            action: .run { [weak self] in self?.requestAccessibility() }
-        ))
+        alerts?.post(
+            NotchAlert(
+                icon: .symbol("speaker.wave.2.fill", .gray),
+                source: "Encoche",
+                title: "Remplacer l'indicateur de volume de macOS ?",
+                body: "Clique pour autoriser Encoche dans « Accessibilité ».",
+                action: .run { [weak self] in self?.requestAccessibility() }
+            ))
     }
 
     func toggleMute() {
@@ -183,7 +184,8 @@ final class VolumeController {
 
     private func readState(showHUD: Bool) {
         var settable: DarwinBoolean = false
-        isAdjustable = AudioObjectHasProperty(device, &volumeAddress)
+        isAdjustable =
+            AudioObjectHasProperty(device, &volumeAddress)
             && AudioObjectIsPropertySettable(device, &volumeAddress, &settable) == noErr
             && settable.boolValue
 

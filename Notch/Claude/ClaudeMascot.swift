@@ -31,7 +31,8 @@ struct ClaudeMascot: View {
 
     var body: some View {
         // Au repos, on ne redessine qu'aux deux moments du clignement (et non en continu).
-        TimelineView(mood == .idle ? AnyTimelineSchedule(BlinkSchedule()) : AnyTimelineSchedule(.periodic(from: .now, by: Self.step))) { context in
+        TimelineView(mood == .idle ? AnyTimelineSchedule(BlinkSchedule()) : AnyTimelineSchedule(.periodic(from: .now, by: Self.step))) {
+            context in
             let time = context.date.timeIntervalSinceReferenceDate
             let tick = Int(time / Self.step)
             let blinking = mood == .idle && time.truncatingRemainder(dividingBy: Self.blinkPeriod) < Self.blinkLength
@@ -54,12 +55,13 @@ struct ClaudeMascot: View {
         // Tous les pixels forment un seul tracé, rempli d'un coup : pas de fines lignes entre eux.
         var shape = Path()
         func fill(_ x: Int, _ y: Int, dy: CGFloat = 0) {
-            shape.addRect(CGRect(
-                x: CGFloat(x) * pixelWidth,
-                y: CGFloat(y) * pixelHeight + dy,
-                width: pixelWidth,
-                height: pixelHeight
-            ))
+            shape.addRect(
+                CGRect(
+                    x: CGFloat(x) * pixelWidth,
+                    y: CGFloat(y) * pixelHeight + dy,
+                    width: pixelWidth,
+                    height: pixelHeight
+                ))
         }
 
         // Corps : deux lignes pleines ; les yeux sont des trous, refermés quand il cligne.

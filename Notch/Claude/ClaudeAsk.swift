@@ -18,11 +18,11 @@ final class ClaudeAsk {
     }()
 
     private static let systemPrompt = """
-    Tu réponds dans une petite fenêtre logée dans l'encoche d'un Mac. Sois direct et concis : \
-    quelques phrases ou une courte liste suffisent dans la plupart des cas. Pas de titres ni de \
-    tableaux ; le gras, l'italique et le `code` en ligne s'affichent correctement. Réponds dans \
-    la langue de la question.
-    """
+        Tu réponds dans une petite fenêtre logée dans l'encoche d'un Mac. Sois direct et concis : \
+        quelques phrases ou une courte liste suffisent dans la plupart des cas. Pas de titres ni de \
+        tableaux ; le gras, l'italique et le `code` en ligne s'affichent correctement. Réponds dans \
+        la langue de la question.
+        """
 
     private static let cliCandidates = [
         "~/.local/bin/claude",
@@ -103,13 +103,14 @@ final class ClaudeAsk {
     private func announceAnswer() {
         guard errorMessage == nil, !answer.isEmpty else { return }
         let plain = answer.replacingOccurrences(of: "\n", with: " ").replacingOccurrences(of: "**", with: "")
-        alerts?.post(NotchAlert(
-            icon: .symbol("sparkle", .claude),
-            source: "Claude",
-            title: "Claude a répondu · \(askedQuestion)",
-            body: plain.count > 300 ? String(plain.prefix(300)) + "…" : plain,
-            action: .run { [weak self] in self?.openAnswer() }
-        ))
+        alerts?.post(
+            NotchAlert(
+                icon: .symbol("sparkle", .claude),
+                source: "Claude",
+                title: "Claude a répondu · \(askedQuestion)",
+                body: plain.count > 300 ? String(plain.prefix(300)) + "…" : plain,
+                action: .run { [weak self] in self?.openAnswer() }
+            ))
     }
 
     func cancel() {
@@ -135,18 +136,21 @@ final class ClaudeAsk {
         let process = Process()
         process.executableURL = cli
         process.currentDirectoryURL = Self.workingDirectory
-        process.arguments = [
-            "-p", text,
-            "--output-format", "stream-json",
-            "--verbose",
-            "--include-partial-messages",
-            "--tools", "",
-            "--system-prompt", Self.systemPrompt,
-        ] + (sessionID.map { ["--resume", $0] } ?? [])
+        process.arguments =
+            [
+                "-p", text,
+                "--output-format", "stream-json",
+                "--verbose",
+                "--include-partial-messages",
+                "--tools", "",
+                "--system-prompt", Self.systemPrompt,
+            ] + (sessionID.map { ["--resume", $0] } ?? [])
         // Une app lancée depuis le Finder n'a qu'un PATH minimal.
         var environment = ProcessInfo.processInfo.environment
-        environment["PATH"] = [cli.deletingLastPathComponent().path, "/opt/homebrew/bin", "/usr/local/bin",
-                               "/usr/bin", "/bin", environment["PATH"] ?? ""].joined(separator: ":")
+        environment["PATH"] = [
+            cli.deletingLastPathComponent().path, "/opt/homebrew/bin", "/usr/local/bin",
+            "/usr/bin", "/bin", environment["PATH"] ?? "",
+        ].joined(separator: ":")
         process.environment = environment
 
         let stdout = Pipe()
@@ -166,7 +170,7 @@ final class ClaudeAsk {
             for try await line in stdout.fileHandleForReading.bytes.lines {
                 guard !Task.isCancelled else { break }
                 guard let data = line.data(using: .utf8),
-                      let event = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+                    let event = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
                 else { continue }
                 handle(event)
             }
@@ -180,10 +184,11 @@ final class ClaudeAsk {
         switch event["type"] as? String {
         case "stream_event":
             guard let inner = event["event"] as? [String: Any],
-                  inner["type"] as? String == "content_block_delta",
-                  let delta = inner["delta"] as? [String: Any],
-                  delta["type"] as? String == "text_delta",
-                  let text = delta["text"] as? String else { return }
+                inner["type"] as? String == "content_block_delta",
+                let delta = inner["delta"] as? [String: Any],
+                delta["type"] as? String == "text_delta",
+                let text = delta["text"] as? String
+            else { return }
             answer += text
 
         case "result":
@@ -194,7 +199,8 @@ final class ClaudeAsk {
                 sessionID = nil
                 let status = event["api_error_status"] as? Int
                 needsLogin = status == 401 || result.localizedCaseInsensitiveContains("authenticat")
-                errorMessage = needsLogin
+                errorMessage =
+                    needsLogin
                     ? "La connexion de Claude Code a expiré."
                     : (result.isEmpty ? "Claude Code a renvoyé une erreur." : result)
             } else if answer.isEmpty {

@@ -147,7 +147,9 @@ private struct EventRow: View {
             }
             Spacer(minLength: 0)
             if let url = event.meetingURL, !isPast {
-                Button { NSWorkspace.shared.open(url) } label: {
+                Button {
+                    NSWorkspace.shared.open(url)
+                } label: {
                     Image(systemName: "video.fill")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(.white)
@@ -254,7 +256,9 @@ private struct DayHeader: View {
             }
             Spacer(minLength: 0)
             if !isToday {
-                Button { calendar.selectToday() } label: {
+                Button {
+                    calendar.selectToday()
+                } label: {
                     Text("Aujourd'hui")
                         .font(.system(size: 11, weight: .semibold))
                         .padding(.horizontal, 10)
@@ -368,7 +372,7 @@ private struct MonthDayCell: View {
     }
 }
 
-private extension String {
+extension String {
     /// Majuscule à la première lettre seulement (« Jeudi 5 novembre »).
-    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
+    fileprivate var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
 }

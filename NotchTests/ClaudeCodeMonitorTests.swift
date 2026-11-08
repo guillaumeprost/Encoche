@@ -1,6 +1,7 @@
 import Foundation
 import Network
 import Testing
+
 @testable import Encoche
 
 /// Événements des hooks Claude Code : état des sessions, notifications et demandes de permission.
@@ -80,9 +81,14 @@ struct ClaudeCodeMonitorTests {
     }
 
     @Test func suggestedRepliesBecomeButtonsUntilYouAnswer() async throws {
-        send("PreToolUse", ["tool_name": "mcp__ccd_turn__wrap_up", "tool_input": [
-            "ask": "On publie ?", "actions": [["label": "Oui"], ["label": "Non"]],
-        ]])
+        send(
+            "PreToolUse",
+            [
+                "tool_name": "mcp__ccd_turn__wrap_up",
+                "tool_input": [
+                    "ask": "On publie ?", "actions": [["label": "Oui"], ["label": "Non"]],
+                ],
+            ])
         send("Stop")
         try await waitForAlert()
         #expect(alerts.current?.title == "Encoche te demande")
@@ -135,12 +141,15 @@ struct ClaudeCodeMonitorTests {
 
     // MARK: - Permissions
 
-    private func askPermission(_ tool: String = "Bash", input: [String: Any] = ["command": "rm -rf build"],
-                               suggestions: [[String: Any]] = []) {
-        monitor.handlePermission([
-            "session_id": "s1", "cwd": "/p/Encoche", "tool_name": tool, "tool_input": input,
-            "permission_suggestions": suggestions,
-        ], reply: reply())
+    private func askPermission(
+        _ tool: String = "Bash", input: [String: Any] = ["command": "rm -rf build"],
+        suggestions: [[String: Any]] = []
+    ) {
+        monitor.handlePermission(
+            [
+                "session_id": "s1", "cwd": "/p/Encoche", "tool_name": tool, "tool_input": input,
+                "permission_suggestions": suggestions,
+            ], reply: reply())
     }
 
     @Test func permissionRequestWaitsForYourDecision() {
@@ -166,9 +175,15 @@ struct ClaudeCodeMonitorTests {
     }
 
     @Test func singleQuestionGetsOneButtonPerAnswer() {
-        askPermission("AskUserQuestion", input: ["questions": [[
-            "question": "Laquelle ?", "options": [["label": "A"], ["label": "B"]],
-        ]]])
+        askPermission(
+            "AskUserQuestion",
+            input: [
+                "questions": [
+                    [
+                        "question": "Laquelle ?", "options": [["label": "A"], ["label": "B"]],
+                    ]
+                ]
+            ])
         #expect(alerts.current?.title == "Encoche te demande")
         #expect(alerts.current?.body == "Laquelle ?")
         #expect(alerts.current?.buttons.map(\.label) == ["Autre…", "A", "B"])

@@ -58,7 +58,8 @@ final class MusicController {
             nonisolated(unsafe) let info = note.userInfo ?? [:]
             MainActor.assumeIsolated { self?.handle(info, from: .music) }
         }
-        center.addObserver(forName: Notification.Name("com.spotify.client.PlaybackStateChanged"), object: nil, queue: .main) { [weak self] note in
+        center.addObserver(forName: Notification.Name("com.spotify.client.PlaybackStateChanged"), object: nil, queue: .main) {
+            [weak self] note in
             // Reçue sur le fil principal (queue: .main) : le dictionnaire n'en sort pas.
             nonisolated(unsafe) let info = note.userInfo ?? [:]
             MainActor.assumeIsolated { self?.handle(info, from: .spotify) }
@@ -90,9 +91,11 @@ final class MusicController {
         // Lecteur externe : la position arrive avec ses mises à jour.
         guard externalPlayer == nil, let source, source.isRunning else { return }
         Task {
-            guard let value = await AppleScriptRunner.run(
-                "tell application id \"\(source.rawValue)\" to get player position"
-            )?.doubleValue, self.source == source else { return }
+            guard
+                let value = await AppleScriptRunner.run(
+                    "tell application id \"\(source.rawValue)\" to get player position"
+                )?.doubleValue, self.source == source
+            else { return }
             setPosition(value)
         }
     }
@@ -215,12 +218,12 @@ final class MusicController {
     /// Interroge l'app et renvoie un dictionnaire au même format que ses notifications.
     private func queryState(of source: Source) async -> [AnyHashable: Any]? {
         let script = """
-        tell application id "\(source.rawValue)"
-            if player state is stopped then return {"stopped"}
-            set t to current track
-            return {player state as string, name of t, artist of t, album of t, duration of t}
-        end tell
-        """
+            tell application id "\(source.rawValue)"
+                if player state is stopped then return {"stopped"}
+                set t to current track
+                return {player state as string, name of t, artist of t, album of t, duration of t}
+            end tell
+            """
         guard let result = await AppleScriptRunner.run(script), result.numberOfItems >= 5 else { return nil }
         let rawState = result.atIndex(1)?.stringValue ?? ""
         let duration = result.atIndex(5)?.doubleValue ?? 0
@@ -296,9 +299,11 @@ final class MusicController {
                 self.applyArtwork(data.flatMap(NSImage.init(data:)) ?? self.appArtworkImage(for: expected))
 
             case .spotify:
-                guard let urlString = await AppleScriptRunner.run(
-                    "tell application id \"com.spotify.client\" to get artwork url of current track"
-                )?.stringValue, let url = URL(string: urlString) else {
+                guard
+                    let urlString = await AppleScriptRunner.run(
+                        "tell application id \"com.spotify.client\" to get artwork url of current track"
+                    )?.stringValue, let url = URL(string: urlString)
+                else {
                     if self.track == expected { self.applyArtwork(nil) }
                     return
                 }

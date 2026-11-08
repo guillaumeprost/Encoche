@@ -42,7 +42,8 @@ final class ScreenshotWatcher {
         var found: [Screenshot] = []
         for case let item as NSMetadataItem in query.results {
             guard let path = item.value(forAttribute: NSMetadataItemPathKey) as? String,
-                  FileManager.default.fileExists(atPath: path) else { continue }
+                FileManager.default.fileExists(atPath: path)
+            else { continue }
             let date = item.value(forAttribute: NSMetadataItemFSCreationDateKey) as? Date ?? .distantPast
             found.append(Screenshot(url: URL(fileURLWithPath: path), date: date))
             if found.count == Self.limit { break }

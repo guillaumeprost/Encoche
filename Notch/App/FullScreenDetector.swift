@@ -45,16 +45,18 @@ final class FullScreenDetector {
     }
 
     private static func fullScreenDisplays() -> Set<CGDirectDisplayID> {
-        guard let windows = CGWindowListCopyWindowInfo(
-            [.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID
-        ) as? [[String: Any]] else { return [] }
+        guard
+            let windows = CGWindowListCopyWindowInfo(
+                [.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID
+            ) as? [[String: Any]]
+        else { return [] }
 
         let ownPID = ProcessInfo.processInfo.processIdentifier
         let covering: [CGRect] = windows.compactMap { window in
             guard window[kCGWindowLayer as String] as? Int == 0,
-                  window[kCGWindowOwnerPID as String] as? pid_t != ownPID,
-                  let boundsDict = window[kCGWindowBounds as String] as? NSDictionary,
-                  let bounds = CGRect(dictionaryRepresentation: boundsDict)
+                window[kCGWindowOwnerPID as String] as? pid_t != ownPID,
+                let boundsDict = window[kCGWindowBounds as String] as? NSDictionary,
+                let bounds = CGRect(dictionaryRepresentation: boundsDict)
             else { return nil }
             return bounds
         }

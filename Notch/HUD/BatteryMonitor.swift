@@ -18,11 +18,12 @@ final class BatteryMonitor {
     init() {
         read()
         let context = Unmanaged.passUnretained(self).toOpaque()
-        source = IOPSNotificationCreateRunLoopSource({ context in
-            guard let context else { return }
-            let monitor = Unmanaged<BatteryMonitor>.fromOpaque(context).takeUnretainedValue()
-            MainActor.assumeIsolated { monitor.powerSourceChanged() }
-        }, context)?.takeRetainedValue()
+        source = IOPSNotificationCreateRunLoopSource(
+            { context in
+                guard let context else { return }
+                let monitor = Unmanaged<BatteryMonitor>.fromOpaque(context).takeUnretainedValue()
+                MainActor.assumeIsolated { monitor.powerSourceChanged() }
+            }, context)?.takeRetainedValue()
         if let source { CFRunLoopAddSource(CFRunLoopGetMain(), source, .defaultMode) }
     }
 
@@ -53,10 +54,12 @@ final class BatteryMonitor {
 
     private func read() {
         guard let info = IOPSCopyPowerSourcesInfo()?.takeRetainedValue(),
-              let list = IOPSCopyPowerSourcesList(info)?.takeRetainedValue() as? [CFTypeRef] else { return }
+            let list = IOPSCopyPowerSourcesList(info)?.takeRetainedValue() as? [CFTypeRef]
+        else { return }
         for item in list {
             guard let description = IOPSGetPowerSourceDescription(info, item)?.takeUnretainedValue() as? [String: Any],
-                  description[kIOPSTypeKey] as? String == kIOPSInternalBatteryType else { continue }
+                description[kIOPSTypeKey] as? String == kIOPSInternalBatteryType
+            else { continue }
             hasBattery = true
             let current = description[kIOPSCurrentCapacityKey] as? Int ?? 0
             let max = description[kIOPSMaxCapacityKey] as? Int ?? 100

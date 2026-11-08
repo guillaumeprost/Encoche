@@ -33,7 +33,8 @@ enum ClaudeReply {
         // App Claude : si la réponse correspond à un bouton affiché (question, réponses proposées),
         // on clique dessus, exactement comme à la main.
         if asChoice, app.bundleIdentifier == claudeAppID,
-           await Task.detached(operation: { pressButton(labeled: message, inAppWith: pid_t(app.processIdentifier)) }).value {
+            await Task.detached(operation: { pressButton(labeled: message, inAppWith: pid_t(app.processIdentifier)) }).value
+        {
             return .sent(app: appName)
         }
 
@@ -41,42 +42,42 @@ enum ClaudeReply {
         case (iTermID, let tty?):
             // iTerm écrit directement dans la session, sans changer de fenêtre.
             let script = """
-            tell application id "\(iTermID)"
-                repeat with w in windows
-                    repeat with t in tabs of w
-                        repeat with s in sessions of t
-                            if tty of s is "\(tty)" then
-                                tell s to write text "\(AppleScriptRunner.escape(message))" newline no
-                                delay 0.25
-                                tell s to write text ""
-                                return "ok"
-                            end if
+                tell application id "\(iTermID)"
+                    repeat with w in windows
+                        repeat with t in tabs of w
+                            repeat with s in sessions of t
+                                if tty of s is "\(tty)" then
+                                    tell s to write text "\(AppleScriptRunner.escape(message))" newline no
+                                    delay 0.25
+                                    tell s to write text ""
+                                    return "ok"
+                                end if
+                            end repeat
                         end repeat
                     end repeat
-                end repeat
-            end tell
-            return "missing"
-            """
+                end tell
+                return "missing"
+                """
             return await AppleScriptRunner.run(script, cached: false)?.stringValue == "ok"
                 ? .sent(app: appName) : .failed("Onglet iTerm introuvable")
 
         case (terminalID, let tty?):
             // Terminal : on affiche le bon onglet, puis on colle et on valide.
             let script = """
-            tell application id "\(terminalID)"
-                repeat with w in windows
-                    repeat with t in tabs of w
-                        if tty of t is "\(tty)" then
-                            set selected of t to true
-                            set index of w to 1
-                            activate
-                            return "ok"
-                        end if
+                tell application id "\(terminalID)"
+                    repeat with w in windows
+                        repeat with t in tabs of w
+                            if tty of t is "\(tty)" then
+                                set selected of t to true
+                                set index of w to 1
+                                activate
+                                return "ok"
+                            end if
+                        end repeat
                     end repeat
-                end repeat
-            end tell
-            return "missing"
-            """
+                end tell
+                return "missing"
+                """
             guard await AppleScriptRunner.run(script, cached: false)?.stringValue == "ok" else {
                 return .failed("Onglet Terminal introuvable")
             }
@@ -150,7 +151,8 @@ enum ClaudeReply {
         for _ in 0..<6 {
             // Le nom du mode est dans la description : le titre est vide.
             if let window = AX.mainWindow(of: app),
-               let chat = AX.first(in: window, where: { AX.role($0) == "AXRadioButton" && AX.label(of: $0).hasPrefix("Chat") }) {
+                let chat = AX.first(in: window, where: { AX.role($0) == "AXRadioButton" && AX.label(of: $0).hasPrefix("Chat") })
+            {
                 var selected: AnyObject?
                 AXUIElementCopyAttributeValue(chat, kAXValueAttribute as CFString, &selected)
                 if (selected as? Int) == 1 { return false }
@@ -170,7 +172,7 @@ enum ClaudeReply {
             if let window = AX.mainWindow(of: app) {
                 for area in AX.collect(in: window, where: { AX.role($0) == "AXWebArea" }).reversed() {
                     guard let field = AX.first(in: area, where: { AX.role($0) == "AXTextArea" }),
-                          (AX.string(field, kAXValueAttribute) ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                        (AX.string(field, kAXValueAttribute) ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                     else { continue }
                     AXUIElementSetAttributeValue(field, kAXFocusedAttribute as CFString, kCFBooleanTrue)
                     return AXUIElementSetAttributeValue(field, kAXValueAttribute as CFString, text as CFString) == .success
@@ -257,7 +259,8 @@ enum ClaudeReply {
             // La fenêtre contient plusieurs zones web : on prend celle de la conversation, reconnue
             // à son titre (« Titre - Claude Code ») ou, à défaut, à son en-tête.
             let webAreas = AX.collect(in: window) { AX.role($0) == "AXWebArea" }
-            let conversation = webAreas.first { matchesConversation(shown: AX.label(of: $0), title: title) }
+            let conversation =
+                webAreas.first { matchesConversation(shown: AX.label(of: $0), title: title) }
                 ?? webAreas.first { area in
                     AX.first(in: area, where: { AX.role($0) == "AXHeading" && AX.string($0, kAXTitleAttribute) == title }) != nil
                 }
@@ -265,9 +268,13 @@ enum ClaudeReply {
                 return AX.first(in: conversation, where: { AX.role($0) == "AXTextArea" })
             }
             // Autre conversation affichée : on clique une fois sur celle de la session.
-            if attempt == 1, let entry = AX.first(in: window, where: {
-                AX.role($0) == "AXButton" && AX.string($0, kAXTitleAttribute) == title
-            }) {
+            if attempt == 1,
+                let entry = AX.first(
+                    in: window,
+                    where: {
+                        AX.role($0) == "AXButton" && AX.string($0, kAXTitleAttribute) == title
+                    })
+            {
                 AX.press(entry)
             }
             Thread.sleep(forTimeInterval: 0.3)
@@ -287,9 +294,12 @@ enum ClaudeReply {
         for _ in 0..<5 {
             guard let parent = AX.element(ancestor, kAXParentAttribute) else { return nil }
             ancestor = parent
-            if let send = AX.first(in: ancestor, maxDepth: 6, where: {
-                AX.role($0) == "AXButton" && titles.contains(AX.label(of: $0))
-            }) {
+            if let send = AX.first(
+                in: ancestor, maxDepth: 6,
+                where: {
+                    AX.role($0) == "AXButton" && titles.contains(AX.label(of: $0))
+                })
+            {
                 return send
             }
         }
@@ -303,11 +313,12 @@ enum ClaudeReply {
     /// garde sinon le clavier et les recevrait.
     private static func paste(_ text: String, thenReturn: Bool, to pid: pid_t) async {
         let pasteboard = NSPasteboard.general
-        let saved = pasteboard.pasteboardItems?.map { item in
-            item.types.reduce(into: [NSPasteboard.PasteboardType: Data]()) { result, type in
-                result[type] = item.data(forType: type)
-            }
-        } ?? []
+        let saved =
+            pasteboard.pasteboardItems?.map { item in
+                item.types.reduce(into: [NSPasteboard.PasteboardType: Data]()) { result, type in
+                    result[type] = item.data(forType: type)
+                }
+            } ?? []
 
         pasteboard.clearContents()
         let item = NSPasteboardItem()

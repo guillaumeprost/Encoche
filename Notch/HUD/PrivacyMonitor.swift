@@ -44,9 +44,11 @@ final class PrivacyMonitor {
         }
         var devices = [CMIOObjectID](repeating: 0, count: Int(size) / MemoryLayout<CMIOObjectID>.size)
         var used: UInt32 = 0
-        guard CMIOObjectGetPropertyData(
-            CMIOObjectID(kCMIOObjectSystemObject), &address, 0, nil, size, &used, &devices
-        ) == 0 else { return false }
+        guard
+            CMIOObjectGetPropertyData(
+                CMIOObjectID(kCMIOObjectSystemObject), &address, 0, nil, size, &used, &devices
+            ) == 0
+        else { return false }
 
         var running = CMIOObjectPropertyAddress(
             mSelector: CMIOObjectPropertySelector(kCMIODevicePropertyDeviceIsRunningSomewhere),

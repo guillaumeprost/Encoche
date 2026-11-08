@@ -1,13 +1,15 @@
 import Foundation
 import Testing
+
 @testable import Encoche
 
 /// File d'attente des notifications de l'encoche (sans enregistrement sur le disque).
 @MainActor
 struct AlertCenterTests {
     private func alert(_ title: String, app: String? = nil, action: NotchAlert.Action? = nil) -> NotchAlert {
-        NotchAlert(icon: app.map { .app(bundleID: $0) } ?? .symbol("bell.fill", .gray),
-                   source: "Test", title: title, body: nil, action: action)
+        NotchAlert(
+            icon: app.map { .app(bundleID: $0) } ?? .symbol("bell.fill", .gray),
+            source: "Test", title: title, body: nil, action: action)
     }
 
     private func withButton(_ title: String, _ onPress: @escaping @MainActor () -> Void = {}) -> NotchAlert {

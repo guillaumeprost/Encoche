@@ -61,7 +61,10 @@ final class MusicExtras {
     /// Recharge si le morceau a changé (appelé à l'affichage de l'onglet et à chaque changement).
     func refresh(force: Bool = false) {
         guard let track = music.track else {
-            queue = []; lyrics = []; queueState = .unavailable; lyricsState = .unavailable
+            queue = []
+            lyrics = []
+            queueState = .unavailable
+            lyricsState = .unavailable
             loadedTrack = nil
             return
         }
@@ -136,19 +139,19 @@ final class MusicExtras {
 
     private func loadPlaylistQueue(for track: MusicController.Track) {
         let script = """
-        tell application id "com.apple.Music"
-            set pl to current playlist
-            set idx to index of current track
-            set n to count of tracks of pl
-            set out to {name of pl}
-            repeat with i from idx + 1 to idx + 15
-                if i > n then exit repeat
-                set t to track i of pl
-                set end of out to {i, name of t, artist of t, duration of t}
-            end repeat
-            return out
-        end tell
-        """
+            tell application id "com.apple.Music"
+                set pl to current playlist
+                set idx to index of current track
+                set n to count of tracks of pl
+                set out to {name of pl}
+                repeat with i from idx + 1 to idx + 15
+                    if i > n then exit repeat
+                    set t to track i of pl
+                    set end of out to {i, name of t, artist of t, duration of t}
+                end repeat
+                return out
+            end tell
+            """
         Task {
             let result = await AppleScriptRunner.run(script, cached: false)
             guard music.track == track else { return }
@@ -163,14 +166,16 @@ final class MusicExtras {
             if result.numberOfItems >= 2 {
                 for position in 2...result.numberOfItems {
                     guard let entry = result.atIndex(position), entry.numberOfItems >= 4,
-                          let index = entry.atIndex(1)?.int32Value, index > 0 else { continue }
-                    items.append(QueueItem(
-                        id: position,
-                        source: .playlist(index: Int(index)),
-                        title: entry.atIndex(2)?.stringValue ?? "",
-                        artist: entry.atIndex(3)?.stringValue ?? "",
-                        duration: entry.atIndex(4)?.doubleValue ?? 0
-                    ))
+                        let index = entry.atIndex(1)?.int32Value, index > 0
+                    else { continue }
+                    items.append(
+                        QueueItem(
+                            id: position,
+                            source: .playlist(index: Int(index)),
+                            title: entry.atIndex(2)?.stringValue ?? "",
+                            artist: entry.atIndex(3)?.stringValue ?? "",
+                            duration: entry.atIndex(4)?.doubleValue ?? 0
+                        ))
                 }
             }
             queue = items
@@ -213,10 +218,11 @@ final class MusicExtras {
 
         func search(_ term: String, entity: String, attribute: String? = nil) async -> [ITunesResults.Item] {
             var components = URLComponents(string: "https://itunes.apple.com/search")!
-            components.queryItems = [
-                URLQueryItem(name: "term", value: term), URLQueryItem(name: "entity", value: entity),
-                URLQueryItem(name: "limit", value: "25"), URLQueryItem(name: "country", value: country),
-            ] + (attribute.map { [URLQueryItem(name: "attribute", value: $0)] } ?? [])
+            components.queryItems =
+                [
+                    URLQueryItem(name: "term", value: term), URLQueryItem(name: "entity", value: entity),
+                    URLQueryItem(name: "limit", value: "25"), URLQueryItem(name: "country", value: country),
+                ] + (attribute.map { [URLQueryItem(name: "attribute", value: $0)] } ?? [])
             guard let data = await request(components.url!) else { return [] }
             return (try? JSONDecoder().decode(ITunesResults.self, from: data))?.results ?? []
         }
@@ -238,8 +244,10 @@ final class MusicExtras {
             URLQueryItem(name: "country", value: country),
         ]
         guard let data = await request(lookup.url!),
-              let results = try? JSONDecoder().decode(ITunesResults.self, from: data).results else { return nil }
-        let songs = results
+            let results = try? JSONDecoder().decode(ITunesResults.self, from: data).results
+        else { return nil }
+        let songs =
+            results
             .filter { $0.wrapperType == "track" }
             .sorted { ($0.discNumber ?? 1, $0.trackNumber ?? 0) < ($1.discNumber ?? 1, $1.trackNumber ?? 0) }
         let current = songs.firstIndex { normalized($0.trackName ?? "") == normalized(track.title) }
@@ -300,7 +308,8 @@ final class MusicExtras {
         components.queryItems = query
 
         if let exact = await request(components.url!).flatMap({ try? JSONDecoder().decode(LRCLibResult.self, from: $0) }),
-           exact.syncedLyrics != nil || exact.plainLyrics != nil {
+            exact.syncedLyrics != nil || exact.plainLyrics != nil
+        {
             return (exact.syncedLyrics, exact.plainLyrics)
         }
         // Pas de correspondance exacte (album ou durée différents) : recherche plus large.
@@ -310,8 +319,8 @@ final class MusicExtras {
             URLQueryItem(name: "artist_name", value: track.artist),
         ]
         guard let data = await request(search.url!),
-              let results = try? JSONDecoder().decode([LRCLibResult].self, from: data),
-              let best = results.first(where: { $0.syncedLyrics != nil }) ?? results.first
+            let results = try? JSONDecoder().decode([LRCLibResult].self, from: data),
+            let best = results.first(where: { $0.syncedLyrics != nil }) ?? results.first
         else { return nil }
         return (best.syncedLyrics, best.plainLyrics)
     }
@@ -321,7 +330,8 @@ final class MusicExtras {
         // LRCLIB demande d'identifier le client.
         request.setValue("Encoche (https://github.com/guillaumeprost/Encoche)", forHTTPHeaderField: "User-Agent")
         guard let (data, response) = try? await URLSession.shared.data(for: request),
-              (response as? HTTPURLResponse)?.statusCode == 200 else { return nil }
+            (response as? HTTPURLResponse)?.statusCode == 200
+        else { return nil }
         return data
     }
 
@@ -348,6 +358,6 @@ final class MusicExtras {
     }
 }
 
-private extension MusicQueueReader.Result {
-    var isPanelClosed: Bool { if case .panelClosed = self { true } else { false } }
+extension MusicQueueReader.Result {
+    fileprivate var isPanelClosed: Bool { if case .panelClosed = self { true } else { false } }
 }

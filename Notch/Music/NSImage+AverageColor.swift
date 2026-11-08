@@ -6,10 +6,14 @@ extension NSImage {
     var vividAverageColor: NSColor? {
         guard let cgImage = cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
         let input = CIImage(cgImage: cgImage)
-        guard let filter = CIFilter(name: "CIAreaAverage", parameters: [
-            kCIInputImageKey: input,
-            kCIInputExtentKey: CIVector(cgRect: input.extent),
-        ]), let output = filter.outputImage else { return nil }
+        guard
+            let filter = CIFilter(
+                name: "CIAreaAverage",
+                parameters: [
+                    kCIInputImageKey: input,
+                    kCIInputExtentKey: CIVector(cgRect: input.extent),
+                ]), let output = filter.outputImage
+        else { return nil }
 
         var pixel = [UInt8](repeating: 0, count: 4)
         CIContext(options: [.workingColorSpace: NSNull()]).render(
@@ -22,7 +26,10 @@ extension NSImage {
             srgbRed: CGFloat(pixel[0]) / 255, green: CGFloat(pixel[1]) / 255,
             blue: CGFloat(pixel[2]) / 255, alpha: 1
         )
-        var h: CGFloat = 0, s: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        var h: CGFloat = 0
+        var s: CGFloat = 0
+        var b: CGFloat = 0
+        var a: CGFloat = 0
         average.getHue(&h, saturation: &s, brightness: &b, alpha: &a)
         return NSColor(hue: h, saturation: min(s * 1.3, 0.85), brightness: max(b, 0.8), alpha: 1)
     }

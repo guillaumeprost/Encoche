@@ -66,19 +66,21 @@ final class VolumeKeyInterceptor {
         // Touches spéciales (volume, luminosité…) : événements « système » de type 14 (NX_SYSDEFINED).
         let mask = CGEventMask(1 << 14)
         let refcon = Unmanaged.passUnretained(self).toOpaque()
-        guard let tap = CGEvent.tapCreate(
-            tap: .cgSessionEventTap,
-            place: .headInsertEventTap,
-            options: .defaultTap,
-            eventsOfInterest: mask,
-            callback: { _, type, event, refcon in
-                guard let refcon else { return Unmanaged.passUnretained(event) }
-                let interceptor = Unmanaged<VolumeKeyInterceptor>.fromOpaque(refcon).takeUnretainedValue()
-                let passes = MainActor.assumeIsolated { interceptor.passes(type: type, event: event) }
-                return passes ? Unmanaged.passUnretained(event) : nil
-            },
-            userInfo: refcon
-        ) else { return false }
+        guard
+            let tap = CGEvent.tapCreate(
+                tap: .cgSessionEventTap,
+                place: .headInsertEventTap,
+                options: .defaultTap,
+                eventsOfInterest: mask,
+                callback: { _, type, event, refcon in
+                    guard let refcon else { return Unmanaged.passUnretained(event) }
+                    let interceptor = Unmanaged<VolumeKeyInterceptor>.fromOpaque(refcon).takeUnretainedValue()
+                    let passes = MainActor.assumeIsolated { interceptor.passes(type: type, event: event) }
+                    return passes ? Unmanaged.passUnretained(event) : nil
+                },
+                userInfo: refcon
+            )
+        else { return false }
 
         let source = CFMachPortCreateRunLoopSource(nil, tap, 0)
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
@@ -97,7 +99,8 @@ final class VolumeKeyInterceptor {
         }
 
         guard let nsEvent = NSEvent(cgEvent: event),
-              nsEvent.type == .systemDefined, nsEvent.subtype.rawValue == 8 else {
+            nsEvent.type == .systemDefined, nsEvent.subtype.rawValue == 8
+        else {
             return true
         }
 
@@ -108,11 +111,11 @@ final class VolumeKeyInterceptor {
 
         let key: Key
         switch keyCode {
-        case 0: key = .up       // NX_KEYTYPE_SOUND_UP
-        case 1: key = .down     // NX_KEYTYPE_SOUND_DOWN
-        case 7: key = .mute     // NX_KEYTYPE_MUTE
-        case 2: key = .brightnessUp    // NX_KEYTYPE_BRIGHTNESS_UP
-        case 3: key = .brightnessDown  // NX_KEYTYPE_BRIGHTNESS_DOWN
+        case 0: key = .up // NX_KEYTYPE_SOUND_UP
+        case 1: key = .down // NX_KEYTYPE_SOUND_DOWN
+        case 7: key = .mute // NX_KEYTYPE_MUTE
+        case 2: key = .brightnessUp // NX_KEYTYPE_BRIGHTNESS_UP
+        case 3: key = .brightnessDown // NX_KEYTYPE_BRIGHTNESS_DOWN
         default: return true
         }
 

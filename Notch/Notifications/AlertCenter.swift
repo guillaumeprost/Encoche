@@ -249,14 +249,18 @@ private enum HistoryStore {
 
     static func load() -> [NotchAlert] {
         guard let data = try? Data(contentsOf: url),
-              let stored = try? JSONDecoder().decode([Stored].self, from: data) else { return [] }
+            let stored = try? JSONDecoder().decode([Stored].self, from: data)
+        else { return [] }
         return stored.map { item in
-            let icon: NotchAlert.Icon = item.appBundleID.map { .app(bundleID: $0) }
+            let icon: NotchAlert.Icon =
+                item.appBundleID.map { .app(bundleID: $0) }
                 ?? .symbol(item.symbol ?? "bell.fill", item.colorName.flatMap { colors[$0] } ?? .gray)
-            let action: NotchAlert.Action? = item.openURL.map { .openURL($0) }
+            let action: NotchAlert.Action? =
+                item.openURL.map { .openURL($0) }
                 ?? item.appBundleID.map { .openApp(bundleID: $0) }
-            return NotchAlert(id: item.id, icon: icon, source: item.source, title: item.title,
-                              body: item.body, date: item.date, action: action)
+            return NotchAlert(
+                id: item.id, icon: icon, source: item.source, title: item.title,
+                body: item.body, date: item.date, action: action)
         }
     }
 }

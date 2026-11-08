@@ -33,12 +33,14 @@ struct HomeControlView: View {
             Image(systemName: "square.2.layers.3d")
                 .font(.system(size: 22))
                 .foregroundStyle(.primary.opacity(0.5))
-            Text(home.hasFolder
-                 ? "Ajoute des raccourcis dans le dossier « \(HomeShortcuts.folderName) » de Raccourcis"
-                 : "Crée un dossier « \(HomeShortcuts.folderName) » dans Raccourcis et mets-y tes raccourcis")
-                .font(.system(size: 12))
-                .foregroundStyle(.primary.opacity(0.6))
-                .multilineTextAlignment(.center)
+            Text(
+                home.hasFolder
+                    ? "Ajoute des raccourcis dans le dossier « \(HomeShortcuts.folderName) » de Raccourcis"
+                    : "Crée un dossier « \(HomeShortcuts.folderName) » dans Raccourcis et mets-y tes raccourcis"
+            )
+            .font(.system(size: 12))
+            .foregroundStyle(.primary.opacity(0.6))
+            .multilineTextAlignment(.center)
             Button("Ouvrir Raccourcis") { home.openShortcutsApp() }
                 .buttonStyle(.bordered)
                 .controlSize(.small)

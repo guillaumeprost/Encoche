@@ -47,8 +47,9 @@ final class TimerController {
     /// Reprend un minuteur en cours après un redémarrage d'Encoche (mise à jour…).
     init() {
         guard let saved = UserDefaults.standard.dictionary(forKey: Self.storeKey),
-              let kind = (saved["kind"] as? String).flatMap(Kind.init),
-              let duration = saved["duration"] as? Double else { return }
+            let kind = (saved["kind"] as? String).flatMap(Kind.init),
+            let duration = saved["duration"] as? Double
+        else { return }
         self.kind = kind
         self.duration = duration
         if let paused = saved["pausedRemaining"] as? Double {

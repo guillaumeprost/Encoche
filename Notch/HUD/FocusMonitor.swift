@@ -40,9 +40,9 @@ final class FocusMonitor {
 
     private static func readActiveMode() -> Mode? {
         guard let data = try? Data(contentsOf: folder.appendingPathComponent("Assertions.json")),
-              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let store = (root["data"] as? [[String: Any]])?.first,
-              let records = store["storeAssertionRecords"] as? [[String: Any]], !records.isEmpty
+            let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let store = (root["data"] as? [[String: Any]])?.first,
+            let records = store["storeAssertionRecords"] as? [[String: Any]], !records.isEmpty
         else { return nil }
         let identifier = (records.last?["assertionDetails"] as? [String: Any])?["assertionDetailsModeIdentifier"] as? String
         return mode(for: identifier) ?? Mode(name: "Concentration", symbol: "moon.fill")
@@ -51,10 +51,10 @@ final class FocusMonitor {
     /// Nom et symbole du mode, d'après les réglages de Concentration.
     private static func mode(for identifier: String?) -> Mode? {
         guard let identifier,
-              let data = try? Data(contentsOf: folder.appendingPathComponent("ModeConfigurations.json")),
-              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let configurations = ((root["data"] as? [[String: Any]])?.first?["modeConfigurations"]) as? [String: Any],
-              let mode = ((configurations[identifier] as? [String: Any])?["mode"]) as? [String: Any]
+            let data = try? Data(contentsOf: folder.appendingPathComponent("ModeConfigurations.json")),
+            let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let configurations = ((root["data"] as? [[String: Any]])?.first?["modeConfigurations"]) as? [String: Any],
+            let mode = ((configurations[identifier] as? [String: Any])?["mode"]) as? [String: Any]
         else { return nil }
         let name = mode["name"] as? String ?? "Concentration"
         return Mode(

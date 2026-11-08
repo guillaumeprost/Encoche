@@ -28,7 +28,8 @@ enum ProcessOwner {
     /// Terminal du processus (`/dev/ttys003`), ou `nil` s'il n'en a pas (app Claude…).
     static func ttyPath(of pid: pid_t) -> String? {
         guard let device = info(of: pid)?.kp_eproc.e_tdev, device != -1,
-              let name = devname(device, S_IFCHR) else { return nil }
+            let name = devname(device, S_IFCHR)
+        else { return nil }
         return "/dev/" + String(cString: name)
     }
 

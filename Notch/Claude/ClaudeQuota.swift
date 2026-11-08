@@ -48,7 +48,8 @@ final class ClaudeQuota {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         guard let (data, response) = try? await URLSession.shared.data(for: request) else { return nil }
         guard (response as? HTTPURLResponse)?.statusCode == 200,
-              let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else {
             NSLog("[Encoche] Claude quota request failed: \((response as? HTTPURLResponse)?.statusCode ?? -1)")
             return nil
         }
@@ -74,12 +75,15 @@ final class ClaudeQuota {
     /// C'est lui qu'utilise Claude Code : il y a déjà accès, et macOS ne redemande donc pas
     /// d'autorisation quand Claude Code renouvelle sa connexion (ce qui réécrit l'élément).
     private nonisolated static func accessToken() async -> String? {
-        guard let output = await ProcessRunner.run(
-            "/usr/bin/security", ["find-generic-password", "-s", "Claude Code-credentials", "-w"]
-        ), output.status == 0,
-              let root = try? JSONSerialization.jsonObject(with: Data(output.text.trimmingCharacters(in: .whitespacesAndNewlines).utf8)) as? [String: Any],
-              let oauth = root["claudeAiOauth"] as? [String: Any],
-              let token = oauth["accessToken"] as? String else {
+        guard
+            let output = await ProcessRunner.run(
+                "/usr/bin/security", ["find-generic-password", "-s", "Claude Code-credentials", "-w"]
+            ), output.status == 0,
+            let root = try? JSONSerialization.jsonObject(with: Data(output.text.trimmingCharacters(in: .whitespacesAndNewlines).utf8))
+                as? [String: Any],
+            let oauth = root["claudeAiOauth"] as? [String: Any],
+            let token = oauth["accessToken"] as? String
+        else {
             NSLog("[Encoche] Claude credentials not readable")
             return nil
         }
@@ -122,7 +126,8 @@ struct ClaudeQuotaRing: View {
             guard let limit else { return nil }
             var text = "\(title) : \(Int((limit.used * 100).rounded())) %"
             if let reset = limit.resetsAt {
-                let when = Calendar.current.isDateInToday(reset)
+                let when =
+                    Calendar.current.isDateInToday(reset)
                     ? reset.formatted(date: .omitted, time: .shortened)
                     : reset.formatted(.dateTime.weekday(.abbreviated).hour().minute())
                 text += " · réinitialisation \(Calendar.current.isDateInToday(reset) ? "à" : "le") \(when)"

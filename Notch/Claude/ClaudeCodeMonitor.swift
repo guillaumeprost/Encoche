@@ -100,8 +100,10 @@ final class PendingPermission: Identifiable {
     /// Pour vérifier dans la conversation si la demande a été tranchée ailleurs (app Claude, terminal).
     var toolUseID: String?
 
-    init(sessionID: String, projectName: String, toolName: String, summary: String,
-         suggestions: [[String: Any]], input: [String: Any] = [:], reply: HookReply) {
+    init(
+        sessionID: String, projectName: String, toolName: String, summary: String,
+        suggestions: [[String: Any]], input: [String: Any] = [:], reply: HookReply
+    ) {
         self.input = input
         self.sessionID = sessionID
         self.projectName = projectName
@@ -270,13 +272,18 @@ final class ClaudeCodeMonitor {
 
         let body = output.flatMap {
             try? JSONSerialization.data(withJSONObject: [
-                "hookSpecificOutput": ["hookEventName": "PermissionRequest", "decision": $0],
+                "hookSpecificOutput": ["hookEventName": "PermissionRequest", "decision": $0]
             ])
         }
         permission.reply.send(body)
         remove(permission)
 
-        if decision != .terminal { update(permission.sessionID) { $0.state = .working; $0.detail = permission.toolName } }
+        if decision != .terminal {
+            update(permission.sessionID) {
+                $0.state = .working
+                $0.detail = permission.toolName
+            }
+        }
     }
 
     typealias Decision = PendingPermission.Decision
@@ -342,13 +349,15 @@ final class ClaudeCodeMonitor {
             },
         ]
         if permission.canAllowAlways {
-            buttons.append(.init(label: "Toujours", role: .normal) { [weak self, weak permission] in
-                if let permission { self?.decide(permission, .allowAlways) }
-            })
+            buttons.append(
+                .init(label: "Toujours", role: .normal) { [weak self, weak permission] in
+                    if let permission { self?.decide(permission, .allowAlways) }
+                })
         }
-        buttons.append(.init(label: "Autoriser", role: .primary) { [weak self, weak permission] in
-            if let permission { self?.decide(permission, .allow) }
-        })
+        buttons.append(
+            .init(label: "Autoriser", role: .primary) { [weak self, weak permission] in
+                if let permission { self?.decide(permission, .allow) }
+            })
         alert.buttons = buttons
         permission.alertID = alert.id
         postClaudeAlert(alert, of: sessionID)
@@ -371,12 +380,13 @@ final class ClaudeCodeMonitor {
                 guard let self, let permission else { return }
                 self.decide(permission, .terminal)
                 self.focus(permission.sessionID)
-            },
+            }
         ]
         for (index, label) in labels.enumerated() {
-            buttons.append(.init(label: label, role: index == 0 ? .primary : .normal) { [weak self, weak permission] in
-                if let permission { self?.decide(permission, .answer(label)) }
-            })
+            buttons.append(
+                .init(label: label, role: index == 0 ? .primary : .normal) { [weak self, weak permission] in
+                    if let permission { self?.decide(permission, .answer(label)) }
+                })
         }
         alert.buttons = buttons
         return alert
@@ -385,9 +395,10 @@ final class ClaudeCodeMonitor {
     /// Question à une seule réponse d'« AskUserQuestion » : son texte et ses choix (4 au plus).
     nonisolated static func singleQuestion(in input: [String: Any]) -> (text: String, options: [String])? {
         guard let questions = input["questions"] as? [[String: Any]], questions.count == 1,
-              let question = questions.first, question["multiSelect"] as? Bool != true,
-              let text = question["question"] as? String,
-              let options = question["options"] as? [[String: Any]] else { return nil }
+            let question = questions.first, question["multiSelect"] as? Bool != true,
+            let text = question["question"] as? String,
+            let options = question["options"] as? [[String: Any]]
+        else { return nil }
         let labels = Array(options.compactMap { $0["label"] as? String }.prefix(4))
         return labels.isEmpty ? nil : (text, labels)
     }
@@ -404,7 +415,10 @@ final class ClaudeCodeMonitor {
     private func remove(_ permission: PendingPermission) {
         permissions.removeAll { $0 === permission }
         if let alertID = permission.alertID { alerts?.dismiss(alertID: alertID) }
-        if permissions.isEmpty { answerCheck?.invalidate(); answerCheck = nil }
+        if permissions.isEmpty {
+            answerCheck?.invalidate()
+            answerCheck = nil
+        }
     }
 
     /// Filet de sécurité : si l'événement « réponse donnée » de Claude Code se perd (Encoche occupé
@@ -419,7 +433,7 @@ final class ClaudeCodeMonitor {
     private func checkAnswers() {
         let checks = permissions.compactMap { permission -> (id: String, path: String)? in
             guard let id = permission.toolUseID,
-                  let path = sessions.first(where: { $0.id == permission.sessionID })?.transcriptPath
+                let path = sessions.first(where: { $0.id == permission.sessionID })?.transcriptPath
             else { return nil }
             return (id, path)
         }
@@ -491,7 +505,8 @@ final class ClaudeCodeMonitor {
         currentPID = event["_claude_pid"] as? pid_t
         defer { currentPID = nil }
         guard let id = event["session_id"] as? String,
-              let name = event["hook_event_name"] as? String else { return }
+            let name = event["hook_event_name"] as? String
+        else { return }
         let cwd = event["cwd"] as? String ?? ""
         if isAskSession(cwd) { return }
 
@@ -503,7 +518,11 @@ final class ClaudeCodeMonitor {
 
         if name == "SessionEnd" {
             // Gardée dans le sélecteur des dernières sessions.
-            update(id) { $0.state = .inactive; $0.detail = nil; $0.pid = nil }
+            update(id) {
+                $0.state = .inactive
+                $0.detail = nil
+                $0.pid = nil
+            }
             trimSessions()
             return
         }
@@ -519,7 +538,10 @@ final class ClaudeCodeMonitor {
 
         switch name {
         case "SessionStart":
-            upsert(id, cwd: cwd) { $0.state = .idle; $0.detail = nil }
+            upsert(id, cwd: cwd) {
+                $0.state = .idle
+                $0.detail = nil
+            }
             readTranscript(of: id)
         case "UserPromptSubmit":
             let prompt = (event["prompt"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -545,7 +567,8 @@ final class ClaudeCodeMonitor {
                 ClaudeActivity.applyPlan(tool: tool, input: input, to: &session.plan)
                 if let choices = ClaudeActivity.suggestedReplies(tool: tool, input: input) { session.choices = choices }
                 if ClaudeActivity.agentTools.contains(tool) {
-                    let name = (input["description"] as? String)
+                    let name =
+                        (input["description"] as? String)
                         ?? (input["subagent_type"] as? String) ?? "Agent"
                     session.agents.append(.init(id: toolUseID ?? UUID().uuidString, name: name, isRunning: true))
                 }
@@ -558,7 +581,8 @@ final class ClaudeCodeMonitor {
                 session.state = .working
                 guard ClaudeActivity.agentTools.contains(tool) else { return }
                 let name = input["description"] as? String
-                let index = session.agents.firstIndex { $0.id == toolUseID }
+                let index =
+                    session.agents.firstIndex { $0.id == toolUseID }
                     ?? session.agents.firstIndex { $0.isRunning && $0.name == name }
                 if let index { session.agents[index].isRunning = false }
             }
@@ -571,7 +595,10 @@ final class ClaudeCodeMonitor {
             }
             // Déjà signalée (demande de permission en cours, ou fin de tâche à l'instant) : pas de doublon.
             guard previousState != .waiting, previousState != .done else { return }
-            upsert(id, cwd: cwd) { $0.state = .waiting; $0.detail = message.isEmpty ? nil : message }
+            upsert(id, cwd: cwd) {
+                $0.state = .waiting
+                $0.detail = message.isEmpty ? nil : message
+            }
             let project = sessions.first { $0.id == id }?.projectName ?? "Claude Code"
             let alert = NotchAlert(
                 icon: .symbol("hand.raised.fill", .claude),
@@ -595,7 +622,8 @@ final class ClaudeCodeMonitor {
     }
 
     private func upsert(_ id: String, cwd: String, _ change: (inout ClaudeCodeSession) -> Void) {
-        var session = sessions.first { $0.id == id }
+        var session =
+            sessions.first { $0.id == id }
             ?? ClaudeCodeSession(id: id, cwd: cwd, state: .idle, detail: nil, updatedAt: Date())
         if !cwd.isEmpty { session.cwd = cwd }
         if let pid = currentPID { session.pid = pid }
@@ -643,9 +671,10 @@ final class ClaudeCodeMonitor {
                 )
                 var buttons: [NotchAlert.Button] = [.init(label: "Plus tard", role: .normal) {}]
                 for (index, option) in choices.options.prefix(3).enumerated() {
-                    buttons.append(.init(label: option, role: index == 0 ? .primary : .normal) { [weak self] in
-                        self?.sendChoice(option, to: id)
-                    })
+                    buttons.append(
+                        .init(label: option, role: index == 0 ? .primary : .normal) { [weak self] in
+                            self?.sendChoice(option, to: id)
+                        })
                 }
                 alert.buttons = buttons
                 // Retirée si tu réponds directement dans Claude.
@@ -678,21 +707,24 @@ final class ClaudeCodeMonitor {
         Task {
             let outcome = await reply(option, to: id, asChoice: true)
             if case .pasted(let app) = outcome {
-                alerts?.post(NotchAlert(
-                    icon: .symbol("doc.on.clipboard.fill", .claude),
-                    source: "Claude Code",
-                    title: "« \(option) » collé dans \(app)",
-                    body: "Appuie sur Entrée pour l'envoyer."
-                ))
+                alerts?.post(
+                    NotchAlert(
+                        icon: .symbol("doc.on.clipboard.fill", .claude),
+                        source: "Claude Code",
+                        title: "« \(option) » collé dans \(app)",
+                        body: "Appuie sur Entrée pour l'envoyer."
+                    ))
             } else if case .failed(let reason) = outcome {
-                alerts?.post(NotchAlert(icon: .symbol("exclamationmark.triangle.fill", .orange), source: "Claude Code", title: reason, body: nil))
+                alerts?.post(
+                    NotchAlert(icon: .symbol("exclamationmark.triangle.fill", .orange), source: "Claude Code", title: reason, body: nil))
             }
         }
     }
 
     /// Réponse de Claude en texte simple sur une ligne (sans titres, listes ni gras Markdown).
     nonisolated static func plainSummary(_ text: String) -> String {
-        let cleaned = text
+        let cleaned =
+            text
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "#>-*• ")) }
             .filter { !$0.isEmpty && !$0.hasPrefix("```") }

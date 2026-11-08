@@ -26,7 +26,8 @@ enum MusicQueueReader {
     nonisolated static func read() -> Result {
         guard AXIsProcessTrusted(), let window = musicWindow() else { return .unavailable }
         guard let container = find(in: window, where: { AX.string($0, kAXIdentifierAttribute) == "headerContainer" }),
-              let table = find(in: container, where: { AX.role($0) == "AXTable" }) else { return .panelClosed }
+            let table = find(in: container, where: { AX.role($0) == "AXTable" })
+        else { return .panelClosed }
         let rows = AX.elements(table, kAXRowsAttribute)
         // Lecture paresseuse, depuis la fin : les lignes hors de l'écran sont lentes à lire.
         return .entries(upcoming(fromLastRows: rows.reversed().lazy.map { texts(in: $0) }))
@@ -68,7 +69,8 @@ enum MusicQueueReader {
     /// Ouvre le panneau de file d'attente dans Musique (bouton du mini-lecteur).
     nonisolated static func showPanel() {
         guard let window = musicWindow(),
-              let button = find(in: window, where: { AX.string($0, kAXIdentifierAttribute) == "Music.miniPlayer.queueButton" }) else { return }
+            let button = find(in: window, where: { AX.string($0, kAXIdentifierAttribute) == "Music.miniPlayer.queueButton" })
+        else { return }
         AX.press(button)
     }
 

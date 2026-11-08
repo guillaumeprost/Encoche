@@ -25,8 +25,9 @@ final class BrightnessController {
 
     init() {
         guard let handle = dlopen("/System/Library/PrivateFrameworks/DisplayServices.framework/DisplayServices", RTLD_LAZY),
-              let get = dlsym(handle, "DisplayServicesGetBrightness"),
-              let set = dlsym(handle, "DisplayServicesSetBrightness") else { return }
+            let get = dlsym(handle, "DisplayServicesGetBrightness"),
+            let set = dlsym(handle, "DisplayServicesSetBrightness")
+        else { return }
         getter = unsafeBitCast(get, to: GetBrightness.self)
         setter = unsafeBitCast(set, to: SetBrightness.self)
     }

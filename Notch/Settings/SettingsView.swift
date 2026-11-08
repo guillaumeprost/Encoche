@@ -46,9 +46,11 @@ struct SettingsView: View {
             Form {
                 Section("Général") {
                     if launchAtLogin.isInstalledCopy {
-                        Toggle("Ouvrir Encoche au démarrage du Mac", isOn: Binding(
-                            get: { launchAtLogin.isEnabled }, set: { launchAtLogin.set($0) }
-                        ))
+                        Toggle(
+                            "Ouvrir Encoche au démarrage du Mac",
+                            isOn: Binding(
+                                get: { launchAtLogin.isEnabled }, set: { launchAtLogin.set($0) }
+                            ))
                     } else {
                         Text("Ouverture au démarrage : seulement pour la copie installée dans Applications.")
                             .foregroundStyle(.secondary)
@@ -108,13 +110,15 @@ struct SettingsView: View {
                 }
 
                 Section {
-                    Toggle("Remplacer les indicateurs de volume et de luminosité", isOn: Binding(
-                        get: { settings.replaceSystemVolumeHUD },
-                        set: {
-                            settings.replaceSystemVolumeHUD = $0
-                            volume.setReplacesSystemHUD($0)
-                        }
-                    ))
+                    Toggle(
+                        "Remplacer les indicateurs de volume et de luminosité",
+                        isOn: Binding(
+                            get: { settings.replaceSystemVolumeHUD },
+                            set: {
+                                settings.replaceSystemVolumeHUD = $0
+                                volume.setReplacesSystemHUD($0)
+                            }
+                        ))
                     PermissionRow(
                         title: "Accessibilité",
                         detail: "Pour les touches volume / luminosité et masquer les bannières.",
@@ -159,7 +163,8 @@ struct SettingsView: View {
                 }
 
                 Section("À propos") {
-                    LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—")
+                    LabeledContent(
+                        "Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—")
                     Button("Quitter Encoche", role: .destructive) { NSApp.terminate(nil) }
                 }
             }

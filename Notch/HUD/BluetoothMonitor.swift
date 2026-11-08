@@ -85,7 +85,8 @@ final class BluetoothMonitor: NSObject {
     /// `SPBluetoothDataType[0].device_connected` : `[{ "Nom": { "device_address": …, "device_batteryLevelLeft": "80%" … } }]`.
     private nonisolated static func parseBattery(_ data: Data, address: String) -> Int? {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let controllers = root["SPBluetoothDataType"] as? [[String: Any]] else { return nil }
+            let controllers = root["SPBluetoothDataType"] as? [[String: Any]]
+        else { return nil }
         let wanted = normalized(address)
         for controller in controllers {
             for entry in controller["device_connected"] as? [[String: Any]] ?? [] {

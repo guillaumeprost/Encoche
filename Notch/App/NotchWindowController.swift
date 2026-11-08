@@ -101,8 +101,9 @@ final class NotchWindowController {
 
         let size = Self.panelSize
         panel.setFrame(
-            NSRect(x: screen.frame.midX - size.width / 2, y: screen.frame.maxY - size.height,
-                   width: size.width, height: size.height),
+            NSRect(
+                x: screen.frame.midX - size.width / 2, y: screen.frame.maxY - size.height,
+                width: size.width, height: size.height),
             display: true
         )
     }
@@ -111,17 +112,23 @@ final class NotchWindowController {
 
     private func installMonitors() {
         let mask: NSEvent.EventTypeMask = [.mouseMoved, .leftMouseDragged, .leftMouseDown, .leftMouseUp]
-        if let global = NSEvent.addGlobalMonitorForEvents(matching: mask, handler: { [weak self] event in
-            let type = event.type
-            MainActor.assumeIsolated { self?.handle(type) }
-        }) {
+        if let global = NSEvent.addGlobalMonitorForEvents(
+            matching: mask,
+            handler: { [weak self] event in
+                let type = event.type
+                MainActor.assumeIsolated { self?.handle(type) }
+            })
+        {
             monitors.append(global)
         }
-        if let local = NSEvent.addLocalMonitorForEvents(matching: mask, handler: { [weak self] event in
-            let type = event.type
-            MainActor.assumeIsolated { self?.handle(type) }
-            return event
-        }) {
+        if let local = NSEvent.addLocalMonitorForEvents(
+            matching: mask,
+            handler: { [weak self] event in
+                let type = event.type
+                MainActor.assumeIsolated { self?.handle(type) }
+                return event
+            })
+        {
             monitors.append(local)
         }
     }
@@ -135,8 +142,9 @@ final class NotchWindowController {
             ).isEmpty,
             tab: settings.tab
         )
-        let rect = NSRect(x: screenFrame.midX - size.width / 2, y: screenFrame.maxY - size.height,
-                          width: size.width, height: size.height)
+        let rect = NSRect(
+            x: screenFrame.midX - size.width / 2, y: screenFrame.maxY - size.height,
+            width: size.width, height: size.height)
         // Un peu de tolérance quand c'est replié, pour attraper la souris facilement.
         return viewModel.isOpen ? rect.insetBy(dx: -4, dy: -4) : rect.insetBy(dx: -8, dy: -2)
     }
@@ -176,7 +184,8 @@ final class NotchWindowController {
 
         // Reste ouverte pendant une saisie, ou tant qu'un glisser parti de l'encoche n'est pas lâché
         // (sinon le fichier qu'on sort de l'étagère disparaîtrait en plein mouvement).
-        let inside = hotRect().contains(mouse)
+        let inside =
+            hotRect().contains(mouse)
             || (viewModel.isOpen && viewModel.holdOpen)
             || (viewModel.isOpen && dragStartedInside)
         if inside == viewModel.isOpen {
@@ -232,7 +241,7 @@ final class NotchWindowController {
         guard !viewModel.isOpen, !viewModel.isRetracted, hotRect().contains(NSEvent.mouseLocation) else { return }
         let pasteboard = NSPasteboard(name: .drag)
         guard pasteboard.changeCount != dragChangeCount,
-              pasteboard.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true])
+            pasteboard.canReadObject(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true])
         else { return }
         pendingToggle?.cancel()
         pendingToggle = nil

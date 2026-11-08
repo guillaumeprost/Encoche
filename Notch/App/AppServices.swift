@@ -89,7 +89,8 @@ struct AppServices {
         // Bannières de macOS fermées tant qu'Encoche les relaie : seulement si le relais marche,
         // pour ne jamais perdre une notification.
         bannerSuppressor = BannerSuppressor()
-        let settings = settings, watcher = systemNotifications
+        let settings = settings
+        let watcher = systemNotifications
         bannerSuppressor.isEnabled = {
             settings.hideSystemBanners && settings.mirrorSystemNotifications && watcher.access == .granted
         }
@@ -100,13 +101,14 @@ struct AppServices {
         bannerSuppressor.onUnreadBanner = { appName, title, body in
             guard !alertCenter.hasRecent(title: title) else { return }
             let bundleID = AppDirectory.bundleID(forName: appName)
-            alertCenter.post(NotchAlert(
-                icon: bundleID.map { .app(bundleID: $0) } ?? .symbol("bell.fill", .gray),
-                source: appName,
-                title: title,
-                body: body,
-                action: bundleID.map { .openApp(bundleID: $0) }
-            ))
+            alertCenter.post(
+                NotchAlert(
+                    icon: bundleID.map { .app(bundleID: $0) } ?? .symbol("bell.fill", .gray),
+                    source: appName,
+                    title: title,
+                    body: body,
+                    action: bundleID.map { .openApp(bundleID: $0) }
+                ))
         }
         bannerSuppressor.start()
     }

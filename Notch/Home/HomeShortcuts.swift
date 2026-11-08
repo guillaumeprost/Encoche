@@ -109,8 +109,8 @@ struct HomeShortcutStyle {
     }
 }
 
-private extension String {
-    var lines: [String] {
+extension String {
+    fileprivate var lines: [String] {
         split(whereSeparator: \.isNewline)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }

@@ -143,9 +143,11 @@ private struct LockMeetingCard: View {
                             .font(.system(size: 14, weight: .bold))
                             .foregroundStyle(.white)
                             .lineLimit(1)
-                        Text("Dans \(MeetingCountdown.short(until: meeting.start, now: context.date)) · \(meeting.start.formatted(date: .omitted, time: .shortened))")
-                            .font(.system(size: 12.5, weight: .medium))
-                            .foregroundStyle(meeting.color)
+                        Text(
+                            "Dans \(MeetingCountdown.short(until: meeting.start, now: context.date)) · \(meeting.start.formatted(date: .omitted, time: .shortened))"
+                        )
+                        .font(.system(size: 12.5, weight: .medium))
+                        .foregroundStyle(meeting.color)
                     }
                     Spacer(minLength: 0)
                 }
@@ -172,9 +174,12 @@ private struct LockDownloadCard: View {
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(.white)
                         .lineLimit(1)
-                    Text(downloads.finishedName != nil ? "Terminé" : downloads.fraction.map { "\(Int(($0 * 100).rounded())) %" } ?? "En cours…")
-                        .font(.system(size: 12.5, weight: .medium))
-                        .foregroundStyle(.blue)
+                    Text(
+                        downloads.finishedName != nil
+                            ? "Terminé" : downloads.fraction.map { "\(Int(($0 * 100).rounded())) %" } ?? "En cours…"
+                    )
+                    .font(.system(size: 12.5, weight: .medium))
+                    .foregroundStyle(.blue)
                 }
                 Spacer(minLength: 0)
             }

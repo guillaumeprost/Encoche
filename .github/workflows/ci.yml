@@ -17,6 +17,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check formatting
+        run: ./scripts/format.sh --check
+
       - name: Install XcodeGen
         run: brew install xcodegen
 

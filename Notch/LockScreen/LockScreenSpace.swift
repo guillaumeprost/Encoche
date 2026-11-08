@@ -25,11 +25,11 @@ final class LockScreenSpace {
 
     private init?() {
         guard let handle = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/Versions/A/SkyLight", RTLD_NOW),
-              let mainConnection = dlsym(handle, "SLSMainConnectionID"),
-              let spaceCreate = dlsym(handle, "SLSSpaceCreate"),
-              let setLevel = dlsym(handle, "SLSSpaceSetAbsoluteLevel"),
-              let showSpaces = dlsym(handle, "SLSShowSpaces"),
-              let addWindows = dlsym(handle, "SLSSpaceAddWindowsAndRemoveFromSpaces")
+            let mainConnection = dlsym(handle, "SLSMainConnectionID"),
+            let spaceCreate = dlsym(handle, "SLSSpaceCreate"),
+            let setLevel = dlsym(handle, "SLSSpaceSetAbsoluteLevel"),
+            let showSpaces = dlsym(handle, "SLSShowSpaces"),
+            let addWindows = dlsym(handle, "SLSSpaceAddWindowsAndRemoveFromSpaces")
         else { return nil }
 
         connection = unsafeBitCast(mainConnection, to: MainConnectionID.self)()

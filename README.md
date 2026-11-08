@@ -104,6 +104,7 @@ Pendant le développement :
 ```bash
 ./scripts/run.sh          # compile en Debug et relance l'app
 ./scripts/test.sh         # tests unitaires de la logique (NotchTests)
+./scripts/format.sh       # met le code en forme (--check : vérifie seulement, comme la CI)
 ./scripts/release.sh      # version universelle zippée dans dist/, pour une Release GitHub
 ```
 

@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import Encoche
 
 /// Traduction des outils de Claude Code, plan, réponses proposées et transcriptions.
@@ -28,20 +29,29 @@ struct ClaudeActivityTests {
 
     @Test func todoWriteReplacesThePlan() {
         var plan: [ClaudeCodeSession.PlanItem] = []
-        ClaudeActivity.applyPlan(tool: "TodoWrite", input: ["todos": [
-            ["content": "Écrire", "status": "completed"],
-            ["content": "Tester", "activeForm": "Teste", "status": "in_progress"],
-            ["content": "Publier", "status": "pending"],
-        ]], to: &plan)
+        ClaudeActivity.applyPlan(
+            tool: "TodoWrite",
+            input: [
+                "todos": [
+                    ["content": "Écrire", "status": "completed"],
+                    ["content": "Tester", "activeForm": "Teste", "status": "in_progress"],
+                    ["content": "Publier", "status": "pending"],
+                ]
+            ], to: &plan)
         #expect(plan.map(\.content) == ["Écrire", "Teste", "Publier"])
         #expect(plan.map(\.status) == [.completed, .inProgress, .pending])
     }
 
     @Test func updatePlanAdvancesAndJumps() {
         var plan: [ClaudeCodeSession.PlanItem] = []
-        ClaudeActivity.applyPlan(tool: "mcp__ccd_turn__update_plan", input: ["items": [
-            ["content": "A", "status": "in_progress"], ["content": "B", "status": "pending"], ["content": "C", "status": "pending"],
-        ]], to: &plan)
+        ClaudeActivity.applyPlan(
+            tool: "mcp__ccd_turn__update_plan",
+            input: [
+                "items": [
+                    ["content": "A", "status": "in_progress"], ["content": "B", "status": "pending"],
+                    ["content": "C", "status": "pending"],
+                ]
+            ], to: &plan)
         ClaudeActivity.applyPlan(tool: "mcp__ccd_turn__update_plan", input: ["advance": true], to: &plan)
         #expect(plan.map(\.status) == [.completed, .inProgress, .pending])
         ClaudeActivity.applyPlan(tool: "mcp__ccd_turn__update_plan", input: ["done": [2], "start": 3], to: &plan)
@@ -49,10 +59,12 @@ struct ClaudeActivityTests {
     }
 
     @Test func suggestedRepliesIgnoreAppActions() {
-        let choices = ClaudeActivity.suggestedReplies(tool: "mcp__ccd_turn__wrap_up", input: [
-            "ask": "On publie ?",
-            "actions": [["label": "Oui"], ["label": "Commit", "action": "commit"], ["label": "Non"]],
-        ])
+        let choices = ClaudeActivity.suggestedReplies(
+            tool: "mcp__ccd_turn__wrap_up",
+            input: [
+                "ask": "On publie ?",
+                "actions": [["label": "Oui"], ["label": "Commit", "action": "commit"], ["label": "Non"]],
+            ])
         #expect(choices?.question == "On publie ?")
         #expect(choices?.options == ["Oui", "Non"])
         #expect(ClaudeActivity.suggestedReplies(tool: "mcp__ccd_turn__wrap_up", input: ["recap": "ok"]) == nil)
@@ -60,9 +72,11 @@ struct ClaudeActivityTests {
     }
 
     @Test func suggestedRepliesAcceptJSONStrings() {
-        let choices = ClaudeActivity.suggestedReplies(tool: "mcp__ccd_turn__wrap_up", input: [
-            "ask": "Quoi ?", "actions": #"[{"label": "A"}, {"label": "B"}]"#,
-        ])
+        let choices = ClaudeActivity.suggestedReplies(
+            tool: "mcp__ccd_turn__wrap_up",
+            input: [
+                "ask": "Quoi ?", "actions": #"[{"label": "A"}, {"label": "B"}]"#,
+            ])
         #expect(choices?.options == ["A", "B"])
     }
 
@@ -107,17 +121,17 @@ struct ClaudeActivityTests {
 struct QuestionAnsweredElsewhereTests {
     @Test func findsToolResultForTheQuestion() {
         let transcript = """
-        {"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_A","name":"AskUserQuestion"}]}}
-        {"type":"user","message":{"content":[{"tool_use_id":"toolu_A","type":"tool_result","content":"Oui"}]}}
-        """
+            {"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_A","name":"AskUserQuestion"}]}}
+            {"type":"user","message":{"content":[{"tool_use_id":"toolu_A","type":"tool_result","content":"Oui"}]}}
+            """
         #expect(ClaudeCodeMonitor.containsResult(in: transcript, for: "toolu_A"))
     }
 
     @Test func ignoresTheQuestionItselfAndOtherResults() {
         let transcript = """
-        {"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_A","name":"AskUserQuestion"}]}}
-        {"type":"user","message":{"content":[{"tool_use_id":"toolu_B","type":"tool_result","content":"ok"}]}}
-        """
+            {"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_A","name":"AskUserQuestion"}]}}
+            {"type":"user","message":{"content":[{"tool_use_id":"toolu_B","type":"tool_result","content":"ok"}]}}
+            """
         #expect(!ClaudeCodeMonitor.containsResult(in: transcript, for: "toolu_A"))
     }
 }

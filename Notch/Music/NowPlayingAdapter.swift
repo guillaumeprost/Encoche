@@ -106,7 +106,8 @@ final class NowPlayingAdapter: @unchecked Sendable {
             let line = buffer[buffer.startIndex..<newline]
             buffer.removeSubrange(buffer.startIndex...newline)
             guard let json = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
-                  json["type"] as? String == "data" else { continue }
+                json["type"] as? String == "data"
+            else { continue }
             let info = Self.parse(json["payload"] as? [String: Any] ?? [:])
             DispatchQueue.main.async { [weak self] in
                 MainActor.assumeIsolated { self?.onUpdate?(info) }
@@ -116,8 +117,9 @@ final class NowPlayingAdapter: @unchecked Sendable {
 
     static func parse(_ payload: [String: Any], now: Date = Date()) -> Info? {
         guard let title = payload["title"] as? String, !title.isEmpty,
-              let bundleID = payload["parentApplicationBundleIdentifier"] as? String
-                ?? payload["bundleIdentifier"] as? String else { return nil }
+            let bundleID = payload["parentApplicationBundleIdentifier"] as? String
+                ?? payload["bundleIdentifier"] as? String
+        else { return nil }
         let playing = payload["playing"] as? Bool ?? false
         var elapsed = payload["elapsedTime"] as? Double ?? 0
         // La position est donnée à un instant : on l'avance jusqu'à maintenant.

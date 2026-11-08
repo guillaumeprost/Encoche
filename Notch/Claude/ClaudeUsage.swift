@@ -20,8 +20,9 @@ final class ClaudeUsage {
         var total: Int { input + output + cacheWrite + cacheRead }
 
         static func + (lhs: Totals, rhs: Totals) -> Totals {
-            Totals(input: lhs.input + rhs.input, output: lhs.output + rhs.output,
-                   cacheWrite: lhs.cacheWrite + rhs.cacheWrite, cacheRead: lhs.cacheRead + rhs.cacheRead)
+            Totals(
+                input: lhs.input + rhs.input, output: lhs.output + rhs.output,
+                cacheWrite: lhs.cacheWrite + rhs.cacheWrite, cacheRead: lhs.cacheRead + rhs.cacheRead)
         }
     }
 
@@ -81,7 +82,8 @@ final class ClaudeUsage {
             var seenPaths: Set<String> = []
             for case let url as URL in files where url.pathExtension == "jsonl" {
                 guard let values = try? url.resourceValues(forKeys: Set(keys)),
-                      (values.contentModificationDate ?? .distantPast) >= since else { continue }
+                    (values.contentModificationDate ?? .distantPast) >= since
+                else { continue }
                 seenPaths.insert(url.path)
                 let size = UInt64(values.fileSize ?? 0)
                 let offset = offsets[url.path] ?? 0
@@ -103,16 +105,18 @@ final class ClaudeUsage {
             defer { try? handle.close() }
             try? handle.seek(toOffset: offset)
             guard let data = try? handle.readToEnd(),
-                  let lastNewline = data.lastIndex(of: UInt8(ascii: "\n")) else { return 0 }
+                let lastNewline = data.lastIndex(of: UInt8(ascii: "\n"))
+            else { return 0 }
             let complete = data[data.startIndex...lastNewline]
             let marker = Data("\"usage\"".utf8)
 
             for line in complete.split(separator: UInt8(ascii: "\n")) where line.range(of: marker) != nil {
                 guard let entry = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
-                      let message = entry["message"] as? [String: Any],
-                      let usage = message["usage"] as? [String: Any],
-                      let stamp = entry["timestamp"] as? String,
-                      let date = isoFormatter.date(from: stamp) else { continue }
+                    let message = entry["message"] as? [String: Any],
+                    let usage = message["usage"] as? [String: Any],
+                    let stamp = entry["timestamp"] as? String,
+                    let date = isoFormatter.date(from: stamp)
+                else { continue }
                 // Une réponse est écrite sur plusieurs lignes : on ne la compte qu'une fois.
                 let id = (message["id"] as? String ?? "") + (entry["requestId"] as? String ?? "")
                 let day = Calendar.current.startOfDay(for: date)

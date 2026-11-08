@@ -20,8 +20,10 @@ enum AppDirectory {
         if let cache { return cache }
         var result: [String: String] = [:]
         let fileManager = FileManager.default
-        let folders = ["/Applications", "/System/Applications", "/System/Applications/Utilities",
-                       fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Applications").path]
+        let folders = [
+            "/Applications", "/System/Applications", "/System/Applications/Utilities",
+            fileManager.homeDirectoryForCurrentUser.appendingPathComponent("Applications").path,
+        ]
         for folder in folders {
             for item in (try? fileManager.contentsOfDirectory(atPath: folder)) ?? [] where item.hasSuffix(".app") {
                 let path = (folder as NSString).appendingPathComponent(item)

@@ -47,8 +47,10 @@ enum AX {
 
     /// Premier élément (parcours en profondeur) qui correspond. `skipping` : rôles dans lesquels
     /// on ne descend pas (listes de centaines de lignes…).
-    nonisolated static func first(in element: AXUIElement, maxDepth: Int = 60, skipping: Set<String> = [],
-                                  where match: (AXUIElement) -> Bool) -> AXUIElement? {
+    nonisolated static func first(
+        in element: AXUIElement, maxDepth: Int = 60, skipping: Set<String> = [],
+        where match: (AXUIElement) -> Bool
+    ) -> AXUIElement? {
         func search(_ node: AXUIElement, _ depth: Int) -> AXUIElement? {
             if match(node) { return node }
             guard depth < maxDepth, depth == 0 || !skipping.contains(role(node) ?? "") else { return nil }
@@ -61,8 +63,10 @@ enum AX {
     }
 
     /// Tous les éléments qui correspondent, dans l'ordre du parcours.
-    nonisolated static func collect(in element: AXUIElement, maxDepth: Int = 40,
-                                    where match: (AXUIElement) -> Bool) -> [AXUIElement] {
+    nonisolated static func collect(
+        in element: AXUIElement, maxDepth: Int = 40,
+        where match: (AXUIElement) -> Bool
+    ) -> [AXUIElement] {
         var results: [AXUIElement] = []
         func walk(_ node: AXUIElement, _ depth: Int) {
             if match(node) { results.append(node) }

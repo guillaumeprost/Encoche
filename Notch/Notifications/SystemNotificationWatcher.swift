@@ -59,7 +59,8 @@ final class SystemNotificationWatcher {
         var handle: OpaquePointer?
         let flags = SQLITE_OPEN_READONLY | SQLITE_OPEN_NOMUTEX
         guard sqlite3_open_v2(Self.databaseURL.path, &handle, flags, nil) == SQLITE_OK,
-              let latest = Self.latestDate(handle) else {
+            let latest = Self.latestDate(handle)
+        else {
             sqlite3_close(handle)
             access = .denied
             return
@@ -144,9 +145,9 @@ final class SystemNotificationWatcher {
 
     private func makeAlert(from data: Data) -> NotchAlert? {
         guard let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
-              let bundleID = plist["app"] as? String,
-              bundleID != Bundle.main.bundleIdentifier,
-              let request = plist["req"] as? [String: Any]
+            let bundleID = plist["app"] as? String,
+            bundleID != Bundle.main.bundleIdentifier,
+            let request = plist["req"] as? [String: Any]
         else { return nil }
 
         let title = (request["titl"] as? String)?.trimmed
@@ -167,7 +168,8 @@ final class SystemNotificationWatcher {
 
     private func name(of bundleID: String) -> String {
         if let cached = appNames[bundleID] { return cached }
-        let name = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
+        let name =
+            NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
             .map { FileManager.default.displayName(atPath: $0.path).replacingOccurrences(of: ".app", with: "") }
             ?? bundleID
         appNames[bundleID] = name
@@ -177,16 +179,17 @@ final class SystemNotificationWatcher {
     private func showOnboardingOnce() {
         guard !UserDefaults.standard.bool(forKey: Self.onboardingKey) else { return }
         UserDefaults.standard.set(true, forKey: Self.onboardingKey)
-        alerts.post(NotchAlert(
-            icon: .symbol("bell.badge.fill", .red),
-            source: "Encoche",
-            title: "Afficher tes notifications ici ?",
-            body: "Clique pour autoriser Encoche dans « Accès complet au disque ».",
-            action: .run { [weak self] in self?.openPrivacySettings() }
-        ))
+        alerts.post(
+            NotchAlert(
+                icon: .symbol("bell.badge.fill", .red),
+                source: "Encoche",
+                title: "Afficher tes notifications ici ?",
+                body: "Clique pour autoriser Encoche dans « Accès complet au disque ».",
+                action: .run { [weak self] in self?.openPrivacySettings() }
+            ))
     }
 }
 
-private extension String {
-    var trimmed: String { trimmingCharacters(in: .whitespacesAndNewlines) }
+extension String {
+    fileprivate var trimmed: String { trimmingCharacters(in: .whitespacesAndNewlines) }
 }

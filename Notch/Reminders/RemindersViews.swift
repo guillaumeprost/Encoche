@@ -14,11 +14,13 @@ struct RemindersTab: View {
             .foregroundStyle(.primary)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         case .notDetermined:
-            AccessPrompt(symbol: "checklist", message: "Affiche tes rappels du jour ici", button: "Autoriser les rappels",
-                                  action: reminders.requestAccess)
+            AccessPrompt(
+                symbol: "checklist", message: "Affiche tes rappels du jour ici", button: "Autoriser les rappels",
+                action: reminders.requestAccess)
         case .denied:
-            AccessPrompt(symbol: "checklist", message: "Accès aux rappels refusé", button: "Ouvrir les Réglages",
-                                  action: reminders.openPrivacySettings)
+            AccessPrompt(
+                symbol: "checklist", message: "Accès aux rappels refusé", button: "Ouvrir les Réglages",
+                action: reminders.openPrivacySettings)
         }
     }
 
@@ -71,9 +73,9 @@ struct RemindersColumn: View {
                 Button(notAsked ? "Afficher" : "Autoriser") {
                     if notAsked { reminders.requestAccess() } else { reminders.openPrivacySettings() }
                 }
-                    .buttonStyle(.glass)
-                    .controlSize(.small)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .buttonStyle(.glass)
+                .controlSize(.small)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
         .foregroundStyle(.primary)
@@ -121,7 +123,9 @@ private struct ReminderRow: View {
 
     var body: some View {
         HStack(spacing: large ? 9 : 6) {
-            Button { reminders.toggle(reminder) } label: {
+            Button {
+                reminders.toggle(reminder)
+            } label: {
                 ZStack {
                     Circle().strokeBorder(reminder.color, lineWidth: 1.5)
                     if reminder.isCompleted {

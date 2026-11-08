@@ -21,9 +21,11 @@ final class HookReply {
         let payload = body ?? Data()
         var response = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
         response += "Content-Length: \(payload.count)\r\nConnection: close\r\n\r\n"
-        connection.send(content: Data(response.utf8) + payload, completion: .contentProcessed { [connection] _ in
-            connection.cancel()
-        })
+        connection.send(
+            content: Data(response.utf8) + payload,
+            completion: .contentProcessed { [connection] _ in
+                connection.cancel()
+            })
     }
 
     /// Surveille la fermeture côté client.
@@ -145,7 +147,8 @@ final class HookServer {
             fields[line[..<colon].lowercased()] = line[line.index(after: colon)...].trimmingCharacters(in: .whitespaces)
         }
 
-        let length = headers
+        let length =
+            headers
             .split(separator: "\r\n")
             .first { $0.lowercased().hasPrefix("content-length:") }
             .flatMap { Int($0.split(separator: ":")[1].trimmingCharacters(in: .whitespaces)) } ?? 0
