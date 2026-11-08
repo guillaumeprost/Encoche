@@ -36,12 +36,12 @@ final class NotchViewModel {
     static let homeExtraWidth: CGFloat = 150
 
     /// Largeur ajoutée à l'encoche ouverte selon l'onglet.
-    static func extraWidth(for tab: NotchTab) -> CGFloat {
+    private static func extraWidth(for tab: NotchTab) -> CGFloat {
         tab == .home ? homeExtraWidth : 0
     }
 
-    /// Hauteur ajoutée à l'encoche ouverte selon l'onglet (accueil, calendrier, musique et Claude).
-    static func extraHeight(for tab: NotchTab) -> CGFloat {
+    /// Hauteur ajoutée à l'encoche ouverte selon l'onglet.
+    private static func extraHeight(for tab: NotchTab) -> CGFloat {
         switch tab {
         case .home: return homeExtraHeight
         case .calendar, .music, .reminders: return calendarExtraHeight
@@ -65,7 +65,9 @@ final class NotchViewModel {
     var activityHeight: CGFloat { notchSize.height + Self.activityExtraHeight }
 
     /// Taille totale de la forme, évasements du haut compris.
-    func shapeSize(showsActivity: Bool, extraHeight: CGFloat = 0, extraWidth: CGFloat = 0) -> CGSize {
+    func shapeSize(showsActivity: Bool, tab: NotchTab) -> CGSize {
+        let extraWidth = Self.extraWidth(for: tab)
+        let extraHeight = Self.extraHeight(for: tab)
         let bodyWidth: CGFloat
         let height: CGFloat
         if isOpen {

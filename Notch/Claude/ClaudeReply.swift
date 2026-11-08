@@ -98,7 +98,7 @@ enum ClaudeReply {
                 return .pasted(app: appName)
             }
             try? await Task.sleep(for: .milliseconds(200))
-            press(key: 36, flags: [], to: appPID) // Entrée
+            AX.press(key: 36, flags: [], to: appPID) // Entrée
             return .sent(app: appName)
 
         default:
@@ -130,7 +130,7 @@ enum ClaudeReply {
         if await Task.detached(operation: { selectChatMode(inAppWith: appPID) }).value {
             try? await Task.sleep(for: .milliseconds(700))
         }
-        press(key: 45, flags: .maskCommand, to: appPID) // ⌘N
+        AX.press(key: 45, flags: .maskCommand, to: appPID) // ⌘N
         try? await Task.sleep(for: .milliseconds(1200))
 
         let typed = await Task.detached { typeInVisibleComposer(message, inAppWith: appPID) }.value
@@ -139,7 +139,7 @@ enum ClaudeReply {
             return .pasted(app: "Claude")
         }
         try? await Task.sleep(for: .milliseconds(200))
-        press(key: 36, flags: [], to: appPID) // Entrée
+        AX.press(key: 36, flags: [], to: appPID) // Entrée
         return .sent(app: "Claude")
     }
 
@@ -316,9 +316,9 @@ enum ClaudeReply {
         item.setString("", forType: .init("org.nspasteboard.ConcealedType"))
         pasteboard.writeObjects([item])
 
-        press(key: 9, flags: .maskCommand, to: pid) // V
+        AX.press(key: 9, flags: .maskCommand, to: pid) // V
         try? await Task.sleep(for: .milliseconds(300))
-        if thenReturn { press(key: 36, flags: [], to: pid) } // Entrée
+        if thenReturn { AX.press(key: 36, flags: [], to: pid) } // Entrée
 
         try? await Task.sleep(for: .milliseconds(400))
         pasteboard.clearContents()
@@ -328,15 +328,6 @@ enum ClaudeReply {
             return item
         }
         if !restored.isEmpty { pasteboard.writeObjects(restored) }
-    }
-
-    private static func press(key: CGKeyCode, flags: CGEventFlags, to pid: pid_t) {
-        let source = CGEventSource(stateID: .hidSystemState)
-        for down in [true, false] {
-            let event = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: down)
-            event?.flags = flags
-            event?.postToPid(pid)
-        }
     }
 
     // MARK: - Outils

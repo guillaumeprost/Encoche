@@ -110,7 +110,8 @@ final class RemindersController {
     private func apply(_ list: [TodayReminder]) {
         // Les rappels cochés depuis l'encoche restent visibles, barrés.
         let checked = reminders.filter { old in old.isCompleted && !list.contains { $0.id == old.id } }
-        let merged = (list + checked).sorted(by: Self.order)
+        let today = Calendar.current.startOfDay(for: Date())
+        let merged = (list + checked).sorted { Self.order($0, $1, today: today) }
         if merged != reminders { reminders = merged }
     }
 
@@ -127,8 +128,8 @@ final class RemindersController {
     }
 
     /// Les rappels en retard d'abord, puis ceux de la journée sans heure, puis par heure.
-    nonisolated static func order(_ a: TodayReminder, _ b: TodayReminder) -> Bool {
-        let today = Calendar.current.startOfDay(for: Date())
+    nonisolated static func order(_ a: TodayReminder, _ b: TodayReminder,
+                                  today: Date = Calendar.current.startOfDay(for: Date())) -> Bool {
         let aLate = (a.due ?? today) < today, bLate = (b.due ?? today) < today
         if aLate != bLate { return aLate }
         if a.hasTime != b.hasTime { return !a.hasTime }

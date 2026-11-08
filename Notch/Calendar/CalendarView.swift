@@ -184,14 +184,16 @@ private struct EventRow: View {
 
 // MARK: - Permission
 
-private struct AccessPrompt: View {
+/// Demande d'accès (calendrier, rappels) : un symbole, un message et un bouton.
+struct AccessPrompt: View {
+    var symbol = "calendar"
     let message: String
     let button: String
     let action: () -> Void
 
     var body: some View {
         VStack(spacing: 10) {
-            Image(systemName: "calendar")
+            Image(systemName: symbol)
                 .font(.system(size: 22))
                 .foregroundStyle(.primary.opacity(0.6))
             Text(message)

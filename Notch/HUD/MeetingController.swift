@@ -78,7 +78,7 @@ final class MeetingController {
         case .meet(let browser):
             Task.detached { _ = Self.pressMeetButton(in: browser, labels: Self.meetCameraLabels) }
         case .zoom:
-            press(key: 9, flags: [.maskCommand, .maskShift], bundleID: Self.zoomID) // ⇧⌘V
+            press(key: 9, flags: [.maskCommand, .maskShift], bundleIDs: [Self.zoomID]) // ⇧⌘V
         case .teams:
             press(key: 31, flags: [.maskCommand, .maskShift], bundleIDs: Self.teamsIDs) // ⇧⌘O
         }
@@ -90,7 +90,7 @@ final class MeetingController {
         case .meet(let browser):
             Task.detached { _ = Self.pressMeetButton(in: browser, labels: Self.meetLeaveLabels) }
         case .zoom:
-            press(key: 13, flags: .maskCommand, bundleID: Self.zoomID) // ⌘W (Zoom demande confirmation)
+            press(key: 13, flags: .maskCommand, bundleIDs: [Self.zoomID]) // ⌘W (Zoom demande confirmation)
         case .teams:
             press(key: 4, flags: [.maskCommand, .maskShift], bundleIDs: Self.teamsIDs) // ⇧⌘H
         }
@@ -152,19 +152,10 @@ final class MeetingController {
         return labels.contains { normalized.hasPrefix($0) }
     }
 
-    private func press(key: CGKeyCode, flags: CGEventFlags, bundleID: String) {
-        press(key: key, flags: flags, bundleIDs: [bundleID])
-    }
-
     private func press(key: CGKeyCode, flags: CGEventFlags, bundleIDs: [String]) {
         guard let app = bundleIDs.lazy.compactMap({ NSRunningApplication.runningApplications(withBundleIdentifier: $0).first }).first
         else { return }
-        let source = CGEventSource(stateID: .hidSystemState)
-        for down in [true, false] {
-            let event = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: down)
-            event?.flags = flags
-            event?.postToPid(app.processIdentifier)
-        }
+        AX.press(key: key, flags: flags, to: app.processIdentifier)
     }
 
     // MARK: - CoreAudio

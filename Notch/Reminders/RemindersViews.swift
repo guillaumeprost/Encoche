@@ -14,10 +14,10 @@ struct RemindersTab: View {
             .foregroundStyle(.primary)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         case .notDetermined:
-            RemindersAccessPrompt(message: "Affiche tes rappels du jour ici", button: "Autoriser les rappels",
+            AccessPrompt(symbol: "checklist", message: "Affiche tes rappels du jour ici", button: "Autoriser les rappels",
                                   action: reminders.requestAccess)
         case .denied:
-            RemindersAccessPrompt(message: "Accès aux rappels refusé", button: "Ouvrir les Réglages",
+            AccessPrompt(symbol: "checklist", message: "Accès aux rappels refusé", button: "Ouvrir les Réglages",
                                   action: reminders.openPrivacySettings)
         }
     }
@@ -64,16 +64,12 @@ struct RemindersColumn: View {
                 }
             }
             .padding(.horizontal, 4)
-            switch reminders.access {
-            case .granted:
+            if reminders.access == .granted {
                 RemindersList(large: false)
-            case .notDetermined:
-                Button("Afficher", action: reminders.requestAccess)
-                    .buttonStyle(.glass)
-                    .controlSize(.small)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            case .denied:
-                Button("Autoriser", action: reminders.openPrivacySettings)
+            } else {
+                let notAsked = reminders.access == .notDetermined
+                Button(notAsked ? "Afficher" : "Autoriser",
+                       action: notAsked ? reminders.requestAccess : reminders.openPrivacySettings)
                     .buttonStyle(.glass)
                     .controlSize(.small)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -176,26 +172,5 @@ private struct ReminderRow: View {
         }
         if large, !reminder.list.isEmpty { parts.append(reminder.list) }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
-    }
-}
-
-private struct RemindersAccessPrompt: View {
-    let message: String
-    let button: String
-    let action: () -> Void
-
-    var body: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "checklist")
-                .font(.system(size: 22))
-                .foregroundStyle(.primary.opacity(0.6))
-            Text(message)
-                .font(.system(size: 12))
-                .foregroundStyle(.primary.opacity(0.6))
-            Button(button, action: action)
-                .buttonStyle(.glass)
-                .controlSize(.small)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }

@@ -15,7 +15,7 @@ struct RemindersTests {
             reminder("all-day", due: today, hasTime: false),
             reminder("timed-early", due: today.addingTimeInterval(9 * 3600), hasTime: true),
             reminder("yesterday", due: today.addingTimeInterval(-86_400), hasTime: false),
-        ].sorted(by: RemindersController.order)
+        ].sorted { RemindersController.order($0, $1, today: today) }
         #expect(list.map(\.id) == ["yesterday", "all-day", "timed-early", "timed-late"])
     }
 

@@ -72,23 +72,36 @@ struct BrightnessHUDView: View {
     }
 }
 
+/// Icône de la caméra ou du micro : rouge quand le micro est coupé depuis l'encoche,
+/// vert pour la caméra, orange pour le micro.
+struct PrivacyIndicator {
+    let symbol: String
+    let color: Color
+    let help: String
+
+    @MainActor
+    init(privacy: PrivacyMonitor, meeting: MeetingController) {
+        if meeting.isMuted {
+            (symbol, color, help) = ("mic.slash.fill", .red, "Micro coupé")
+        } else if privacy.isCameraInUse {
+            (symbol, color, help) = ("video.fill", .green, "Caméra en cours d'utilisation")
+        } else {
+            (symbol, color, help) = ("mic.fill", .orange, "Micro en cours d'utilisation")
+        }
+    }
+}
+
 /// Caméra ou micro utilisés : icône à gauche de l'encoche, point lumineux à droite.
 struct CollapsedPrivacyView: View {
     @Environment(PrivacyMonitor.self) private var privacy
     @Environment(MeetingController.self) private var meeting
     let slotWidth: CGFloat
 
-    /// Rouge quand le micro est coupé depuis l'encoche, vert pour la caméra, orange pour le micro.
-    private var color: Color { meeting.isMuted ? .red : privacy.isCameraInUse ? .green : .orange }
-
-    private var symbol: String {
-        if meeting.isMuted { return "mic.slash.fill" }
-        return privacy.isCameraInUse ? "video.fill" : "mic.fill"
-    }
-
     var body: some View {
+        let indicator = PrivacyIndicator(privacy: privacy, meeting: meeting)
+        let color = indicator.color
         CollapsedActivityLayout(slotWidth: slotWidth) {
-            Image(systemName: symbol)
+            Image(systemName: indicator.symbol)
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(color)
                 .contentTransition(.symbolEffect(.replace))
@@ -98,6 +111,6 @@ struct CollapsedPrivacyView: View {
                 .frame(width: 7, height: 7)
                 .shadow(color: color.opacity(0.8), radius: 4)
         }
-        .help(meeting.isMuted ? "Micro coupé" : privacy.isCameraInUse ? "Caméra en cours d'utilisation" : "Micro en cours d'utilisation")
+        .help(indicator.help)
     }
 }

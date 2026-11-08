@@ -83,4 +83,14 @@ enum AX {
         AXUIElementCopyAttributeValue(element, name as CFString, &value)
         return value
     }
+
+    /// Envoie une touche (avec modificateurs) à une app, sans la passer au premier plan.
+    static func press(key: CGKeyCode, flags: CGEventFlags = [], to pid: pid_t) {
+        let source = CGEventSource(stateID: .hidSystemState)
+        for down in [true, false] {
+            let event = CGEvent(keyboardEventSource: source, virtualKey: key, keyDown: down)
+            event?.flags = flags
+            event?.postToPid(pid)
+        }
+    }
 }

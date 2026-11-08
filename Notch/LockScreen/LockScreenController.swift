@@ -17,8 +17,9 @@ final class LockScreenController {
     @ObservationIgnored private var windows: [NSWindow] = []
     @ObservationIgnored private var hideTask: Task<Void, Never>?
 
+    /// Lecteur de musique, en bas au-dessus de la photo de profil.
     static let musicCardSize = CGSize(width: 420, height: 124)
-    /// Zone des cartes : assez basse pour ne jamais recouvrir le champ du mot de passe.
+    /// Zone des cartes d'activité, sous l'horloge.
     static let activitiesSize = CGSize(width: 420, height: 380)
     /// Part du haut de l'écran prise par la date et l'horloge de l'écran verrouillé.
     static let clockFraction: CGFloat = 0.31
@@ -53,9 +54,17 @@ final class LockScreenController {
         showWindows()
     }
 
+    @ObservationIgnored private var relayoutTask: Task<Void, Never>?
+
+    /// Les changements d'écran arrivent en rafale : on attend la fin avant de tout replacer.
     private func screensDidChange() {
         guard phase == .locked else { return }
-        showWindows()
+        relayoutTask?.cancel()
+        relayoutTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled, let self, self.phase == .locked else { return }
+            self.showWindows()
+        }
     }
 
     /// Écran de l'encoche : celui du Mac quand il est ouvert (sa vraie encoche), sinon l'écran principal.

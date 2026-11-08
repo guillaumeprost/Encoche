@@ -133,8 +133,7 @@ final class NotchWindowController {
                 settings: settings, claudeCode: claudeCode, privacy: privacy, downloads: downloads, music: music,
                 calendar: calendar, timer: timer, focus: focus, calls: calls
             ).isEmpty,
-            extraHeight: NotchViewModel.extraHeight(for: settings.tab),
-            extraWidth: NotchViewModel.extraWidth(for: settings.tab)
+            tab: settings.tab
         )
         let rect = NSRect(x: screenFrame.midX - size.width / 2, y: screenFrame.maxY - size.height,
                           width: size.width, height: size.height)

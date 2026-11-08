@@ -114,8 +114,7 @@ enum PictureInPicture {
             }
         }
         // Pas d'entrée « Image dans l'image » : on referme le menu.
-        CGEvent(keyboardEventSource: nil, virtualKey: 53, keyDown: true)?.postToPid(safariApp.processIdentifier)
-        CGEvent(keyboardEventSource: nil, virtualKey: 53, keyDown: false)?.postToPid(safariApp.processIdentifier)
+        AX.press(key: 53, to: safariApp.processIdentifier) // Échap
         return false
     }
 }

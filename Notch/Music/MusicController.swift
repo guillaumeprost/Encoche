@@ -237,10 +237,9 @@ final class MusicController {
     /// Mise à jour du « À l'écoute » de macOS. Musique et Spotify ont leur propre suivi
     /// (plus complet) : seuls les autres lecteurs sont pris ici.
     private func handleExternal(_ info: NowPlayingAdapter.Info?) {
-        if let info, [Source.music.rawValue, Source.spotify.rawValue].contains(info.bundleID) {
-            useAppArtwork(from: info)
-        }
-        guard let info, ![Source.music.rawValue, Source.spotify.rawValue].contains(info.bundleID) else {
+        let appInfo = info.flatMap { Source(rawValue: $0.bundleID) != nil ? $0 : nil }
+        if let appInfo { useAppArtwork(from: appInfo) }
+        guard let info, appInfo == nil else {
             // Plus rien, ou Musique / Spotify reprend la main.
             if externalPlayer != nil {
                 clear()
@@ -292,13 +291,7 @@ final class MusicController {
                     "tell application id \"com.apple.Music\" to get raw data of artwork 1 of current track"
                 )?.data
                 guard self.track == expected else { return }
-                if let image = data.flatMap(NSImage.init(data:)) {
-                    self.applyArtwork(image)
-                } else if let fallback = self.appArtwork, fallback.title == expected?.title {
-                    self.applyArtwork(NSImage(data: fallback.data))
-                } else {
-                    self.applyArtwork(nil)
-                }
+                self.applyArtwork(data.flatMap(NSImage.init(data:)) ?? self.appArtworkImage(for: expected))
 
             case .spotify:
                 guard let urlString = await AppleScriptRunner.run(
@@ -320,6 +313,11 @@ final class MusicController {
         appArtwork = (info.title, data)
         guard source?.rawValue == info.bundleID, track?.title == info.title, artwork == nil else { return }
         applyArtwork(NSImage(data: data))
+    }
+
+    private func appArtworkImage(for track: Track?) -> NSImage? {
+        guard let appArtwork, appArtwork.title == track?.title else { return nil }
+        return NSImage(data: appArtwork.data)
     }
 
     private func applyArtwork(_ image: NSImage?) {

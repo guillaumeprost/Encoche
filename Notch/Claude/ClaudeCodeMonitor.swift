@@ -99,7 +99,6 @@ final class PendingPermission: Identifiable {
     var alertID: UUID?
     /// Pour vérifier dans la conversation si la demande a été tranchée ailleurs (app Claude, terminal).
     var toolUseID: String?
-    var transcriptPath: String?
 
     init(sessionID: String, projectName: String, toolName: String, summary: String,
          suggestions: [[String: Any]], input: [String: Any] = [:], reply: HookReply) {
@@ -306,13 +305,13 @@ final class ClaudeCodeMonitor {
             self.remove(permission)
         }
         if let last = lastToolUse[sessionID], last.tool == tool { permission.toolUseID = last.id }
-        permission.transcriptPath = event["transcript_path"] as? String
         permissions.append(permission)
         startAnswerCheck()
 
         upsert(sessionID, cwd: cwd) { session in
             session.state = .waiting
             session.detail = "\(tool) · \(permission.summary)"
+            if let path = event["transcript_path"] as? String, !path.isEmpty { session.transcriptPath = path }
         }
 
         // Question à choix : un bouton par réponse.
@@ -411,33 +410,38 @@ final class ClaudeCodeMonitor {
     }
 
     private func checkAnswers() {
-        let pending = permissions.compactMap { permission -> (PendingPermission, String, String)? in
-            guard let id = permission.toolUseID, let path = permission.transcriptPath else { return nil }
-            return (permission, id, path)
+        let checks = permissions.compactMap { permission -> (id: String, path: String)? in
+            guard let id = permission.toolUseID,
+                  let path = sessions.first(where: { $0.id == permission.sessionID })?.transcriptPath
+            else { return nil }
+            return (id, path)
         }
-        guard !pending.isEmpty else { return }
-        let checks = pending.map { (id: $0.1, path: $0.2) }
+        guard !checks.isEmpty else { return }
         Task { [weak self] in
-            // Lecture des fichiers hors du fil principal.
+            // Lecture des fichiers hors du fil principal, une fois par conversation.
             let answered = await Task.detached(priority: .utility) {
-                Set(checks.filter { Self.transcript(at: $0.path, hasResultFor: $0.id) }.map(\.id))
+                Dictionary(grouping: checks, by: \.path).reduce(into: Set<String>()) { answered, entry in
+                    guard let text = Self.transcriptTail(at: entry.key) else { return }
+                    for check in entry.value where Self.containsResult(in: text, for: check.id) {
+                        answered.insert(check.id)
+                    }
+                }
             }.value
             guard let self, !answered.isEmpty else { return }
-            for (permission, id, _) in pending where answered.contains(id) && self.permissions.contains(where: { $0 === permission }) {
+            for permission in self.permissions where answered.contains(permission.toolUseID ?? "") {
                 permission.reply.send(nil)
                 self.remove(permission)
             }
         }
     }
 
-    /// La fin de la conversation contient-elle le résultat de cet appel d'outil ?
-    nonisolated static func transcript(at path: String, hasResultFor toolUseID: String) -> Bool {
-        guard let handle = FileHandle(forReadingAtPath: path) else { return false }
+    /// Fin de la conversation (256 Ko), où se trouvent les derniers résultats d'outils.
+    nonisolated static func transcriptTail(at path: String) -> String? {
+        guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
         defer { try? handle.close() }
         let size = (try? handle.seekToEnd()) ?? 0
         try? handle.seek(toOffset: size > 262_144 ? size - 262_144 : 0)
-        guard let data = try? handle.readToEnd(), let text = String(data: data, encoding: .utf8) else { return false }
-        return containsResult(in: text, for: toolUseID)
+        return (try? handle.readToEnd()).flatMap { String(decoding: $0, as: UTF8.self) }
     }
 
     /// Une ligne de la conversation est le résultat (tool_result) de cet appel d'outil.
@@ -449,6 +453,16 @@ final class ClaudeCodeMonitor {
 
     /// La session a avancé sans nous (réponse dans le terminal, annulation…) :
     /// les demandes en attente n'ont plus lieu d'être.
+    /// Retient l'alerte qui attend ta réponse (et retire la précédente de la session).
+    private func trackWaitingAlert(_ alert: NotchAlert, of sessionID: String) {
+        clearWaitingAlert(of: sessionID)
+        waitingAlerts[sessionID] = alert.id
+    }
+
+    private func clearWaitingAlert(of sessionID: String) {
+        if let alertID = waitingAlerts.removeValue(forKey: sessionID) { alerts?.dismiss(alertID: alertID) }
+    }
+
     private func resolvePermissions(of sessionID: String) {
         for permission in permissions where permission.sessionID == sessionID {
             permission.reply.send(nil)
@@ -477,7 +491,7 @@ final class ClaudeCodeMonitor {
         // Tout événement qui suit montre que la demande a été tranchée ailleurs.
         if ["PreToolUse", "PostToolUse", "UserPromptSubmit", "Stop", "SessionEnd"].contains(name) {
             resolvePermissions(of: id)
-            if let alertID = waitingAlerts.removeValue(forKey: id) { alerts?.dismiss(alertID: alertID) }
+            clearWaitingAlert(of: id)
         }
 
         if name == "SessionEnd" {
@@ -559,8 +573,7 @@ final class ClaudeCodeMonitor {
                 body: message.isEmpty ? nil : message,
                 action: .run { [weak self] in self?.focus(id) }
             )
-            if let previous = waitingAlerts[id] { alerts?.dismiss(alertID: previous) }
-            waitingAlerts[id] = alert.id
+            trackWaitingAlert(alert, of: id)
             postClaudeAlert(alert)
         case "Stop":
             upsert(id, cwd: cwd) { session in
@@ -629,8 +642,7 @@ final class ClaudeCodeMonitor {
                 }
                 alert.buttons = buttons
                 // Retirée si tu réponds directement dans Claude.
-                if let previous = waitingAlerts[id] { alerts?.dismiss(alertID: previous) }
-                waitingAlerts[id] = alert.id
+                trackWaitingAlert(alert, of: id)
             }
             postClaudeAlert(alert)
         }
@@ -709,4 +721,3 @@ final class ClaudeCodeMonitor {
         if kept.count != sessions.count { sessions = kept }
     }
 }
-

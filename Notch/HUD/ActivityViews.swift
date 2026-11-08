@@ -54,9 +54,10 @@ struct ActivityBubble: View {
             ClaudeMascot(mood: .waiting)
                 .frame(width: 19)
         case .privacy:
-            Image(systemName: meeting.isMuted ? "mic.slash.fill" : privacy.isCameraInUse ? "video.fill" : "mic.fill")
+            let indicator = PrivacyIndicator(privacy: privacy, meeting: meeting)
+            Image(systemName: indicator.symbol)
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(meeting.isMuted ? .red : privacy.isCameraInUse ? .green : .orange)
+                .foregroundStyle(indicator.color)
         case .download:
             ZStack {
                 ProgressRing(fraction: downloads.fraction, tint: .blue)
