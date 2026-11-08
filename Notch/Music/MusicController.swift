@@ -43,6 +43,9 @@ final class MusicController {
     @ObservationIgnored private let nowPlaying = NowPlayingAdapter()
     /// Pochette reçue du « À l'écoute », pour ne la redécoder que si elle change.
     @ObservationIgnored private var artworkData: Data?
+    /// Dernière pochette du « À l'écoute » pour Musique ou Spotify, avec le titre du morceau :
+    /// les titres Apple Music en streaming n'ont pas de pochette par AppleScript.
+    @ObservationIgnored private var appArtwork: (title: String, data: Data)?
     private var basePosition: Double = 0
     private var baseDate = Date()
 
@@ -234,6 +237,9 @@ final class MusicController {
     /// Mise à jour du « À l'écoute » de macOS. Musique et Spotify ont leur propre suivi
     /// (plus complet) : seuls les autres lecteurs sont pris ici.
     private func handleExternal(_ info: NowPlayingAdapter.Info?) {
+        if let info, [Source.music.rawValue, Source.spotify.rawValue].contains(info.bundleID) {
+            useAppArtwork(from: info)
+        }
         guard let info, ![Source.music.rawValue, Source.spotify.rawValue].contains(info.bundleID) else {
             // Plus rien, ou Musique / Spotify reprend la main.
             if externalPlayer != nil {
@@ -286,7 +292,13 @@ final class MusicController {
                     "tell application id \"com.apple.Music\" to get raw data of artwork 1 of current track"
                 )?.data
                 guard self.track == expected else { return }
-                self.applyArtwork(data.flatMap(NSImage.init(data:)))
+                if let image = data.flatMap(NSImage.init(data:)) {
+                    self.applyArtwork(image)
+                } else if let fallback = self.appArtwork, fallback.title == expected?.title {
+                    self.applyArtwork(NSImage(data: fallback.data))
+                } else {
+                    self.applyArtwork(nil)
+                }
 
             case .spotify:
                 guard let urlString = await AppleScriptRunner.run(
@@ -300,6 +312,14 @@ final class MusicController {
                 self.applyArtwork(data.flatMap(NSImage.init(data:)))
             }
         }
+    }
+
+    /// Pochette du « À l'écoute » pour Musique / Spotify, quand l'app n'en donne pas elle-même.
+    private func useAppArtwork(from info: NowPlayingAdapter.Info) {
+        guard let data = info.artwork else { return }
+        appArtwork = (info.title, data)
+        guard source?.rawValue == info.bundleID, track?.title == info.title, artwork == nil else { return }
+        applyArtwork(NSImage(data: data))
     }
 
     private func applyArtwork(_ image: NSImage?) {
