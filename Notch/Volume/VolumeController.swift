@@ -21,21 +21,10 @@ final class VolumeController {
     /// Changement venant de notre propre réglage : pas d'indicateur par-dessus le curseur.
     @ObservationIgnored private var isSettingVolume = false
 
-    @ObservationIgnored private var volumeAddress = AudioObjectPropertyAddress(
-        mSelector: kAudioHardwareServiceDeviceProperty_VirtualMainVolume,
-        mScope: kAudioDevicePropertyScopeOutput,
-        mElement: kAudioObjectPropertyElementMain
-    )
-    @ObservationIgnored private var muteAddress = AudioObjectPropertyAddress(
-        mSelector: kAudioDevicePropertyMute,
-        mScope: kAudioDevicePropertyScopeOutput,
-        mElement: kAudioObjectPropertyElementMain
-    )
-    @ObservationIgnored private var defaultDeviceAddress = AudioObjectPropertyAddress(
-        mSelector: kAudioHardwarePropertyDefaultOutputDevice,
-        mScope: kAudioObjectPropertyScopeGlobal,
-        mElement: kAudioObjectPropertyElementMain
-    )
+    private static let volumeSelector = kAudioHardwareServiceDeviceProperty_VirtualMainVolume
+    @ObservationIgnored private var volumeAddress = AudioHardware.address(volumeSelector, .output)
+    @ObservationIgnored private var muteAddress = AudioHardware.address(kAudioDevicePropertyMute, .output)
+    @ObservationIgnored private var defaultDeviceAddress = AudioHardware.address(kAudioHardwarePropertyDefaultOutputDevice)
 
     @ObservationIgnored private var listener: AudioObjectPropertyListenerBlock?
     @ObservationIgnored private var deviceListener: AudioObjectPropertyListenerBlock?
@@ -49,9 +38,7 @@ final class VolumeController {
             MainActor.assumeIsolated { self?.attachToDefaultDevice() }
         }
         self.deviceListener = deviceListener
-        AudioObjectAddPropertyListenerBlock(
-            AudioObjectID(kAudioObjectSystemObject), &defaultDeviceAddress, .main, deviceListener
-        )
+        AudioObjectAddPropertyListenerBlock(AudioHardware.system, &defaultDeviceAddress, .main, deviceListener)
         attachToDefaultDevice()
     }
 
@@ -69,9 +56,9 @@ final class VolumeController {
 
     func setVolume(_ value: Float) {
         guard isAdjustable else { return }
-        var newValue = min(max(value, 0), 1)
+        let newValue = min(max(value, 0), 1)
         isSettingVolume = true
-        AudioObjectSetPropertyData(device, &volumeAddress, 0, nil, UInt32(MemoryLayout<Float32>.size), &newValue)
+        AudioHardware.set(Float32(newValue), Self.volumeSelector, .output, on: device)
         if isMuted, newValue > 0 { setMuted(false) }
         volume = newValue
         isSettingVolume = false
@@ -148,9 +135,8 @@ final class VolumeController {
     }
 
     private func setMuted(_ muted: Bool) {
-        var value: UInt32 = muted ? 1 : 0
         isSettingVolume = true
-        AudioObjectSetPropertyData(device, &muteAddress, 0, nil, UInt32(MemoryLayout<UInt32>.size), &value)
+        AudioHardware.set(UInt32(muted ? 1 : 0), kAudioDevicePropertyMute, .output, on: device)
         isMuted = muted
         isSettingVolume = false
     }
@@ -163,12 +149,7 @@ final class VolumeController {
             AudioObjectRemovePropertyListenerBlock(device, &muteAddress, .main, listener)
         }
 
-        var newDevice = AudioObjectID(kAudioObjectUnknown)
-        var size = UInt32(MemoryLayout<AudioObjectID>.size)
-        AudioObjectGetPropertyData(
-            AudioObjectID(kAudioObjectSystemObject), &defaultDeviceAddress, 0, nil, &size, &newDevice
-        )
-        device = newDevice
+        device = AudioHardware.defaultDevice(.output) ?? AudioObjectID(kAudioObjectUnknown)
         guard device != kAudioObjectUnknown else {
             isAdjustable = false
             return
@@ -183,23 +164,9 @@ final class VolumeController {
     }
 
     private func readState(showHUD: Bool) {
-        var settable: DarwinBoolean = false
-        isAdjustable =
-            AudioObjectHasProperty(device, &volumeAddress)
-            && AudioObjectIsPropertySettable(device, &volumeAddress, &settable) == noErr
-            && settable.boolValue
-
-        var newVolume: Float32 = 0
-        var size = UInt32(MemoryLayout<Float32>.size)
-        if AudioObjectGetPropertyData(device, &volumeAddress, 0, nil, &size, &newVolume) != noErr {
-            newVolume = 0
-        }
-
-        var muted: UInt32 = 0
-        size = UInt32(MemoryLayout<UInt32>.size)
-        if AudioObjectHasProperty(device, &muteAddress) {
-            AudioObjectGetPropertyData(device, &muteAddress, 0, nil, &size, &muted)
-        }
+        isAdjustable = AudioHardware.isSettable(Self.volumeSelector, .output, on: device)
+        let newVolume: Float32 = AudioHardware.get(Self.volumeSelector, .output, on: device) ?? 0
+        let muted: UInt32 = AudioHardware.get(kAudioDevicePropertyMute, .output, on: device) ?? 0
 
         let changed = abs(newVolume - volume) > 0.001 || (muted != 0) != isMuted
         volume = newVolume

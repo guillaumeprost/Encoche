@@ -48,7 +48,7 @@ final class MeetingController {
     /// Coupe ou réactive le micro par défaut du Mac (toutes les apps l'entendent).
     func toggleMute() {
         let target = !isMuted
-        guard let device = Self.defaultInputDevice() else { return }
+        guard let device = AudioHardware.defaultDevice(.input) else { return }
         if Self.setMute(target, on: device) {
             isMuted = target
             return
@@ -168,58 +168,24 @@ final class MeetingController {
 
     // MARK: - CoreAudio
 
-    private static func defaultInputDevice() -> AudioDeviceID? {
-        var address = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDefaultInputDevice,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-        var device = AudioDeviceID(0)
-        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
-        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &device) == noErr,
-            device != 0
-        else { return nil }
-        return device
-    }
-
-    private static func inputAddress(_ selector: AudioObjectPropertySelector) -> AudioObjectPropertyAddress {
-        AudioObjectPropertyAddress(mSelector: selector, mScope: kAudioDevicePropertyScopeInput, mElement: kAudioObjectPropertyElementMain)
-    }
-
     private static func inputMuted() -> Bool? {
-        guard let device = defaultInputDevice() else { return nil }
-        var address = inputAddress(kAudioDevicePropertyMute)
-        guard AudioObjectHasProperty(device, &address) else { return nil }
-        var value = UInt32(0)
-        var size = UInt32(MemoryLayout<UInt32>.size)
-        guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, &value) == noErr else { return nil }
-        return value != 0
+        guard let device = AudioHardware.defaultDevice(.input),
+            let muted: UInt32 = AudioHardware.get(kAudioDevicePropertyMute, .input, on: device)
+        else { return nil }
+        return muted != 0
     }
 
     private static func setMute(_ muted: Bool, on device: AudioDeviceID) -> Bool {
-        var address = inputAddress(kAudioDevicePropertyMute)
-        var settable = DarwinBoolean(false)
-        guard AudioObjectHasProperty(device, &address),
-            AudioObjectIsPropertySettable(device, &address, &settable) == noErr, settable.boolValue
-        else { return false }
-        var value = UInt32(muted ? 1 : 0)
-        return AudioObjectSetPropertyData(device, &address, 0, nil, UInt32(MemoryLayout<UInt32>.size), &value) == noErr
+        AudioHardware.isSettable(kAudioDevicePropertyMute, .input, on: device)
+            && AudioHardware.set(UInt32(muted ? 1 : 0), kAudioDevicePropertyMute, .input, on: device)
     }
 
     private static func inputVolume(of device: AudioDeviceID) -> Float32? {
-        var address = inputAddress(kAudioDevicePropertyVolumeScalar)
-        guard AudioObjectHasProperty(device, &address) else { return nil }
-        var value = Float32(0)
-        var size = UInt32(MemoryLayout<Float32>.size)
-        guard AudioObjectGetPropertyData(device, &address, 0, nil, &size, &value) == noErr else { return nil }
-        return value
+        AudioHardware.get(kAudioDevicePropertyVolumeScalar, .input, on: device)
     }
 
     private static func setInputVolume(_ volume: Float32, on device: AudioDeviceID) -> Bool {
-        var address = inputAddress(kAudioDevicePropertyVolumeScalar)
-        guard AudioObjectHasProperty(device, &address) else { return false }
-        var value = volume
-        return AudioObjectSetPropertyData(device, &address, 0, nil, UInt32(MemoryLayout<Float32>.size), &value) == noErr
+        AudioHardware.set(volume, kAudioDevicePropertyVolumeScalar, .input, on: device)
     }
 }
 

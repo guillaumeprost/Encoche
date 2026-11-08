@@ -66,39 +66,10 @@ final class PrivacyMonitor {
     // MARK: - Micro (CoreAudio)
 
     private static func microphoneInUse() -> Bool {
-        var address = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDevices,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-        var size: UInt32 = 0
-        guard AudioObjectGetPropertyDataSize(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size) == noErr else {
-            return false
-        }
-        var devices = [AudioObjectID](repeating: 0, count: Int(size) / MemoryLayout<AudioObjectID>.size)
-        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &devices) == noErr else {
-            return false
-        }
-
-        return devices.contains { device in
-            // Seulement les appareils d'entrée (micros).
-            var streams = AudioObjectPropertyAddress(
-                mSelector: kAudioDevicePropertyStreams,
-                mScope: kAudioDevicePropertyScopeInput,
-                mElement: kAudioObjectPropertyElementMain
-            )
-            var streamsSize: UInt32 = 0
-            guard AudioObjectGetPropertyDataSize(device, &streams, 0, nil, &streamsSize) == noErr, streamsSize > 0 else {
-                return false
-            }
-            var running = AudioObjectPropertyAddress(
-                mSelector: kAudioDevicePropertyDeviceIsRunningSomewhere,
-                mScope: kAudioObjectPropertyScopeGlobal,
-                mElement: kAudioObjectPropertyElementMain
-            )
-            var value: UInt32 = 0
-            var valueSize = UInt32(MemoryLayout<UInt32>.size)
-            return AudioObjectGetPropertyData(device, &running, 0, nil, &valueSize, &value) == noErr && value != 0
+        // Seulement les appareils d'entrée (micros).
+        AudioHardware.devices().contains { device in
+            AudioHardware.hasInput(device)
+                && AudioHardware.get(kAudioDevicePropertyDeviceIsRunningSomewhere, on: device) ?? UInt32(0) != 0
         }
     }
 }
