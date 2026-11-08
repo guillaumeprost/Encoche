@@ -17,15 +17,6 @@ final class LockScreenController {
     @ObservationIgnored private var windows: [NSWindow] = []
     @ObservationIgnored private var hideTask: Task<Void, Never>?
 
-    /// Lecteur de musique, en bas au-dessus de la photo de profil.
-    static let musicCardSize = CGSize(width: 420, height: 124)
-    /// Zone des cartes d'activité, sous l'horloge.
-    static let activitiesSize = CGSize(width: 420, height: 380)
-    /// Part du haut de l'écran prise par la date et l'horloge de l'écran verrouillé.
-    static let clockFraction: CGFloat = 0.31
-    /// Part du bas de l'écran prise par la photo de profil, le nom et le mot de passe.
-    static let loginFraction: CGFloat = 0.21
-
     init(services: AppServices) {
         self.services = services
         let center = DistributedNotificationCenter.default()
@@ -67,52 +58,23 @@ final class LockScreenController {
         }
     }
 
-    /// Écran de l'encoche : celui du Mac quand il est ouvert (sa vraie encoche), sinon l'écran principal.
-    static func lockScreen() -> NSScreen? {
-        NSScreen.screens.first(where: \.hasNotch) ?? NSScreen.screens.first
-    }
-
     private func showWindows() {
         closeWindows()
-        guard let space = LockScreenSpace.shared, let screen = Self.lockScreen() else { return }
+        guard let space = LockScreenSpace.shared,
+            let screen = ScreenLayout.lockScreen(among: NSScreen.screens, hasNotch: \.hasNotch)
+        else { return }
         notchSize = screen.notchSize
         phase = .locked
 
-        let notchWindow = makeWindow(
-            frame: NSRect(
-                x: screen.frame.midX - LockNotchView.width(for: notchSize) / 2,
-                y: screen.frame.maxY - notchSize.height,
-                width: LockNotchView.width(for: notchSize),
-                height: notchSize.height
-            ),
-            content: LockNotchView(),
-            clickable: false
-        )
-        windows.append(notchWindow)
-
-        // Activités empilées sous l'horloge (comme sur iPhone), mises à jour en direct.
-        let size = Self.activitiesSize
-        let top = screen.frame.maxY - screen.frame.height * Self.clockFraction
-        let activitiesWindow = makeWindow(
-            frame: NSRect(
-                x: screen.frame.midX - size.width / 2, y: top - size.height,
-                width: size.width, height: size.height),
-            content: LockActivitiesView(),
-            clickable: true
-        )
-        windows.append(activitiesWindow)
-
-        // Lecteur en bas, juste au-dessus de la photo de profil.
-        let music = Self.musicCardSize
-        let musicWindow = makeWindow(
-            frame: NSRect(
-                x: screen.frame.midX - music.width / 2,
-                y: screen.frame.minY + screen.frame.height * Self.loginFraction,
-                width: music.width, height: music.height),
-            content: LockMusicArea(),
-            clickable: true
-        )
-        windows.append(musicWindow)
+        let frames = ScreenLayout.lockFrames(
+            screen: screen.frame, notchWidth: LockNotchView.width(for: notchSize), notchHeight: notchSize.height)
+        windows = [
+            makeWindow(frame: frames.notch, content: LockNotchView(), clickable: false),
+            // Activités empilées sous l'horloge (comme sur iPhone), mises à jour en direct.
+            makeWindow(frame: frames.activities, content: LockActivitiesView(), clickable: true),
+            // Lecteur en bas, juste au-dessus de la photo de profil.
+            makeWindow(frame: frames.music, content: LockMusicArea(), clickable: true),
+        ]
         windows.forEach(space.add)
     }
 

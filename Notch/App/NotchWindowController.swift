@@ -99,13 +99,7 @@ final class NotchWindowController {
         viewModel.notchSize = screen.notchSize
         viewModel.hasPhysicalNotch = screen.hasNotch
 
-        let size = Self.panelSize
-        panel.setFrame(
-            NSRect(
-                x: screen.frame.midX - size.width / 2, y: screen.frame.maxY - size.height,
-                width: size.width, height: size.height),
-            display: true
-        )
+        panel.setFrame(ScreenLayout.topCenter(Self.panelSize, in: screen.frame), display: true)
     }
 
     // MARK: - Survol

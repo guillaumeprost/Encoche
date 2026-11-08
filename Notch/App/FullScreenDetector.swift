@@ -61,15 +61,11 @@ final class FullScreenDetector {
             return bounds
         }
 
-        var result = Set<CGDirectDisplayID>()
+        var screens: [CGDirectDisplayID: CGRect] = [:]
         for screen in NSScreen.screens {
-            guard let id = screen.displayID else { continue }
-            let frame = screen.quartzFrame
-            if covering.contains(where: { $0.insetBy(dx: -1, dy: -1).contains(frame) }) {
-                result.insert(id)
-            }
+            if let id = screen.displayID { screens[id] = screen.quartzFrame }
         }
-        return result
+        return ScreenLayout.coveredDisplays(screens: screens, windows: covering)
     }
 }
 
@@ -81,7 +77,6 @@ extension NSScreen {
     /// Cadre de l'écran en coordonnées Quartz (origine en haut à gauche de l'écran principal),
     /// celles qu'utilise CGWindowList.
     var quartzFrame: CGRect {
-        let primaryHeight = NSScreen.screens.first?.frame.height ?? frame.height
-        return CGRect(x: frame.minX, y: primaryHeight - frame.maxY, width: frame.width, height: frame.height)
+        ScreenLayout.quartzFrame(frame, primaryHeight: NSScreen.screens.first?.frame.height ?? frame.height)
     }
 }

@@ -9,11 +9,9 @@ extension NSScreen {
 
     /// Taille de l'encoche physique, ou d'une encoche simulée à la hauteur de la barre de menus.
     var notchSize: CGSize {
-        if hasNotch, let left = auxiliaryTopLeftArea, let right = auxiliaryTopRightArea {
-            return CGSize(width: frame.width - left.width - right.width, height: safeAreaInsets.top)
-        }
-        let menuBarHeight = frame.maxY - visibleFrame.maxY
-        return CGSize(width: 190, height: menuBarHeight > 0 ? menuBarHeight : 24)
+        ScreenLayout.notchSize(
+            frame: frame, visibleFrame: visibleFrame, safeAreaTop: safeAreaInsets.top,
+            leftArea: auxiliaryTopLeftArea, rightArea: auxiliaryTopRightArea)
     }
 }
 
