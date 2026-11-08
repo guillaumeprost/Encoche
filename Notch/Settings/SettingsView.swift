@@ -67,14 +67,16 @@ struct SettingsView: View {
                     Toggle("Seulement sur l'écran principal", isOn: $settings.notificationsOnPrimaryScreenOnly)
                     PermissionRow(
                         title: "Accès complet au disque",
-                        detail: "Pour lire les notifications des autres apps.",
-                        granted: notifications.access == .granted,
+                        detail: notifications.access == .unavailable
+                            ? "Base des notifications introuvable : Encoche lit les bannières à la place."
+                            : "Pour lire les notifications des autres apps.",
+                        granted: notifications.access != .denied,
                         action: notifications.openPrivacySettings
                     )
                 } header: {
                     Text("Notifications")
                 } footer: {
-                    Text("Les bannières sont masquées seulement si Encoche peut lire les notifications : rien ne se perd.")
+                    Text("Une bannière n'est masquée qu'une fois relayée dans l'encoche : rien ne se perd.")
                 }
 
                 Section {

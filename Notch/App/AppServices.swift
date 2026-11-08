@@ -89,14 +89,13 @@ struct AppServices {
         launchAtLogin = LaunchAtLogin()
         systemNotifications = SystemNotificationWatcher(alerts: alerts, settings: settings)
 
-        // Bannières de macOS fermées tant qu'Encoche les relaie : seulement si le relais marche,
-        // pour ne jamais perdre une notification.
+        // Bannières de macOS fermées tant qu'Encoche les relaie : lues dans la base des
+        // notifications, sinon dans la bannière elle-même (Accessibilité).
         bannerSuppressor = BannerSuppressor()
         let settings = settings
         let watcher = systemNotifications
-        bannerSuppressor.isEnabled = {
-            settings.hideSystemBanners && settings.mirrorSystemNotifications && watcher.access == .granted
-        }
+        bannerSuppressor.isEnabled = { settings.hideSystemBanners && settings.mirrorSystemNotifications }
+        bannerSuppressor.canReadDatabase = { watcher.access == .granted }
         bannerSuppressor.beforeClosing = { watcher.pollNow() }
         let callMonitor = calls
         bannerSuppressor.onCallAlerts = { callMonitor.update($0) }

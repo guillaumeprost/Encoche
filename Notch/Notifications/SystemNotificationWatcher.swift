@@ -11,7 +11,12 @@ import SQLite3
 @Observable
 @MainActor
 final class SystemNotificationWatcher {
-    enum Access { case granted, denied }
+    enum Access {
+        case granted, denied
+        /// Pas de base des notifications (macOS l'a déplacée ou supprimée) : les bannières
+        /// sont lues directement (Accessibilité).
+        case unavailable
+    }
 
     private static let databaseURL = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Group Containers/group.com.apple.usernoted/db2/db")
@@ -62,7 +67,7 @@ final class SystemNotificationWatcher {
             let latest = Self.latestDate(handle)
         else {
             sqlite3_close(handle)
-            access = .denied
+            access = FileManager.default.fileExists(atPath: Self.databaseURL.path) ? .denied : .unavailable
             return
         }
         db = handle

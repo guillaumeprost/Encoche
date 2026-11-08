@@ -23,8 +23,11 @@ final class BannerSuppressor {
     /// Filet de sécurité : la bannière est fermée avant que la notification n'ait été lue
     /// dans la base. On transmet ce qu'elle affiche (app, titre, texte).
     var onUnreadBanner: ((_ app: String, _ title: String, _ body: String?) -> Void)?
-    /// Faut-il fermer les bannières maintenant ? (relais actif et accès accordé)
+    /// Faut-il fermer les bannières maintenant ? (relais actif)
     var isEnabled: () -> Bool = { false }
+    /// La base des notifications est lisible. Sinon, seules les bannières dont on lit le
+    /// contenu sont fermées (elles sont relayées par `onUnreadBanner`).
+    var canReadDatabase: () -> Bool = { false }
     /// Alertes d'appel affichées (appel de l'iPhone sur le Mac), à chaque passage, même vide :
     /// elles ne sont jamais fermées (ce serait refuser l'appel).
     var onCallAlerts: (([CallAlert]) -> Void)?
@@ -107,10 +110,16 @@ final class BannerSuppressor {
 
         guard isEnabled(), !banners.isEmpty else { return }
         beforeClosing?()
+        let fromDatabase = canReadDatabase()
         for banner in banners {
             guard let action = closeAction(of: banner) else { continue }
             let content = content(of: banner)
-            if let title = content.title { onUnreadBanner?(content.app, title, content.body) }
+            if let title = content.title {
+                onUnreadBanner?(content.app, title, content.body)
+            } else if !fromDatabase {
+                // Contenu illisible et pas de base : on laisse la bannière, pour ne rien perdre.
+                continue
+            }
             AXUIElementPerformAction(banner, action as CFString)
         }
     }
