@@ -40,9 +40,14 @@ final class SystemNotificationWatcher {
     private var timer: Timer?
     private var appNames: [String: String] = [:]
 
-    init(alerts: AlertCenter, settings: AppSettings) {
+    /// La Concentration fait taire les notifications : elles vont seulement dans l'historique.
+    /// Celles qu'elle laisse passer s'affichent en bannière et sont montrées par le relais des bannières.
+    private let isSilenced: () -> Bool
+
+    init(alerts: AlertCenter, settings: AppSettings, isSilenced: @escaping () -> Bool = { false }) {
         self.alerts = alerts
         self.settings = settings
+        self.isSilenced = isSilenced
 
         connect()
         if access == .denied { showOnboardingOnce() }
@@ -122,7 +127,10 @@ final class SystemNotificationWatcher {
             lastDate = max(lastDate, date)
             // Notification antérieure au lancement (simple mise à jour d'une ancienne) : on l'ignore.
             guard let data = Self.blob(statement, column: 1), date >= startDate else { continue }
-            if let alert = makeAlert(from: data) { alerts.post(alert) }
+            // Déjà relayée depuis sa bannière (lue avant d'arriver dans la base) : pas de doublon.
+            guard let alert = makeAlert(from: data), !alerts.hasRecent(title: alert.title, body: alert.body)
+            else { continue }
+            alerts.post(alert, silently: isSilenced())
         }
     }
 

@@ -87,7 +87,10 @@ struct AppServices {
         claudeUsage = ClaudeUsage()
         claudeQuota = ClaudeQuota()
         launchAtLogin = LaunchAtLogin()
-        systemNotifications = SystemNotificationWatcher(alerts: alerts, settings: settings)
+        let focusMonitor = focus
+        systemNotifications = SystemNotificationWatcher(alerts: alerts, settings: settings) {
+            focusMonitor.activeMode != nil
+        }
 
         // Bannières de macOS fermées tant qu'Encoche les relaie : lues dans la base des
         // notifications, sinon dans la bannière elle-même (Accessibilité).
@@ -103,6 +106,8 @@ struct AppServices {
         // fermée seulement si la base l'a relayée, pour ne rien perdre.
         bannerSuppressor.relay = { appName, title, body in
             guard let title else { return watcher.access == .granted }
+            // macOS l'affiche malgré la Concentration : elle s'affiche aussi dans l'encoche.
+            if alertCenter.presentSilenced(title: title) { return true }
             guard !alertCenter.hasRecent(title: title) else { return true }
             let bundleID = AppDirectory.bundleID(forName: appName)
             alertCenter.post(

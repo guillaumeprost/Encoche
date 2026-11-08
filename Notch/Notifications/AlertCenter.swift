@@ -91,7 +91,11 @@ final class AlertCenter {
         if let current, isDuplicate(current) { dismiss() }
     }
 
-    func post(_ alert: NotchAlert) {
+    /// Notifications tues (mode Concentration) : rangées dans l'historique sans s'afficher.
+    private var silencedIDs: Set<UUID> = []
+
+    /// `silently` : seulement dans l'historique, comme une notification que la Concentration fait taire.
+    func post(_ alert: NotchAlert, silently: Bool = false) {
         if case .app(let bundleID) = alert.icon, let until = mutedApps[bundleID], until > Date() { return }
         // Les demandes qui attendent une réponse n'ont pas leur place dans l'historique.
         if !alert.isPersistent {
@@ -100,8 +104,27 @@ final class AlertCenter {
             unreadCount += 1
             saveHistory()
         }
+        guard !silently || alert.isPersistent else {
+            silencedIDs.insert(alert.id)
+            return
+        }
         queue.append(alert)
         if current == nil { showNext() }
+    }
+
+    /// Une notification tue s'affiche quand même en bannière (app autorisée pendant la
+    /// Concentration, notification urgente) : on l'affiche aussi dans l'encoche.
+    /// `false` s'il n'y en a pas avec ce titre il y a moins de `seconds` secondes.
+    func presentSilenced(title: String, within seconds: TimeInterval = 10) -> Bool {
+        guard
+            let alert = history.first(where: {
+                silencedIDs.contains($0.id) && $0.title == title && Date().timeIntervalSince($0.date) < seconds
+            })
+        else { return false }
+        silencedIDs.remove(alert.id)
+        queue.append(alert)
+        if current == nil { showNext() }
+        return true
     }
 
     func setHovering(_ hovering: Bool, from source: ObjectIdentifier) {
@@ -120,6 +143,11 @@ final class AlertCenter {
     /// Une notification avec ce titre est-elle arrivée il y a moins de `seconds` secondes ?
     func hasRecent(title: String, within seconds: TimeInterval = 10) -> Bool {
         history.contains { $0.title == title && Date().timeIntervalSince($0.date) < seconds }
+    }
+
+    /// Même question, avec le même texte.
+    func hasRecent(title: String, body: String?, within seconds: TimeInterval = 10) -> Bool {
+        history.contains { $0.title == title && $0.body == body && Date().timeIntervalSince($0.date) < seconds }
     }
 
     func markAllRead() {

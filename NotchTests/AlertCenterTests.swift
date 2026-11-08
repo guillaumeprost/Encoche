@@ -111,4 +111,37 @@ struct AlertCenterTests {
         #expect(center.history.isEmpty)
         #expect(center.unreadCount == 0)
     }
+
+    @Test func silencedAlertsGoToHistoryOnly() {
+        let center = AlertCenter(historyURL: nil)
+        center.post(alert("Pendant la Concentration"), silently: true)
+        #expect(center.current == nil)
+        #expect(center.history.map(\.title) == ["Pendant la Concentration"])
+        #expect(center.unreadCount == 1)
+    }
+
+    @Test func silencedAlertShownWhenMacOSShowsItsBanner() {
+        let center = AlertCenter(historyURL: nil)
+        center.post(alert("Urgent"), silently: true)
+        #expect(!center.presentSilenced(title: "Autre"))
+        #expect(center.presentSilenced(title: "Urgent"))
+        #expect(center.current?.title == "Urgent")
+        // Une seule fois, et sans doublon dans l'historique.
+        #expect(!center.presentSilenced(title: "Urgent"))
+        #expect(center.history.count == 1)
+    }
+
+    @Test func requestsAreNeverSilenced() {
+        let center = AlertCenter(historyURL: nil)
+        center.post(withButton("Question"), silently: true)
+        #expect(center.current?.title == "Question")
+    }
+
+    @Test func recentAlertsMatchTitleAndText() {
+        let center = AlertCenter(historyURL: nil)
+        center.post(NotchAlert(icon: .symbol("bell.fill", .gray), source: "Messages", title: "Marie", body: "Salut"))
+        #expect(center.hasRecent(title: "Marie", body: "Salut"))
+        #expect(!center.hasRecent(title: "Marie", body: "Tu viens ?"))
+        #expect(!center.hasRecent(title: "Marie", body: nil))
+    }
 }
