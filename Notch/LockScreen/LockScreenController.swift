@@ -61,13 +61,15 @@ final class LockScreenController {
     private func showWindows() {
         closeWindows()
         guard let space = LockScreenSpace.shared,
-            let screen = ScreenLayout.lockScreen(among: NSScreen.screens, hasNotch: \.hasNotch)
+            let screen = ScreenLayout.lockScreen(among: NSScreen.screens, hasNotch: \.hasNotch),
+            let mainScreen = NSScreen.screens.first
         else { return }
         notchSize = screen.notchSize
         phase = .locked
 
         let frames = ScreenLayout.lockFrames(
-            screen: screen.frame, notchWidth: LockNotchView.width(for: notchSize), notchHeight: notchSize.height)
+            notchScreen: screen.frame, mainScreen: mainScreen.frame, notchWidth: LockNotchView.width(for: notchSize),
+            notchHeight: notchSize.height)
         windows = [
             makeWindow(frame: frames.notch, content: LockNotchView(), clickable: false),
             // Activités empilées sous l'horloge (comme sur iPhone), mises à jour en direct.

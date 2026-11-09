@@ -29,8 +29,9 @@ enum ScreenLayout {
         CGRect(x: screen.midX - size.width / 2, y: y, width: size.width, height: size.height)
     }
 
-    /// Écran de l'écran verrouillé : celui du Mac quand il est ouvert (sa vraie encoche),
-    /// sinon l'écran principal (le premier de la liste).
+    /// Écran de l'encoche verrouillée : celui du Mac quand il est ouvert (sa vraie encoche),
+    /// sinon l'écran principal (le premier de la liste). Les activités et le lecteur vont,
+    /// eux, sur l'écran principal, là où macOS affiche l'horloge et la photo de profil.
     static func lockScreen<Screen>(among screens: [Screen], hasNotch: (Screen) -> Bool) -> Screen? {
         screens.first(where: hasNotch) ?? screens.first
     }
@@ -54,14 +55,17 @@ enum ScreenLayout {
     /// Espace gardé entre les activités et le lecteur.
     static let lockSpacing: CGFloat = 12
 
-    static func lockFrames(screen: CGRect, notchWidth: CGFloat, notchHeight: CGFloat) -> LockFrames {
-        let music = centered(lockMusicSize, in: screen, y: screen.minY + screen.height * lockLoginFraction)
+    /// - Parameters:
+    ///   - notchScreen: écran de l'encoche (voir `lockScreen(among:hasNotch:)`).
+    ///   - mainScreen: écran principal, qui porte l'horloge et la photo de profil.
+    static func lockFrames(notchScreen: CGRect, mainScreen: CGRect, notchWidth: CGFloat, notchHeight: CGFloat) -> LockFrames {
+        let music = centered(lockMusicSize, in: mainScreen, y: mainScreen.minY + mainScreen.height * lockLoginFraction)
         // Sous l'horloge, sans descendre sur le lecteur (petits écrans).
-        let clockBottom = screen.maxY - screen.height * lockClockFraction
+        let clockBottom = mainScreen.maxY - mainScreen.height * lockClockFraction
         let height = max(0, min(lockActivitiesSize.height, clockBottom - music.maxY - lockSpacing))
         return LockFrames(
-            notch: topCenter(CGSize(width: notchWidth, height: notchHeight), in: screen),
-            activities: centered(CGSize(width: lockActivitiesSize.width, height: height), in: screen, y: clockBottom - height),
+            notch: topCenter(CGSize(width: notchWidth, height: notchHeight), in: notchScreen),
+            activities: centered(CGSize(width: lockActivitiesSize.width, height: height), in: mainScreen, y: clockBottom - height),
             music: music
         )
     }

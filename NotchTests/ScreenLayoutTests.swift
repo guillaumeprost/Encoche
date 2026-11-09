@@ -45,7 +45,7 @@ struct ScreenLayoutTests {
     }
 
     @Test func lockScreenWindowsAvoidTheClockAndTheLogin() {
-        let frames = ScreenLayout.lockFrames(screen: macBook, notchWidth: 280, notchHeight: 32)
+        let frames = ScreenLayout.lockFrames(notchScreen: macBook, mainScreen: macBook, notchWidth: 280, notchHeight: 32)
         #expect(frames.notch == CGRect(x: 756 - 140, y: 950, width: 280, height: 32))
         // Activités juste sous l'horloge, lecteur juste au-dessus de la photo de profil.
         #expect(frames.activities.maxY == macBook.maxY - macBook.height * ScreenLayout.lockClockFraction)
@@ -58,12 +58,21 @@ struct ScreenLayoutTests {
     }
 
     @Test func lockScreenFollowsASecondScreen() {
-        let frames = ScreenLayout.lockFrames(screen: external, notchWidth: 280, notchHeight: 25)
+        let frames = ScreenLayout.lockFrames(notchScreen: external, mainScreen: external, notchWidth: 280, notchHeight: 25)
         // Grand écran : toute la hauteur prévue pour les activités.
         #expect(frames.activities.height == ScreenLayout.lockActivitiesSize.height)
         for frame in [frames.notch, frames.activities, frames.music] {
             #expect(external.contains(frame))
         }
+    }
+
+    @Test func lockScreenPlayerGoesOnTheMainScreen() {
+        // Écran externe principal, MacBook ouvert à côté : l'encoche reste sur le MacBook,
+        // les activités et le lecteur vont sous l'horloge de l'écran principal.
+        let frames = ScreenLayout.lockFrames(notchScreen: macBook, mainScreen: external, notchWidth: 280, notchHeight: 32)
+        #expect(macBook.contains(frames.notch))
+        #expect(external.contains(frames.activities))
+        #expect(external.contains(frames.music))
     }
 
     @Test func quartzFramesStartAtTheTopOfThePrimaryScreen() {
