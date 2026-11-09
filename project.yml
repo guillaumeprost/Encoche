@@ -51,8 +51,8 @@ targets:
       path: Notch/Info.plist
       properties:
         CFBundleDisplayName: Encoche
-        CFBundleShortVersionString: "1.1.0"
-        CFBundleVersion: "2"
+        CFBundleShortVersionString: "1.1.1"
+        CFBundleVersion: "3"
         LSUIElement: true
         CFBundleDevelopmentRegion: fr
         NSCalendarsFullAccessUsageDescription: "Encoche affiche les événements de tes calendriers dans l'encoche."
