@@ -32,7 +32,28 @@ final class BluetoothMonitor: NSObject {
         )
     }
 
-    @objc private func deviceConnected(_ notification: IOBluetoothUserNotification, device: IOBluetoothDevice) {
+    // IOBluetooth appelle ces méthodes depuis la file de CoreBluetooth, pas toujours depuis
+    // le thread principal : on y revient avant de toucher à l'état (sinon Swift arrête l'app).
+    @objc private nonisolated func deviceConnected(_ notification: IOBluetoothUserNotification, device: IOBluetoothDevice) {
+        nonisolated(unsafe) let device = device
+        onMain { $0.handleConnection(of: device) }
+    }
+
+    @objc private nonisolated func deviceDisconnected(_ notification: IOBluetoothUserNotification, device: IOBluetoothDevice) {
+        nonisolated(unsafe) let notification = notification
+        nonisolated(unsafe) let device = device
+        onMain { $0.handleDisconnection(of: device, notification: notification) }
+    }
+
+    private nonisolated func onMain(_ work: @escaping @MainActor (BluetoothMonitor) -> Void) {
+        if Thread.isMainThread {
+            MainActor.assumeIsolated { work(self) }
+        } else {
+            DispatchQueue.main.async { work(self) }
+        }
+    }
+
+    private func handleConnection(of device: IOBluetoothDevice) {
         guard let address = device.addressString else { return }
         disconnectNotifications[address]?.unregister()
         disconnectNotifications[address] = device.register(
@@ -44,7 +65,7 @@ final class BluetoothMonitor: NSObject {
         Task { await self.loadBattery(address: address) }
     }
 
-    @objc private func deviceDisconnected(_ notification: IOBluetoothUserNotification, device: IOBluetoothDevice) {
+    private func handleDisconnection(of device: IOBluetoothDevice, notification: IOBluetoothUserNotification) {
         notification.unregister()
         if let address = device.addressString { disconnectNotifications[address] = nil }
         announce(device, connected: false)
