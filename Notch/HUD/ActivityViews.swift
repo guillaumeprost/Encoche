@@ -204,6 +204,9 @@ struct CollapsedDownloadView: View {
                         .font(.system(size: 11, weight: .semibold).monospacedDigit())
                         .contentTransition(.numericText())
                         .foregroundStyle(.white)
+                        .padding(.trailing, 4)
+                        .minimumScaleFactor(0.8)
+                        .lineLimit(1)
                 }
             }
             .font(.system(size: 12))
@@ -278,6 +281,10 @@ struct CollapsedMeetingView: View {
                         .font(.system(size: 10.5, weight: .semibold).monospacedDigit())
                         .foregroundStyle(meeting.color)
                         .contentTransition(.numericText())
+                        // Un peu d'air avant le bord arrondi de l'encoche.
+                        .padding(.trailing, 5)
+                        .minimumScaleFactor(0.8)
+                        .lineLimit(1)
                 }
             }
             .help("\(meeting.title) à \(meeting.start.formatted(date: .omitted, time: .shortened))")
