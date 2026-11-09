@@ -132,21 +132,47 @@ final class BannerSuppressor {
         return children.flatMap { findBanners(in: $0, depth: depth + 1) }
     }
 
-    /// App (début de la description, « Mail, … »), titre et texte affichés par la bannière.
-    private func content(of banner: AXUIElement) -> (app: String, title: String?, body: String?) {
-        let description = attribute(banner, kAXDescriptionAttribute) as? String ?? ""
-        let app = description.components(separatedBy: ", ").first ?? ""
-        var title: String?
-        var body: String?
-        for child in attribute(banner, kAXChildrenAttribute) as? [AXUIElement] ?? [] {
-            let value = attribute(child, kAXValueAttribute) as? String
-            switch attribute(child, kAXIdentifierAttribute) as? String {
-            case "title": title = value
-            case "body": body = value
-            default: break
+    /// App, titre et texte affichés par la bannière.
+    private func content(of banner: AXUIElement) -> Content {
+        let texts = (attribute(banner, kAXChildrenAttribute) as? [AXUIElement] ?? []).compactMap { child in
+            (attribute(child, kAXValueAttribute) as? String).map {
+                (id: attribute(child, kAXIdentifierAttribute) as? String, value: $0)
             }
         }
-        return (app, title, body)
+        return Self.parse(description: attribute(banner, kAXDescriptionAttribute) as? String ?? "", texts: texts)
+    }
+
+    struct Content: Equatable {
+        let app: String
+        let title: String?
+        let body: String?
+    }
+
+    /// Préfixe des notifications résumées par Apple Intelligence (« Résumé : Mail »).
+    private nonisolated static let summaryPrefixes = ["Résumé", "Summary", "Zusammenfassung", "Resumen", "Riepilogo"]
+
+    /// Lit une bannière : sa description (« Mail, titre, texte ») et ses textes (`title`, `body`).
+    /// Une notification résumée n'a pas toujours de texte `body` : le résumé est alors pris
+    /// dans les autres textes, ou à la fin de la description.
+    nonisolated static func parse(description: String, texts: [(id: String?, value: String)]) -> Content {
+        let parts = description.replacingOccurrences(of: "\u{00A0}", with: " ").components(separatedBy: ", ")
+        var app = parts.first ?? ""
+        for prefix in summaryPrefixes where app.hasPrefix(prefix) {
+            if let colon = app.firstIndex(of: ":") {
+                app = app[app.index(after: colon)...].trimmingCharacters(in: .whitespaces)
+            }
+        }
+        let title = texts.first { $0.id == "title" }?.value
+        var body = texts.first { $0.id == "body" }?.value
+        if body == nil {
+            let others = texts.filter { $0.id != "title" && !$0.value.isEmpty && $0.value != title }.map(\.value)
+            if !others.isEmpty {
+                body = others.joined(separator: "\n")
+            } else if let title, let index = parts.firstIndex(of: title), index + 1 < parts.count {
+                body = parts[(index + 1)...].joined(separator: ", ")
+            }
+        }
+        return Content(app: app, title: title, body: body)
     }
 
     /// Alerte d'appel : elle porte un bouton Accepter ou Refuser.
