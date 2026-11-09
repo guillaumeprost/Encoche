@@ -222,7 +222,6 @@ private struct MeetingButton: View {
     let filled: Bool
     let help: String
     let action: () -> Void
-    @State private var hovering = false
 
     var body: some View {
         Button(action: action) {
@@ -230,11 +229,10 @@ private struct MeetingButton: View {
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(filled ? Color.white : tint)
                 .frame(width: 26, height: 22)
-                .background(Capsule().fill(filled ? tint.opacity(hovering ? 1 : 0.85) : .primary.opacity(hovering ? 0.14 : 0.06)))
+                .glassButton(in: Capsule(), tint: filled ? tint : nil)
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
         .help(help)
     }
 }

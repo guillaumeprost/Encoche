@@ -88,7 +88,6 @@ struct AlertBannerView: View {
 private struct AlertButtonView: View {
     let button: NotchAlert.Button
     let action: () -> Void
-    @State private var hovering = false
 
     var body: some View {
         Button(action: action) {
@@ -97,16 +96,10 @@ private struct AlertButtonView: View {
                 .foregroundStyle(button.role == .destructive ? Color.red : button.role == .primary ? Color.white : Color.primary)
                 .padding(.horizontal, 12)
                 .frame(height: 26)
-                .background {
-                    if button.role == .primary {
-                        Capsule().fill(Color.claude.opacity(hovering ? 1 : 0.85))
-                    }
-                }
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .glassEffect(.regular.tint(.primary.opacity(hovering ? 0.12 : 0.04)).interactive(), in: Capsule())
-        .onHover { hovering = $0 }
+        .glassButton(in: Capsule(), tint: button.role == .primary ? .claude : nil)
     }
 }
 

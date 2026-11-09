@@ -73,7 +73,7 @@ struct SessionChips: View {
                     .padding(.horizontal, 10)
                     .frame(maxWidth: .infinity)
                     .frame(height: 26)
-                    .background(Capsule().fill(.primary.opacity(isSelected ? 0.16 : 0.06)))
+                    .glassButton(in: Capsule(), tint: isSelected ? .primary.opacity(0.12) : nil)
                     .foregroundStyle(.primary.opacity(isSelected ? 1 : 0.6))
                     .contentShape(Capsule())
                 }
@@ -196,7 +196,7 @@ private struct SessionDetail: View {
                 .foregroundStyle(filled ? .white : color)
                 .padding(.horizontal, 11)
                 .frame(height: 24)
-                .background(Capsule().fill(filled ? color : .primary.opacity(0.08)))
+                .glassButton(in: Capsule(), tint: filled ? color : nil)
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)

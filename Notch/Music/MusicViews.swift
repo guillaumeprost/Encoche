@@ -84,7 +84,7 @@ private struct ControlButton: View {
             Image(systemName: symbol)
                 .font(.system(size: size, weight: .semibold))
                 .frame(width: 34, height: 30)
-                .background(Circle().fill(.primary.opacity(hovering ? 0.12 : 0)))
+                .glassButton(in: Circle(), isShown: hovering)
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
@@ -487,7 +487,7 @@ private struct MiniButton: View {
                 .font(.system(size: 10.5, weight: .bold))
                 .contentTransition(.symbolEffect(.replace))
                 .frame(width: 22, height: 22)
-                .background(Circle().fill(.primary.opacity(hovering ? 0.14 : 0)))
+                .glassButton(in: Circle(), isShown: hovering)
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)

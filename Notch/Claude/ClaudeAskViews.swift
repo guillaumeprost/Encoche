@@ -99,7 +99,7 @@ struct AskPanel: View {
                             .font(.system(size: 10, weight: .medium))
                             .padding(.horizontal, 7)
                             .frame(height: 18)
-                            .background(Capsule().fill(.primary.opacity(0.1)))
+                            .glassButton(in: Capsule())
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.secondary)

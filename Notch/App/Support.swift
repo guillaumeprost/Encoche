@@ -71,4 +71,15 @@ extension View {
     func plainMenu() -> some View {
         menuStyle(.button).buttonStyle(.plain).menuIndicator(.hidden).fixedSize()
     }
+
+    /// Fond Liquid Glass d'un bouton, qui réagit au survol et au clic. Teinté pour une action
+    /// principale ; `isShown` à `false` pour un bouton discret qui n'en a qu'au survol.
+    @ViewBuilder
+    func glassButton(in shape: some Shape, tint: Color? = nil, isShown: Bool = true) -> some View {
+        if isShown {
+            glassEffect(.regular.tint(tint).interactive(), in: shape)
+        } else {
+            self
+        }
+    }
 }

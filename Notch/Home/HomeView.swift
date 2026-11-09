@@ -54,7 +54,6 @@ private struct HomeTile: View {
     let shortcut: HomeShortcuts.Shortcut
     let state: HomeShortcuts.RunState?
     let action: () -> Void
-    @State private var hovering = false
 
     var body: some View {
         let style = shortcut.style
@@ -74,14 +73,10 @@ private struct HomeTile: View {
             }
             .padding(.horizontal, 9)
             .frame(height: 48)
-            .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(.primary.opacity(hovering ? 0.16 : 0.09))
-            )
+            .glassButton(in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
-        .onHover { hovering = $0 }
         .help("Lancer « \(shortcut.name) »")
         .animation(.snappy(duration: 0.2), value: state)
     }

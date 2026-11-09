@@ -263,7 +263,7 @@ private struct DayHeader: View {
                         .font(.system(size: 11, weight: .semibold))
                         .padding(.horizontal, 10)
                         .frame(height: 22)
-                        .background(Capsule().fill(.primary.opacity(0.1)))
+                        .glassButton(in: Capsule())
                         .contentShape(Capsule())
                 }
                 .buttonStyle(.plain)
