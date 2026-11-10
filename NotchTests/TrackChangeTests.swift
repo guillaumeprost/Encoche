@@ -47,3 +47,28 @@ struct ActivityTabTests {
         #expect(LiveActivity.timer.tab == .home)
     }
 }
+
+@MainActor
+struct KaraokeLayoutTests {
+    @Test func karaokeAddsALineUnderTheActivity() {
+        let vm = NotchViewModel()
+        let activity = vm.shapeSize(showsActivity: true, tab: .home)
+        vm.showsKaraoke = true
+        let karaoke = vm.shapeSize(showsActivity: true, tab: .home)
+        #expect(abs(karaoke.height - activity.height - NotchViewModel.karaokeHeight) < 0.01)
+        #expect(karaoke.width > activity.width)
+        // Une notification passe devant.
+        vm.showsAlert = true
+        #expect(vm.shapeSize(showsActivity: true, tab: .home).height != karaoke.height)
+    }
+}
+
+struct KaraokeLyricsTests {
+    @Test func sameSongIgnoresDurationAndAlbum() {
+        let a = MusicController.Track(title: "Mentir au psy", artist: "BEN plg", album: "L'histoire sans fin", duration: 181)
+        let b = MusicController.Track(title: "Mentir au psy", artist: "BEN plg", album: "Mentir au psy - Single", duration: 181.4)
+        #expect(MusicExtras.sameSong(a, b))
+        #expect(!MusicExtras.sameSong(a, MusicController.Track(title: "Paiement refusé", artist: "BEN plg", album: "", duration: 0)))
+        #expect(!MusicExtras.sameSong(a, nil))
+    }
+}

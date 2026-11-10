@@ -5,6 +5,7 @@ struct NotchRootView: View {
     @Environment(NotchViewModel.self) private var vm
     @Environment(AppSettings.self) private var settings
     @Environment(MusicController.self) private var music
+    @Environment(MusicExtras.self) private var extras
     @Environment(HUDCenter.self) private var hud
     @Environment(PrivacyMonitor.self) private var privacy
     @Environment(DownloadMonitor.self) private var downloads
@@ -119,6 +120,12 @@ struct NotchRootView: View {
                             .frame(height: NotchViewModel.hudHeight)
                             .padding(.bottom, 2)
                             .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
+                    } else if vm.showsKaraoke {
+                        KaraokeLineView()
+                            .padding(.horizontal, 16 + vm.topRadius)
+                            .frame(height: NotchViewModel.karaokeHeight)
+                            .padding(.bottom, 2)
+                            .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
                     }
                 }
             }
@@ -157,6 +164,11 @@ struct NotchRootView: View {
         .animation(spring, value: vm.alertExpanded)
         .animation(spring, value: vm.showsHUD)
         .onChange(of: hud.current, initial: true) { vm.showsHUD = hud.current != nil }
+        .onChange(of: karaokeActive, initial: true) { vm.showsKaraoke = karaokeActive }
+        .animation(spring, value: vm.showsKaraoke)
+        // Mode karaoké : les paroles se chargent aussi onglet Musique fermé.
+        .onChange(of: music.track, initial: true) { if settings.karaoke { extras.refreshLyrics() } }
+        .onChange(of: settings.karaoke) { if settings.karaoke { extras.refreshLyrics() } }
         .onChange(of: alerts.current?.id, initial: true) { updateAlert() }
         .onChange(of: alerts.isHovered) { updateAlert() }
         .onChange(of: vm.isPrimaryScreen) { updateAlert() }
@@ -191,6 +203,11 @@ struct NotchRootView: View {
     /// Une « live activity » occupe les côtés de l'encoche repliée, par priorité : Claude Code qui
     /// t'attend, caméra ou micro, téléchargement, Claude Code au travail, puis la musique.
     private var showsActivity: Bool { !activities.isEmpty }
+
+    /// Mode karaoké affiché : activé, musique en lecture, paroles synchronisées chargées.
+    private var karaokeActive: Bool {
+        settings.karaoke && music.isPlaying && music.externalPlayer == nil && extras.hasSyncedLyrics
+    }
 
     private var activities: [LiveActivity] {
         LiveActivity.active(

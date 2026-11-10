@@ -288,13 +288,16 @@ struct MusicTab: View {
                     .frame(width: 1)
                     .padding(.vertical, 4)
                 VStack(alignment: .leading, spacing: 8) {
-                    Picker("", selection: $showsQueue) {
-                        Text("Paroles").tag(false)
-                        Text("À suivre").tag(true)
+                    HStack(spacing: 8) {
+                        Picker("", selection: $showsQueue) {
+                            Text("Paroles").tag(false)
+                            Text("À suivre").tag(true)
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .frame(width: 180)
+                        KaraokeButton()
                     }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .frame(width: 180)
                     .frame(maxWidth: .infinity)
 
                     if showsQueue {
@@ -308,6 +311,67 @@ struct MusicTab: View {
             .foregroundStyle(.primary)
             .onAppear { extras.refresh() }
             .onChange(of: music.track) { extras.refresh() }
+        }
+    }
+}
+
+/// Active le mode karaoké : la phrase en cours s'affiche sous l'encoche repliée.
+/// Seulement avec des paroles synchronisées.
+private struct KaraokeButton: View {
+    @Environment(AppSettings.self) private var settings
+    @Environment(MusicExtras.self) private var extras
+    @State private var hovering = false
+
+    var body: some View {
+        let available = extras.hasSyncedLyrics
+        // Le bouton montre le réglage tel quel : il reste allumé même quand ce morceau-ci
+        // n'a pas de paroles synchronisées (la ligne ne s'affiche simplement pas).
+        let on = settings.karaoke
+        Button {
+            settings.karaoke.toggle()
+        } label: {
+            Image(systemName: "music.mic")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(on ? Color.white : Color.primary)
+                .frame(width: 30, height: 22)
+                // Allumé : fond plein (le verre teinté ne se redessinait pas toujours à
+                // la réouverture de l'onglet, et le bouton semblait éteint).
+                .background(Capsule().fill(Color.accentColor).opacity(on ? 1 : 0))
+                .glassButton(in: Capsule(), isShown: !on && hovering)
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        // Toujours cliquable ; atténué quand ce morceau n'a pas de paroles synchronisées
+        // (la ligne sous l'encoche ne s'affiche alors pas).
+        .opacity(available ? 1 : 0.45)
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.15), value: on)
+        .help(
+            available
+                ? (on ? "Désactiver le mode karaoké" : "Mode karaoké : les paroles sous l'encoche")
+                : "Pas de paroles synchronisées pour ce morceau (mode karaoké \(on ? "activé" : "désactivé"))")
+    }
+}
+
+/// Mode karaoké : la phrase en cours des paroles, sous l'encoche repliée.
+struct KaraokeLineView: View {
+    @Environment(MusicController.self) private var music
+    @Environment(MusicExtras.self) private var extras
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 0.2)) { context in
+            let line = extras.currentLine(at: music.position(at: context.date))
+            ZStack {
+                Text(line.map(\.text).flatMap { $0.isEmpty ? nil : $0 } ?? "♪")
+                    .font(.system(size: 12.5, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .frame(maxWidth: .infinity)
+                    .id(line?.id ?? -1)
+                    .transition(.blurReplace(.upUp))
+            }
+            .animation(.smooth(duration: 0.35), value: line?.id)
         }
     }
 }

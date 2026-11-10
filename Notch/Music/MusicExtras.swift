@@ -51,6 +51,8 @@ final class MusicExtras {
     private(set) var lyrics: [LyricLine] = []
     private(set) var lyricsSynced = false
     private(set) var lyricsState: LoadState = .idle
+    /// Morceau dont les paroles sont chargées.
+    private(set) var lyricsTrack: MusicController.Track?
     /// Vidéo en boucle (HLS) de la pochette, pour les albums qui en ont une.
     private(set) var motionArtwork: URL?
 
@@ -79,6 +81,29 @@ final class MusicExtras {
         loadedTrack = track
         loadQueue(for: track)
         loadLyrics(for: track)
+    }
+
+    /// Paroles du morceau en cours seulement (mode karaoké, onglet Musique fermé).
+    func refreshLyrics() {
+        guard let track = music.track, music.externalPlayer == nil, !Self.sameSong(track, lyricsTrack) else { return }
+        loadLyrics(for: track)
+    }
+
+    /// Paroles synchronisées du morceau en cours, prêtes : le mode karaoké est possible.
+    var hasSyncedLyrics: Bool {
+        Self.sameSong(music.track, lyricsTrack) && lyricsSynced && lyricsState == .loaded
+    }
+
+    /// Même titre et même artiste : les apps renvoient parfois le morceau avec une durée
+    /// ou un album un peu différents, ce qui ne change pas ses paroles.
+    nonisolated static func sameSong(_ a: MusicController.Track?, _ b: MusicController.Track?) -> Bool {
+        guard let a, let b else { return false }
+        return a.title == b.title && a.artist == b.artist
+    }
+
+    /// Phrase en cours d'après la position de lecture.
+    func currentLine(at position: Double) -> LyricLine? {
+        currentLineID(at: position).flatMap { id in lyrics.first { $0.id == id } }
     }
 
     /// Lance un morceau de la file.
@@ -128,7 +153,7 @@ final class MusicExtras {
         Task {
             // La vraie file, lue dans le panneau de Musique.
             let result = await Task.detached(priority: .userInitiated) { MusicQueueReader.read() }.value
-            guard music.track == track else { return }
+            guard Self.sameSong(music.track, track) else { return }
             switch result {
             case .entries(let entries):
                 queue = entries.enumerated().map { offset, entry in
@@ -161,7 +186,7 @@ final class MusicExtras {
             """
         Task {
             let result = await AppleScriptRunner.run(script, cached: false)
-            guard music.track == track else { return }
+            guard Self.sameSong(music.track, track) else { return }
             guard let result, result.numberOfItems >= 1 else {
                 // Pas de playlist accessible (Apple Music en streaming) : suite de l'album.
                 loadAlbumQueue(for: track)
@@ -193,7 +218,7 @@ final class MusicExtras {
     private func loadAlbumQueue(for track: MusicController.Track) {
         Task {
             let items = await Self.albumTracks(after: track)
-            guard music.track == track else { return }
+            guard Self.sameSong(music.track, track) else { return }
             queue = items ?? []
             queueTitle = items == nil ? nil : track.album
             queueIsAlbum = true
@@ -296,7 +321,7 @@ final class MusicExtras {
         Task {
             let url = await Self.motionArtwork(of: track)
             motionCache[key] = url
-            guard music.track == track else { return }
+            guard Self.sameSong(music.track, track) else { return }
             motionArtwork = url
         }
     }
@@ -331,13 +356,16 @@ final class MusicExtras {
             lyrics = cached.0
             lyricsSynced = cached.1
             lyricsState = cached.0.isEmpty ? .unavailable : .loaded
+            lyricsTrack = track
             return
         }
         lyrics = []
         lyricsState = .loading
+        lyricsTrack = track
         Task {
             let found = await Self.fetchLyrics(for: track)
-            guard music.track == track else { return }
+            // Même morceau, même si l'app l'a renvoyé entre-temps avec une autre durée.
+            guard Self.sameSong(music.track, track) else { return }
             let lines = found.map { Self.parse($0.synced ?? $0.plain ?? "", synced: $0.synced != nil) } ?? []
             let synced = found?.synced != nil
             lyricsCache[key] = (lines, synced)

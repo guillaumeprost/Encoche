@@ -77,6 +77,11 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(showBluetoothActivity, forKey: "showBluetoothActivity") }
     }
 
+    /// Mode karaoké de l'onglet Musique : paroles synchronisées sous l'encoche repliée.
+    var karaoke: Bool = UserDefaults.standard.bool(forKey: "karaoke") {
+        didSet { UserDefaults.standard.set(karaoke, forKey: "karaoke") }
+    }
+
     var showTrackChanges: Bool = UserDefaults.standard.object(forKey: "showTrackChanges") as? Bool ?? true {
         didSet { UserDefaults.standard.set(showTrackChanges, forKey: "showTrackChanges") }
     }
