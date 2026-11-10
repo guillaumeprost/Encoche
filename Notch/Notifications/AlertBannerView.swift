@@ -4,6 +4,8 @@ import SwiftUI
 struct AlertBannerView: View {
     @Environment(AlertCenter.self) private var alerts
     let alert: NotchAlert
+    /// Entrée en cascade : icône, titre, texte puis boutons.
+    @State private var shown = false
 
     private var hovered: Bool { alerts.isHovered }
     /// Un clic fait quelque chose (ouvre l'app, le lien…).
@@ -19,14 +21,23 @@ struct AlertBannerView: View {
                         AlertButtonView(button: button) { alerts.press(button) }
                     }
                 }
+                .scaleEffect(shown ? 1 : 0.9, anchor: .trailing)
+                .entrance(shown, delay: 0.26)
             }
         }
+        .onAppear { shown = true }
     }
 
     private var content: some View {
         HStack(alignment: .center, spacing: 11) {
             AlertIcon(icon: alert.icon)
                 .frame(width: 34, height: 34)
+                // L'icône arrive avec un petit rebond, en se redressant.
+                .scaleEffect(shown ? 1 : 0.3)
+                .rotationEffect(.degrees(shown ? 0 : -14))
+                .blur(radius: shown ? 0 : 4)
+                .opacity(shown ? 1 : 0)
+                .animation(.spring(response: 0.45, dampingFraction: 0.55).delay(0.08), value: shown)
                 .overlay(alignment: .topLeading) {
                     if hovered && alert.buttons.isEmpty {
                         // Au survol : fermer sans ouvrir, comme dans le Centre de notifications.
@@ -59,12 +70,14 @@ struct AlertBannerView: View {
                         .foregroundStyle(.primary.opacity(0.45))
                         .lineLimit(1)
                 }
+                .entrance(shown, delay: 0.14)
                 if let body = alert.body, !body.isEmpty {
                     Text(body)
                         .font(.system(size: 11.5))
                         .foregroundStyle(.primary.opacity(0.75))
                         .lineLimit(hovered ? 5 : 2)
                         .fixedSize(horizontal: false, vertical: hovered)
+                        .entrance(shown, delay: 0.2)
                 }
             }
         }
@@ -82,6 +95,17 @@ struct AlertBannerView: View {
             guard isClickable else { return }
             if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
         }
+    }
+}
+
+extension View {
+    /// Glisse depuis l'encoche en sortant du flou.
+    fileprivate func entrance(_ shown: Bool, delay: Double) -> some View {
+        self
+            .blur(radius: shown ? 0 : 5)
+            .opacity(shown ? 1 : 0)
+            .offset(y: shown ? 0 : -8)
+            .animation(.smooth(duration: 0.4).delay(delay), value: shown)
     }
 }
 

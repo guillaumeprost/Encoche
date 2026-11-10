@@ -108,8 +108,10 @@ struct NotchRootView: View {
                             .id(alert.id)
                             .transition(
                                 .asymmetric(
-                                    insertion: .opacity.combined(with: .scale(scale: 0.9, anchor: .top)).animation(spring.delay(0.08)),
-                                    removal: .opacity.animation(.easeOut(duration: 0.12))
+                                    // Le contenu fait sa propre entrée en cascade (AlertBannerView).
+                                    insertion: .identity,
+                                    removal: .opacity.combined(with: .scale(scale: 0.95, anchor: .top))
+                                        .animation(.easeOut(duration: 0.15))
                                 ))
                     } else if vm.showsHUD, let kind = hud.current {
                         HUDView(kind: kind)
