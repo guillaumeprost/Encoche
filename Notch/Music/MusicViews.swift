@@ -10,34 +10,54 @@ struct CollapsedMusicView: View {
         CollapsedActivityLayout(slotWidth: slotWidth) {
             Artwork(image: music.artwork, cornerRadius: 5)
                 .frame(width: 20, height: 20)
+                // Petit rebond quand le morceau change.
+                .keyframeAnimator(initialValue: 1.0, trigger: music.track?.title) { view, scale in
+                    view.scaleEffect(scale)
+                } keyframes: { _ in
+                    SpringKeyframe(1.25, duration: 0.18, spring: .snappy)
+                    SpringKeyframe(1.0, duration: 0.4, spring: .bouncy)
+                }
         } trailing: {
             AudioBars(isPlaying: music.isPlaying, color: music.accent)
         }
     }
 }
 
-/// Nouveau morceau : pochette, titre et artiste sous l'encoche repliée.
+/// Nouveau morceau : titre et artiste sous l'encoche repliée. La pochette reste
+/// au-dessus, dans l'activité, qui rebondit au même moment.
 struct TrackHUDView: View {
     @Environment(MusicController.self) private var music
+    @State private var shown = false
 
     var body: some View {
         if let track = music.track {
-            HStack(spacing: 8) {
-                Artwork(image: music.artwork, cornerRadius: 4)
-                    .frame(width: 18, height: 18)
-                Text(track.title)
-                    .font(.system(size: 11, weight: .semibold))
-                    .layoutPriority(1)
+            HStack(spacing: 6) {
+                reveal(
+                    Text(track.title).font(.system(size: 11, weight: .semibold)),
+                    delay: 0.08
+                )
+                .layoutPriority(1)
                 if !track.artist.isEmpty {
-                    Text(track.artist)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary)
+                    reveal(
+                        Text(track.artist).font(.system(size: 11)).foregroundStyle(.white.opacity(0.6)),
+                        delay: 0.16
+                    )
                 }
-                Spacer(minLength: 0)
             }
             .lineLimit(1)
             .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .onAppear { shown = true }
         }
+    }
+
+    /// Le texte descend de sous l'encoche en sortant du flou.
+    private func reveal(_ text: some View, delay: Double) -> some View {
+        text
+            .blur(radius: shown ? 0 : 6)
+            .opacity(shown ? 1 : 0)
+            .offset(y: shown ? 0 : -8)
+            .animation(.smooth(duration: 0.45).delay(delay), value: shown)
     }
 }
 
