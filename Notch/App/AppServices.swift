@@ -58,6 +58,8 @@ struct AppServices {
         calls.privacy = privacy
         timer = TimerController()
         music = MusicController()
+        music.hud = hud
+        music.announcesTrackChanges = { appSettings.showTrackChanges }
         musicExtras = MusicExtras(music: music)
         volume = VolumeController()
         // Une seule base EventKit pour le calendrier et les rappels.

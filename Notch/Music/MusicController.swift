@@ -51,6 +51,17 @@ final class MusicController {
 
     var showsActivity: Bool { track != nil && isPlaying }
 
+    /// Indicateur sous l'encoche repliée, pour annoncer le morceau suivant.
+    @ObservationIgnored var hud: HUDCenter?
+    @ObservationIgnored var announcesTrackChanges: () -> Bool = { true }
+
+    /// Un autre morceau commence : pas au premier morceau connu, ni pour un simple
+    /// changement de durée ou d'album sur le même titre.
+    nonisolated static func isNewSong(_ new: Track, after old: Track?) -> Bool {
+        guard let old, !new.title.isEmpty else { return false }
+        return new.title != old.title || new.artist != old.artist
+    }
+
     init() {
         let center = DistributedNotificationCenter.default()
         center.addObserver(forName: Notification.Name("com.apple.Music.playerInfo"), object: nil, queue: .main) { [weak self] note in
@@ -187,10 +198,12 @@ final class MusicController {
         )
 
         let changed = newTrack != track || origin != source
+        let previous = track
         externalPlayer = nil
         source = origin
         track = newTrack
         isPlaying = state == "Playing"
+        announce(newTrack, after: previous)
 
         if origin == .spotify, let pos = (info["Playback Position"] as? NSNumber)?.doubleValue {
             setPosition(pos)
@@ -257,10 +270,12 @@ final class MusicController {
 
         let newTrack = Track(title: info.title, artist: info.artist, album: info.album, duration: info.duration)
         let changed = newTrack != track || info.bundleID != externalPlayer
+        let previous = track
         source = nil
         externalPlayer = info.bundleID
         track = newTrack
         isPlaying = info.playing
+        announce(newTrack, after: previous)
         setPosition(info.elapsed)
         if let artwork = info.artwork {
             if changed || artworkData != artwork {
@@ -271,6 +286,11 @@ final class MusicController {
             artworkData = nil
             applyArtwork(nil)
         }
+    }
+
+    private func announce(_ newTrack: Track, after previous: Track?) {
+        guard isPlaying, Self.isNewSong(newTrack, after: previous), announcesTrackChanges() else { return }
+        hud?.show(.track, for: .seconds(3))
     }
 
     private func clear() {

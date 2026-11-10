@@ -77,6 +77,10 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(showBluetoothActivity, forKey: "showBluetoothActivity") }
     }
 
+    var showTrackChanges: Bool = UserDefaults.standard.object(forKey: "showTrackChanges") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(showTrackChanges, forKey: "showTrackChanges") }
+    }
+
     /// Écran de verrouillage : cadenas dans l'encoche et lecteur de musique.
     var showOnLockScreen: Bool = UserDefaults.standard.object(forKey: "showOnLockScreen") as? Bool ?? true {
         didSet { UserDefaults.standard.set(showOnLockScreen, forKey: "showOnLockScreen") }

@@ -105,6 +105,7 @@ struct SettingsView: View {
                     Toggle("Réunion dans moins de 10 minutes", isOn: $settings.showMeetingActivity)
                     Toggle("Mode Concentration", isOn: $settings.showFocusActivity)
                     Toggle("Appareils Bluetooth (AirPods…)", isOn: $settings.showBluetoothActivity)
+                    Toggle("Titre du morceau suivant", isOn: $settings.showTrackChanges)
                 } header: {
                     Text("Activités en direct")
                 } footer: {

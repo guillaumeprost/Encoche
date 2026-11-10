@@ -16,6 +16,31 @@ struct CollapsedMusicView: View {
     }
 }
 
+/// Nouveau morceau : pochette, titre et artiste sous l'encoche repliée.
+struct TrackHUDView: View {
+    @Environment(MusicController.self) private var music
+
+    var body: some View {
+        if let track = music.track {
+            HStack(spacing: 8) {
+                Artwork(image: music.artwork, cornerRadius: 4)
+                    .frame(width: 18, height: 18)
+                Text(track.title)
+                    .font(.system(size: 11, weight: .semibold))
+                    .layoutPriority(1)
+                if !track.artist.isEmpty {
+                    Text(track.artist)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .lineLimit(1)
+            .foregroundStyle(.white)
+        }
+    }
+}
+
 // MARK: - Ouverte : lecteur complet
 
 struct ExpandedMusicView: View {

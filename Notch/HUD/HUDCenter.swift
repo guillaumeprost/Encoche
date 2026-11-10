@@ -1,6 +1,6 @@
 import Observation
 
-/// Indicateurs façon iPhone affichés sous l'encoche repliée (volume, luminosité, batterie).
+/// Indicateurs façon iPhone affichés sous l'encoche repliée (volume, luminosité, batterie, morceau).
 /// Un seul à la fois : le dernier arrivé remplace le précédent.
 @Observable
 @MainActor
@@ -11,6 +11,8 @@ final class HUDCenter {
         case battery
         /// Appareil Bluetooth connecté ou déconnecté.
         case device
+        /// Nouveau morceau de musique.
+        case track
     }
 
     private(set) var current: Kind?
