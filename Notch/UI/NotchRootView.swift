@@ -238,7 +238,8 @@ struct NotchRootView: View {
     }
 
     /// La bulle n'accompagne que l'encoche repliée, sans notification (elle reste avec le volume).
-    private var showsBubble: Bool { !vm.isOpen && !vm.showsAlert && !vm.isRetracted }
+    /// La bulle reste à côté d'une notification : la deuxième activité ne disparaît pas.
+    private var showsBubble: Bool { !vm.isOpen && !vm.isRetracted }
 
     @ViewBuilder
     private func activityView(_ activity: LiveActivity) -> some View {

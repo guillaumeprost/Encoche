@@ -166,7 +166,7 @@ final class NotchWindowController {
             return activities.first
         }
         // Même place que dans NotchRootView : décalée de 6 points à droite de la forme, 4 sous le haut.
-        guard activities.count > 1, !viewModel.showsAlert else { return nil }
+        guard activities.count > 1 else { return nil }
         let size = viewModel.activityHeight - 8
         let bubble = NSRect(x: hot.maxX + viewModel.topRadius + 6, y: hot.maxY - 2 - 4 - size, width: size, height: size)
         return bubble.insetBy(dx: -8, dy: -6).contains(mouse) ? activities[1] : nil
@@ -206,7 +206,7 @@ final class NotchWindowController {
         // Notification affichée : le survol la garde à l'écran, le clic l'ouvre ;
         // on n'ouvre pas l'encoche par-dessus.
         if viewModel.showsAlert, !viewModel.isOpen {
-            let over = hotRect().contains(mouse)
+            let over = hotRect().contains(mouse) || activityUnderMouse() != nil
             alerts.setHovering(over, from: ObjectIdentifier(self))
             panel.ignoresMouseEvents = !over
             pendingToggle?.cancel()

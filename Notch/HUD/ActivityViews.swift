@@ -123,39 +123,41 @@ struct MitosisBubble: View {
     @State private var settled = false
 
     var body: some View {
-        MitosisShape(progress: progress, settled: settled, size: size, gap: gap)
-            .frame(width: MitosisShape.overlap + gap + size, height: size)
-            .overlay(alignment: .trailing) {
-                ActivityBubble(activity: activity)
-                    .frame(width: size, height: size)
-                    .opacity(progress > 0.8 ? 1 : 0)
-                    .scaleEffect(progress > 0.8 ? 1 : 0.6)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: progress > 0.8)
+        MitosisShape(progress: progress, settled: settled, size: size, gap: gap) {
+            ActivityBubble(activity: activity)
+        }
+        .frame(width: MitosisMetrics.overlap + gap + size, height: size)
+        .allowsHitTesting(false)
+        .onAppear {
+            withAnimation(.spring(response: 1.0, dampingFraction: 0.58)) {
+                progress = 1
+            } completion: {
+                settled = true
             }
-            .allowsHitTesting(false)
-            .onAppear {
-                withAnimation(.spring(response: 1.0, dampingFraction: 0.58)) {
-                    progress = 1
-                } completion: {
-                    settled = true
-                }
-            }
+        }
     }
 }
 
 /// Forme de la division. Pendant l'animation : flou puis seuil de transparence (effet
 /// « gluant »), qui soude la bulle au bord de l'encoche tant qu'elles sont proches.
 /// Une fois posée : carré arrondi net, avec un fin liseré lumineux vers le bas.
-private struct MitosisShape: View, Animatable {
+private enum MitosisMetrics {
     /// Largeur du bord de l'encoche repris dans la forme, pour que le col y prenne racine.
     static let overlap: CGFloat = 6
     /// Marge autour du dessin : le flou ne doit pas être coupé par le cadre.
-    private static let margin: CGFloat = 14
+    static let margin: CGFloat = 14
+}
+
+private struct MitosisShape<Content: View>: View, Animatable {
+    private static var overlap: CGFloat { MitosisMetrics.overlap }
+    private static var margin: CGFloat { MitosisMetrics.margin }
 
     var progress: Double
     let settled: Bool
     let size: CGFloat
     let gap: CGFloat
+    /// Contenu de la bulle (pochette, icône) : il suit la bulle pendant toute la division.
+    @ViewBuilder let content: Content
 
     nonisolated var animatableData: Double {
         get { progress }
@@ -164,7 +166,32 @@ private struct MitosisShape: View, Animatable {
 
     private var bubbleShape: RoundedRectangle { RoundedRectangle(cornerRadius: 9, style: .continuous) }
 
+    /// Bord gauche de la bulle (avant mise à l'échelle) et taille, à cet instant de la division.
+    /// La bulle part de l'intérieur de l'encoche et grossit en s'éloignant (le ressort peut
+    /// la faire dépasser un peu).
+    private var bubbleX: CGFloat {
+        let start = Self.overlap - size
+        let end = Self.overlap + gap
+        return start + (end - start) * progress
+    }
+
+    private var bubbleSide: CGFloat { size * (0.4 + 0.6 * min(progress, 1)) }
+
     var body: some View {
+        ZStack(alignment: .topLeading) {
+            shape
+            content
+                .frame(width: size, height: size)
+                .scaleEffect(bubbleSide / size)
+                .offset(x: bubbleX)
+                // Apparaît pendant qu'elle se détache, encore reliée par le col.
+                .opacity(min(max((progress - 0.3) / 0.4, 0), 1))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    @ViewBuilder
+    private var shape: some View {
         if settled {
             bubbleShape
                 .fill(.black)
@@ -182,11 +209,8 @@ private struct MitosisShape: View, Animatable {
                     layer.fill(
                         Path(CGRect(x: 0, y: margin + size * 0.2, width: margin + Self.overlap, height: size * 0.6)),
                         with: .color(.black))
-                    // La bulle grossit en s'éloignant (le ressort peut la faire dépasser un peu).
-                    let start = Self.overlap - size
-                    let end = Self.overlap + gap
-                    let side = size * (0.4 + 0.6 * min(progress, 1))
-                    let x = margin + start + (end - start) * progress + (size - side) / 2
+                    let side = bubbleSide
+                    let x = margin + bubbleX + (size - side) / 2
                     let rect = CGRect(x: x, y: margin + (size - side) / 2, width: side, height: side)
                     layer.fill(Path(roundedRect: rect, cornerRadius: 9, style: .continuous), with: .color(.black))
                 }
