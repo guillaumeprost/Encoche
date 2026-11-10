@@ -320,36 +320,22 @@ struct MusicTab: View {
 private struct KaraokeButton: View {
     @Environment(AppSettings.self) private var settings
     @Environment(MusicExtras.self) private var extras
-    @State private var hovering = false
 
     var body: some View {
         let available = extras.hasSyncedLyrics
         // Le bouton montre le réglage tel quel : il reste allumé même quand ce morceau-ci
         // n'a pas de paroles synchronisées (la ligne ne s'affiche simplement pas).
         let on = settings.karaoke
-        Button {
-            settings.karaoke.toggle()
-        } label: {
-            Image(systemName: "music.mic")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(on ? Color.white : Color.primary)
-                .frame(width: 30, height: 22)
-                // Allumé : fond plein (le verre teinté ne se redessinait pas toujours à
-                // la réouverture de l'onglet, et le bouton semblait éteint).
-                .background(Capsule().fill(Color.accentColor).opacity(on ? 1 : 0))
-                .glassButton(in: Capsule(), isShown: !on && hovering)
-                .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        // Toujours cliquable ; atténué quand ce morceau n'a pas de paroles synchronisées
-        // (la ligne sous l'encoche ne s'affiche alors pas).
-        .opacity(available ? 1 : 0.45)
-        .onHover { hovering = $0 }
-        .animation(.easeOut(duration: 0.15), value: on)
-        .help(
-            available
+        LiveLineToggle(
+            symbol: "music.mic",
+            isOn: on,
+            isAvailable: available,
+            help: available
                 ? (on ? "Désactiver le mode karaoké" : "Mode karaoké : les paroles sous l'encoche")
-                : "Pas de paroles synchronisées pour ce morceau (mode karaoké \(on ? "activé" : "désactivé"))")
+                : "Pas de paroles synchronisées pour ce morceau (mode karaoké \(on ? "activé" : "désactivé"))"
+        ) {
+            settings.karaoke.toggle()
+        }
     }
 }
 

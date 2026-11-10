@@ -120,12 +120,18 @@ struct NotchRootView: View {
                             .frame(height: NotchViewModel.hudHeight)
                             .padding(.bottom, 2)
                             .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
-                    } else if vm.showsKaraoke {
-                        KaraokeLineView()
-                            .padding(.horizontal, 16 + vm.topRadius)
-                            .frame(height: NotchViewModel.karaokeHeight)
-                            .padding(.bottom, 2)
-                            .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
+                    } else if vm.showsLiveLine, let line = liveLine {
+                        Group {
+                            switch line {
+                            case .lyrics: KaraokeLineView()
+                            case .claude: ClaudeLiveLineView()
+                            }
+                        }
+                        .id(line)
+                        .padding(.horizontal, 16 + vm.topRadius)
+                        .frame(height: NotchViewModel.liveLineHeight)
+                        .padding(.bottom, 2)
+                        .transition(.opacity.combined(with: .scale(scale: 0.95, anchor: .top)))
                     }
                 }
             }
@@ -164,8 +170,8 @@ struct NotchRootView: View {
         .animation(spring, value: vm.alertExpanded)
         .animation(spring, value: vm.showsHUD)
         .onChange(of: hud.current, initial: true) { vm.showsHUD = hud.current != nil }
-        .onChange(of: karaokeActive, initial: true) { vm.showsKaraoke = karaokeActive }
-        .animation(spring, value: vm.showsKaraoke)
+        .onChange(of: liveLine, initial: true) { vm.showsLiveLine = liveLine != nil }
+        .animation(spring, value: vm.showsLiveLine)
         // Mode karaoké : les paroles se chargent aussi onglet Musique fermé.
         .onChange(of: music.track, initial: true) { if settings.karaoke { extras.refreshLyrics() } }
         .onChange(of: settings.karaoke) { if settings.karaoke { extras.refreshLyrics() } }
@@ -204,9 +210,20 @@ struct NotchRootView: View {
     /// t'attend, caméra ou micro, téléchargement, Claude Code au travail, puis la musique.
     private var showsActivity: Bool { !activities.isEmpty }
 
-    /// Mode karaoké affiché : activé, musique en lecture, paroles synchronisées chargées.
-    private var karaokeActive: Bool {
-        settings.karaoke && music.isPlaying && music.externalPlayer == nil && extras.hasSyncedLyrics
+    /// Ligne en direct sous l'encoche repliée.
+    private enum LiveLine { case lyrics, claude }
+
+    /// Paroles (karaoké activé, musique en lecture, paroles synchronisées) ou action de Claude
+    /// (direct activé, Claude au travail). Les deux à la fois : celle de l'activité principale.
+    private var liveLine: LiveLine? {
+        let lyrics = settings.karaoke && music.isPlaying && music.externalPlayer == nil && extras.hasSyncedLyrics
+        let claude = settings.claudeLive && claudeCode.workingSession != nil
+        switch (lyrics, claude) {
+        case (true, true): return activities.first == .claudeWorking ? .claude : .lyrics
+        case (true, false): return .lyrics
+        case (false, true): return .claude
+        case (false, false): return nil
+        }
     }
 
     private var activities: [LiveActivity] {

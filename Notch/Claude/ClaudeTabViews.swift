@@ -45,11 +45,58 @@ struct ClaudeTab: View {
             HStack(spacing: 6) {
                 @Bindable var ask = ask
                 ClaudeTabField(target: $ask.target, defaultSession: selectedSession)
+                ClaudeLiveButton()
                 // Quota hebdomadaire de l'abonnement, comme dans l'app Claude.
                 ClaudeQuotaRing()
             }
         }
         .foregroundStyle(.primary)
+    }
+}
+
+/// Active le direct de Claude Code : ce qu'il fait s'affiche sous l'encoche repliée.
+private struct ClaudeLiveButton: View {
+    @Environment(AppSettings.self) private var settings
+    @Environment(ClaudeCodeMonitor.self) private var monitor
+
+    var body: some View {
+        let on = settings.claudeLive
+        LiveLineToggle(
+            symbol: "text.bubble",
+            isOn: on,
+            tint: .claude,
+            isAvailable: monitor.hooksInstalled,
+            help: on ? "Désactiver le direct de Claude" : "Direct : ce que fait Claude, sous l'encoche"
+        ) {
+            settings.claudeLive.toggle()
+        }
+    }
+}
+
+/// Direct de Claude Code : son action en cours, sous l'encoche repliée.
+struct ClaudeLiveLineView: View {
+    @Environment(ClaudeCodeMonitor.self) private var monitor
+
+    var body: some View {
+        // Entre la question et le premier outil, Claude n'a pas encore d'action à montrer.
+        let detail = monitor.workingSession?.detail.flatMap { $0.isEmpty ? nil : $0 } ?? "Réfléchit…"
+        HStack(spacing: 7) {
+            Image(systemName: "sparkle")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(Color.claude)
+                .symbolEffect(.pulse)
+            ZStack {
+                Text(detail)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .id(detail)
+                    .transition(.blurReplace(.upUp))
+            }
+            .animation(.smooth(duration: 0.35), value: detail)
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 

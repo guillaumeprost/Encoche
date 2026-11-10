@@ -22,8 +22,8 @@ final class NotchViewModel {
     var alertExpanded = false
     /// Un indicateur (volume, luminosité, batterie) est affiché sous l'encoche repliée.
     var showsHUD = false
-    /// Mode karaoké : la phrase en cours des paroles s'affiche sous l'encoche repliée.
-    var showsKaraoke = false
+    /// Ligne en direct sous l'encoche repliée : paroles (karaoké) ou ce que fait Claude.
+    var showsLiveLine = false
 
     static let expandedBodyWidth: CGFloat = 640
     /// Largeur ouverte en plus de l'encoche physique : 8 onglets, minuteur et Concentration à
@@ -56,12 +56,12 @@ final class NotchViewModel {
     static let alertButtonsHeight: CGFloat = 36
     static let alertExpandedExtraHeight: CGFloat = 46
     static let hudHeight: CGFloat = 26
-    static let karaokeHeight: CGFloat = 26
+    static let liveLineHeight: CGFloat = 26
     /// Plus large que l'activité seule, pour que les phrases tiennent.
-    static let karaokeBodyWidth: CGFloat = 400
+    static let liveLineBodyWidth: CGFloat = 400
 
     var topRadius: CGFloat { isOpen || showsAlert ? 12 : 6 }
-    var bottomRadius: CGFloat { isOpen ? 26 : showsAlert ? 22 : showsHUD || showsKaraoke ? 16 : 9 }
+    var bottomRadius: CGFloat { isOpen ? 26 : showsAlert ? 22 : showsHUD || showsLiveLine ? 16 : 9 }
 
     /// Largeur d'une case latérale de la « live activity » repliée.
     var activitySlotWidth: CGFloat { notchSize.height + 8 }
@@ -91,9 +91,9 @@ final class NotchViewModel {
         } else if showsHUD {
             bodyWidth = notchSize.width + 2 * activitySlotWidth
             height = notchSize.height + Self.hudHeight
-        } else if showsKaraoke {
-            bodyWidth = max(notchSize.width + 2 * activitySlotWidth, Self.karaokeBodyWidth)
-            height = activityHeight + Self.karaokeHeight
+        } else if showsLiveLine {
+            bodyWidth = max(notchSize.width + 2 * activitySlotWidth, Self.liveLineBodyWidth)
+            height = activityHeight + Self.liveLineHeight
         } else if showsActivity {
             bodyWidth = notchSize.width + 2 * activitySlotWidth
             height = activityHeight

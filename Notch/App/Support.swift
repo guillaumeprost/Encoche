@@ -83,3 +83,34 @@ extension View {
         }
     }
 }
+
+/// Petit bouton icône qui active un affichage en direct sous l'encoche (karaoké, Claude).
+/// Allumé : fond plein (le verre teinté ne se redessinait pas toujours à la réouverture
+/// d'un onglet, et le bouton semblait éteint).
+struct LiveLineToggle: View {
+    let symbol: String
+    let isOn: Bool
+    var tint: Color = .accentColor
+    /// Atténué quand rien ne peut s'afficher pour l'instant (il reste cliquable).
+    var isAvailable = true
+    let help: String
+    let action: () -> Void
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(isOn ? Color.white : Color.primary)
+                .frame(width: 30, height: 22)
+                .background(Capsule().fill(tint).opacity(isOn ? 1 : 0))
+                .glassButton(in: Capsule(), isShown: !isOn && hovering)
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .opacity(isAvailable ? 1 : 0.45)
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.15), value: isOn)
+        .help(help)
+    }
+}

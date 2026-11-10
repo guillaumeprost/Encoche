@@ -82,6 +82,11 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(karaoke, forKey: "karaoke") }
     }
 
+    /// Direct de Claude Code : ce qu'il fait, sous l'encoche repliée, pendant qu'il travaille.
+    var claudeLive: Bool = UserDefaults.standard.bool(forKey: "claudeLive") {
+        didSet { UserDefaults.standard.set(claudeLive, forKey: "claudeLive") }
+    }
+
     var showTrackChanges: Bool = UserDefaults.standard.object(forKey: "showTrackChanges") as? Bool ?? true {
         didSet { UserDefaults.standard.set(showTrackChanges, forKey: "showTrackChanges") }
     }

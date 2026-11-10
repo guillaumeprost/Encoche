@@ -53,9 +53,9 @@ struct KaraokeLayoutTests {
     @Test func karaokeAddsALineUnderTheActivity() {
         let vm = NotchViewModel()
         let activity = vm.shapeSize(showsActivity: true, tab: .home)
-        vm.showsKaraoke = true
+        vm.showsLiveLine = true
         let karaoke = vm.shapeSize(showsActivity: true, tab: .home)
-        #expect(abs(karaoke.height - activity.height - NotchViewModel.karaokeHeight) < 0.01)
+        #expect(abs(karaoke.height - activity.height - NotchViewModel.liveLineHeight) < 0.01)
         #expect(karaoke.width > activity.width)
         // Une notification passe devant.
         vm.showsAlert = true
