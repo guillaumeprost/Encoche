@@ -137,8 +137,22 @@ final class NotchWindowController {
             tab: settings.tab
         )
         let rect = ScreenLayout.topCenter(size, in: screenFrame)
-        // Un peu de tolérance quand c'est replié, pour attraper la souris facilement.
-        return viewModel.isOpen ? rect.insetBy(dx: -4, dy: -4) : rect.insetBy(dx: -8, dy: -2)
+        if viewModel.isOpen {
+            // Un peu de tolérance pour ne pas la fermer en frôlant le bord.
+            return rect.insetBy(dx: -4, dy: -4)
+        }
+        // Repliée : seulement le corps noir (sans les petits arrondis du haut), pour ne pas
+        // l'ouvrir en passant près d'elle. Elle dépasse en haut : un curseur collé au bord de
+        // l'écran est à `maxY`, que `contains` exclut.
+        var hot = rect.insetBy(dx: viewModel.topRadius, dy: 0)
+        hot.size.height += 2
+        return hot
+    }
+
+    /// Repliée, l'encoche ne s'ouvre qu'avec le curseur collé en haut de l'écran, au-dessus d'elle.
+    private func openingRect() -> NSRect {
+        let hot = hotRect()
+        return NSRect(x: hot.minX, y: screenFrame.maxY - 2, width: hot.width, height: 4)
     }
 
     private func handle(_ type: NSEvent.EventType) {
@@ -177,7 +191,7 @@ final class NotchWindowController {
         // Reste ouverte pendant une saisie, ou tant qu'un glisser parti de l'encoche n'est pas lâché
         // (sinon le fichier qu'on sort de l'étagère disparaîtrait en plein mouvement).
         let inside =
-            hotRect().contains(mouse)
+            (viewModel.isOpen ? hotRect() : openingRect()).contains(mouse)
             || (viewModel.isOpen && viewModel.holdOpen)
             || (viewModel.isOpen && dragStartedInside)
         if inside == viewModel.isOpen {
