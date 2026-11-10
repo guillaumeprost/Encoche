@@ -116,10 +116,15 @@ private struct ClipCard: View {
 
         case .image:
             if let thumb = clipboard.thumbnail(for: item) {
-                Image(nsImage: thumb)
-                    .resizable()
-                    .scaledToFill()
+                // Le cadre impose la taille et l'image le remplit en overlay : une image en
+                // portrait ne peut plus agrandir la carte ni déborder de l'encoche.
+                Color.clear
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .overlay {
+                        Image(nsImage: thumb)
+                            .resizable()
+                            .scaledToFill()
+                    }
                     .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             } else {
                 Image(systemName: "photo").foregroundStyle(.primary.opacity(0.5))
