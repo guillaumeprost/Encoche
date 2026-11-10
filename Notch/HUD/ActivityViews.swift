@@ -46,12 +46,8 @@ struct ActivityBubble: View {
     @Environment(FocusMonitor.self) private var focus
     let activity: LiveActivity
 
-    var body: some View {
-        ZStack {
-            Circle().fill(.black)
-            content
-        }
-    }
+    /// Contenu seul : le fond (et la division depuis l'encoche) est dessiné par `MitosisBubble`.
+    var body: some View { content }
 
     @ViewBuilder
     private var content: some View {
@@ -108,10 +104,108 @@ struct ActivityBubble: View {
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.indigo)
         case .music:
-            Artwork(image: music.artwork, cornerRadius: 11)
-                .frame(width: 22, height: 22)
-                .clipShape(Circle())
+            Artwork(image: music.artwork, cornerRadius: 5)
+                .frame(width: 21, height: 21)
         }
+    }
+}
+
+/// Deuxième activité qui se détache de l'encoche comme une cellule qui se divise : la bulle
+/// sort du bord, reste reliée par un col qui s'étire puis se rompt, et se pose avec un rebond.
+struct MitosisBubble: View {
+    let activity: LiveActivity
+    let size: CGFloat
+    /// Distance entre le bord de l'encoche et la bulle.
+    let gap: CGFloat
+    @State private var progress: Double = 0
+    /// Ressort arrêté : la forme nette remplace l'effet gluant (pas avant, sinon les deux
+    /// alternent pendant que le ressort oscille autour de sa position finale).
+    @State private var settled = false
+
+    var body: some View {
+        MitosisShape(progress: progress, settled: settled, size: size, gap: gap)
+            .frame(width: MitosisShape.overlap + gap + size, height: size)
+            .overlay(alignment: .trailing) {
+                ActivityBubble(activity: activity)
+                    .frame(width: size, height: size)
+                    .opacity(progress > 0.8 ? 1 : 0)
+                    .scaleEffect(progress > 0.8 ? 1 : 0.6)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.7), value: progress > 0.8)
+            }
+            .allowsHitTesting(false)
+            .onAppear {
+                withAnimation(.spring(response: 1.0, dampingFraction: 0.58)) {
+                    progress = 1
+                } completion: {
+                    settled = true
+                }
+            }
+    }
+}
+
+/// Forme de la division. Pendant l'animation : flou puis seuil de transparence (effet
+/// « gluant »), qui soude la bulle au bord de l'encoche tant qu'elles sont proches.
+/// Une fois posée : carré arrondi net, avec un fin liseré lumineux vers le bas.
+private struct MitosisShape: View, Animatable {
+    /// Largeur du bord de l'encoche repris dans la forme, pour que le col y prenne racine.
+    static let overlap: CGFloat = 6
+    /// Marge autour du dessin : le flou ne doit pas être coupé par le cadre.
+    private static let margin: CGFloat = 14
+
+    var progress: Double
+    let settled: Bool
+    let size: CGFloat
+    let gap: CGFloat
+
+    nonisolated var animatableData: Double {
+        get { progress }
+        set { progress = newValue }
+    }
+
+    private var bubbleShape: RoundedRectangle { RoundedRectangle(cornerRadius: 9, style: .continuous) }
+
+    var body: some View {
+        if settled {
+            bubbleShape
+                .fill(.black)
+                .overlay(bubbleShape.strokeBorder(rim, lineWidth: 1))
+                .frame(width: size, height: size)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+        } else {
+            Canvas { context, _ in
+                let margin = Self.margin
+                context.addFilter(.alphaThreshold(min: 0.5, color: .black))
+                context.addFilter(.blur(radius: 6))
+                context.drawLayer { layer in
+                    // Bord de l'encoche, d'où part la bulle : au milieu de la hauteur et sans
+                    // dépasser le bord, pour ne pas remplir les coins arrondis de l'encoche.
+                    layer.fill(
+                        Path(CGRect(x: 0, y: margin + size * 0.2, width: margin + Self.overlap, height: size * 0.6)),
+                        with: .color(.black))
+                    // La bulle grossit en s'éloignant (le ressort peut la faire dépasser un peu).
+                    let start = Self.overlap - size
+                    let end = Self.overlap + gap
+                    let side = size * (0.4 + 0.6 * min(progress, 1))
+                    let x = margin + start + (end - start) * progress + (size - side) / 2
+                    let rect = CGRect(x: x, y: margin + (size - side) / 2, width: side, height: side)
+                    layer.fill(Path(roundedRect: rect, cornerRadius: 9, style: .continuous), with: .color(.black))
+                }
+            }
+            .padding(-Self.margin)
+        }
+    }
+
+    /// Liseré comme le verre noir de l'encoche ouverte : invisible en haut, plus clair en bas.
+    private var rim: LinearGradient {
+        LinearGradient(
+            stops: [
+                .init(color: .white.opacity(0), location: 0),
+                .init(color: .white.opacity(0), location: 0.35),
+                .init(color: .white.opacity(0.22), location: 1),
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
     }
 }
 

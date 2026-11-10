@@ -146,11 +146,15 @@ struct NotchRootView: View {
             if showsBubble, let second = activities.dropFirst().first {
                 // Un peu plus petite que l'encoche, et décollée du haut de l'écran.
                 let size = vm.activityHeight - 8
-                ActivityBubble(activity: second)
-                    .frame(width: size, height: size)
+                // Elle se divise depuis le bord de l'encoche (sous l'évasement du haut).
+                MitosisBubble(activity: second, size: size, gap: 6 + vm.topRadius)
                     .offset(x: size + 6, y: 4)
                     .id(second)
-                    .transition(.scale(scale: 0.4, anchor: .leading).combined(with: .opacity))
+                    .transition(
+                        .asymmetric(
+                            insertion: .identity,
+                            removal: .scale(scale: 0.4, anchor: .leading).combined(with: .opacity)
+                        ))
             }
         }
         .animation(spring, value: activities)
