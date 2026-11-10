@@ -123,7 +123,7 @@ struct NotchRootView: View {
         }
         // En verre, le contenu suit l'apparence du Mac ; sur fond noir (repliée, ou verre
         // désactivé), il reste en style sombre pour rester lisible.
-        .environment(\.colorScheme, glassActive ? systemColorScheme : .dark)
+        .environment(\.colorScheme, glassActive && !showsMusicBackdrop ? systemColorScheme : .dark)
         .frame(width: size.width, height: size.height, alignment: .top)
         .clipShape(shape)
         // Une deuxième activité en même temps : petite bulle à droite, comme sur iPhone.
@@ -225,6 +225,20 @@ struct NotchRootView: View {
     /// comme l'encoche matérielle (effet Dynamic Island) : seule l'encoche ouverte change de style.
     private var glassActive: Bool { vm.isOpen && settings.notchStyle == .glass }
 
+    /// Onglet Musique : la pochette en fond, à gauche, ses couleurs floutées vers la droite.
+    private var showsMusicBackdrop: Bool {
+        vm.isOpen && settings.tab == .music && music.hasArtworkBackdrop
+    }
+
+    /// Forme de l'encoche du Mac, en noir, sur la pochette : nette comme l'encoche physique,
+    /// avec une ombre douce qui la détache de l'image.
+    private var notchBand: some View {
+        UnevenRoundedRectangle(bottomLeadingRadius: 10, bottomTrailingRadius: 10, style: .continuous)
+            .fill(.black)
+            .frame(width: vm.notchSize.width, height: vm.notchSize.height)
+            .shadow(color: .black.opacity(0.45), radius: 8, y: 2)
+    }
+
     /// Ouverte en verre noir.
     private var darkGlassActive: Bool { vm.isOpen && settings.notchStyle == .darkGlass }
 
@@ -291,6 +305,17 @@ struct NotchRootView: View {
                 shape.stroke(darkGlassRim, lineWidth: 1.5)
             }
             .opacity(darkGlassActive ? 1 : 0)
+
+            if showsMusicBackdrop {
+                // Jusqu'au séparateur : marge du contenu, lecteur, puis la moitié de l'espacement.
+                MusicBackdrop(playerWidth: 24 + vm.topRadius + MusicTab.playerWidth + MusicTab.spacing / 2)
+                    .overlay(alignment: .top) {
+                        if vm.hasPhysicalNotch { notchBand }
+                    }
+                    .clipShape(shape)
+                    .transition(.opacity)
+            }
         }
+        .animation(.easeInOut(duration: 0.4), value: showsMusicBackdrop)
     }
 }

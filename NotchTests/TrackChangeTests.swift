@@ -21,3 +21,19 @@ struct TrackChangeTests {
         #expect(!MusicController.isNewSong(track(""), after: track("One More Time")))
     }
 }
+
+struct MotionArtworkTests {
+    @Test func findsTheSquareVideoInTheAlbumPage() {
+        let page = """
+            "videoArtwork":{"dictionary":{"motionDetailSquare":{"previewFrame":{"bgColor":"1f1c1c","width":3840},\
+            "video":"https:\\u002F\\u002Fmvod.itunes.apple.com\\u002Fa\\u002FP1_default.m3u8"}}},\
+            "tallVideoArtwork":{"dictionary":{"motionDetailTall":{"video":"https://mvod.itunes.apple.com/b/P2_default.m3u8"}}}
+            """
+        #expect(
+            MusicExtras.motionArtworkURL(inAlbumPage: page)?.absoluteString == "https://mvod.itunes.apple.com/a/P1_default.m3u8")
+    }
+
+    @Test func noVideoWithoutMotionArtwork() {
+        #expect(MusicExtras.motionArtworkURL(inAlbumPage: #"{"artwork":{"url":"https://is1-ssl.mzstatic.com/x.jpg"}}"#) == nil)
+    }
+}

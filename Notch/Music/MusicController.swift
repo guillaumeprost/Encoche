@@ -51,6 +51,9 @@ final class MusicController {
 
     var showsActivity: Bool { track != nil && isPlaying }
 
+    /// L'onglet Musique peut mettre la pochette en fond : Musique ou Spotify, pochette chargée.
+    var hasArtworkBackdrop: Bool { track != nil && externalPlayer == nil && artwork != nil }
+
     /// Indicateur sous l'encoche repliée, pour annoncer le morceau suivant.
     @ObservationIgnored var hud: HUDCenter?
     @ObservationIgnored var announcesTrackChanges: () -> Bool = { true }

@@ -8,6 +8,8 @@ import Observation
 ///   playlist en cours (bibliothèque, AppleScript).
 ///   Sinon (Apple Music en streaming, Spotify), on affiche la suite de l'album en cours,
 ///   trouvée dans le catalogue public d'Apple (iTunes Search : titre, artiste et album envoyés).
+/// - Pochette animée : vidéo en boucle d'Apple Music, lue sur la page publique de l'album
+///   (music.apple.com), pour les albums qui en ont une.
 /// - Paroles : LRCLIB (lrclib.net), service libre et gratuit, avec paroles synchronisées.
 ///   Seuls le titre, l'artiste, l'album et la durée du morceau y sont envoyés.
 @Observable
@@ -49,10 +51,15 @@ final class MusicExtras {
     private(set) var lyrics: [LyricLine] = []
     private(set) var lyricsSynced = false
     private(set) var lyricsState: LoadState = .idle
+    /// Vidéo en boucle (HLS) de la pochette, pour les albums qui en ont une.
+    private(set) var motionArtwork: URL?
 
     @ObservationIgnored private let music: MusicController
     @ObservationIgnored private var loadedTrack: MusicController.Track?
     @ObservationIgnored private var lyricsCache: [String: ([LyricLine], Bool)] = [:]
+    /// Pochette animée par album (nil : l'album n'en a pas).
+    @ObservationIgnored private var motionCache: [String: URL?] = [:]
+    @ObservationIgnored private var motionTrack: MusicController.Track?
 
     init(music: MusicController) {
         self.music = music
@@ -209,10 +216,11 @@ final class MusicExtras {
         let results: [Item]
     }
 
-    /// Morceaux de l'album après le morceau en cours, d'après le catalogue public d'Apple.
-    private nonisolated static func albumTracks(after track: MusicController.Track) async -> [QueueItem]? {
+    private nonisolated static var country: String { Locale.current.region?.identifier ?? "FR" }
+
+    /// Identifiant de l'album du morceau dans le catalogue public d'Apple.
+    private nonisolated static func albumID(of track: MusicController.Track) async -> Int? {
         guard !track.album.isEmpty else { return nil }
-        let country = Locale.current.region?.identifier ?? "FR"
         let wantedAlbum = normalized(track.album)
         let wantedArtist = normalized(track.artist)
 
@@ -232,11 +240,15 @@ final class MusicExtras {
         }
 
         // Le morceau d'abord (donne directement son album), puis l'album par son nom.
-        var collection = await search("\(track.artist) \(track.title)", entity: "song").first(where: matches)?.collectionId
-        if collection == nil {
-            collection = await search(track.album, entity: "album", attribute: "albumTerm").first(where: matches)?.collectionId
+        if let id = await search("\(track.artist) \(track.title)", entity: "song").first(where: matches)?.collectionId {
+            return id
         }
-        guard let collection else { return nil }
+        return await search(track.album, entity: "album", attribute: "albumTerm").first(where: matches)?.collectionId
+    }
+
+    /// Morceaux de l'album après le morceau en cours, d'après le catalogue public d'Apple.
+    private nonisolated static func albumTracks(after track: MusicController.Track) async -> [QueueItem]? {
+        guard let collection = await albumID(of: track) else { return nil }
 
         var lookup = URLComponents(string: "https://itunes.apple.com/lookup")!
         lookup.queryItems = [
@@ -261,6 +273,49 @@ final class MusicExtras {
                 duration: (song.trackTimeMillis ?? 0) / 1000
             )
         }
+    }
+
+    // MARK: - Pochette animée
+
+    /// Cherche la pochette animée du morceau en cours, si ce n'est pas déjà fait.
+    /// Seulement pour Musique et Spotify : un autre lecteur (YouTube…) n'a pas d'album.
+    func loadMotionArtwork() {
+        guard let track = music.track, music.source != nil else {
+            motionArtwork = nil
+            motionTrack = nil
+            return
+        }
+        guard track != motionTrack else { return }
+        motionTrack = track
+        let key = "\(track.artist)|\(track.album)"
+        if let cached = motionCache[key] {
+            motionArtwork = cached
+            return
+        }
+        motionArtwork = nil
+        Task {
+            let url = await Self.motionArtwork(of: track)
+            motionCache[key] = url
+            guard music.track == track else { return }
+            motionArtwork = url
+        }
+    }
+
+    private nonisolated static func motionArtwork(of track: MusicController.Track) async -> URL? {
+        guard let album = await albumID(of: track),
+            let page = await request(URL(string: "https://music.apple.com/\(country.lowercased())/album/\(album)")!),
+            let html = String(data: page, encoding: .utf8)
+        else { return nil }
+        return motionArtworkURL(inAlbumPage: html)
+    }
+
+    /// Vidéo carrée de la pochette dans le JSON de la page d'un album (« motionDetailSquare »).
+    nonisolated static func motionArtworkURL(inAlbumPage html: String) -> URL? {
+        let text = html.replacingOccurrences(of: "\\u002F", with: "/")
+        guard let start = text.range(of: "\"motionDetailSquare\"") else { return nil }
+        let rest = text[start.upperBound...].prefix(4000)
+        guard let match = rest.firstMatch(of: /"video":"(https:[^"]+?\.m3u8)"/) else { return nil }
+        return URL(string: String(match.1))
     }
 
     private nonisolated static func normalized(_ text: String) -> String {

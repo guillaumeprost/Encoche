@@ -69,7 +69,7 @@ struct ExpandedMusicView: View {
     var body: some View {
         if let track = music.track {
             HStack(spacing: 16) {
-                Artwork(image: music.artwork, cornerRadius: 14)
+                AnimatedArtwork(cornerRadius: 14)
                     .frame(width: 84, height: 84)
                     .shadow(color: music.accent.opacity(0.35), radius: 12, y: 4)
                     .onTapGesture { music.openSourceApp() }
@@ -263,6 +263,10 @@ struct AudioBars: View {
 
 /// Onglet Musique : le lecteur à gauche, les paroles ou la file d'attente à droite.
 struct MusicTab: View {
+    /// Largeur du lecteur, à gauche du séparateur (le fond de pochette s'y cale).
+    static let playerWidth: CGFloat = 270
+    static let spacing: CGFloat = 20
+
     @Environment(MusicController.self) private var music
     @Environment(MusicExtras.self) private var extras
     @AppStorage("musicSidePanel") private var showsQueue = false
@@ -276,9 +280,9 @@ struct MusicTab: View {
             VideoPlayerView()
                 .foregroundStyle(.primary)
         } else {
-            HStack(spacing: 20) {
+            HStack(spacing: Self.spacing) {
                 MusicTabPlayer()
-                    .frame(width: 270)
+                    .frame(width: Self.playerWidth)
                 Rectangle()
                     .fill(.primary.opacity(0.12))
                     .frame(width: 1)
@@ -313,10 +317,30 @@ private struct MusicTabPlayer: View {
     @Environment(MusicController.self) private var music
 
     var body: some View {
-        if let track = music.track {
+        if let track = music.track, music.hasArtworkBackdrop {
+            // La pochette est en fond, derrière : le titre et les commandes passent dessus, en bas.
+            VStack(alignment: .leading, spacing: 8) {
+                Spacer(minLength: 0)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(track.title)
+                        .font(.system(size: 15, weight: .bold))
+                    Text(track.artist)
+                        .font(.system(size: 13))
+                        .foregroundStyle(.primary.opacity(0.75))
+                }
+                .lineLimit(1)
+                .onTapGesture { music.openSourceApp() }
+                if track.duration > 0 {
+                    ProgressBar(duration: track.duration)
+                }
+                Controls()
+            }
+            .shadow(color: .black.opacity(0.35), radius: 6)
+            .frame(maxHeight: .infinity)
+        } else if let track = music.track {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 14) {
-                    Artwork(image: music.artwork, cornerRadius: 14)
+                    AnimatedArtwork(cornerRadius: 14)
                         .frame(width: 96, height: 96)
                         .shadow(color: music.accent.opacity(0.4), radius: 14, y: 5)
                         .onTapGesture { music.openSourceApp() }
