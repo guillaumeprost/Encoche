@@ -129,13 +129,7 @@ final class NotchWindowController {
 
     /// Zone active en coordonnées écran globales (origine en bas à gauche de l'écran principal).
     private func hotRect() -> NSRect {
-        let size = viewModel.shapeSize(
-            showsActivity: !LiveActivity.active(
-                settings: settings, claudeCode: claudeCode, privacy: privacy, downloads: downloads, music: music,
-                calendar: calendar, timer: timer, focus: focus, calls: calls
-            ).isEmpty,
-            tab: settings.tab
-        )
+        let size = viewModel.shapeSize(showsActivity: currentActivity() != nil, tab: settings.tab)
         let rect = ScreenLayout.topCenter(size, in: screenFrame)
         if viewModel.isOpen {
             // Un peu de tolérance pour ne pas la fermer en frôlant le bord.
@@ -149,6 +143,35 @@ final class NotchWindowController {
         return hot
     }
 
+    /// Activités en direct de l'encoche repliée, la plus importante d'abord.
+    private func currentActivities() -> [LiveActivity] {
+        LiveActivity.active(
+            settings: settings, claudeCode: claudeCode, privacy: privacy, downloads: downloads, music: music,
+            calendar: calendar, timer: timer, focus: focus, calls: calls
+        )
+    }
+
+    private func currentActivity() -> LiveActivity? { currentActivities().first }
+
+    /// Repliée, le curseur est sur une activité en direct : un clic ouvre son onglet.
+    /// Avec une notification dessous, seule la rangée du haut (celle de l'activité) compte.
+    /// La deuxième activité est la petite bulle à droite de l'encoche.
+    private func activityUnderMouse() -> LiveActivity? {
+        let mouse = NSEvent.mouseLocation
+        guard !viewModel.isOpen, !viewModel.isRetracted else { return nil }
+        let activities = currentActivities()
+        let hot = hotRect()
+        if hot.contains(mouse) {
+            if viewModel.showsAlert, mouse.y < hot.maxY - viewModel.notchSize.height - 2 { return nil }
+            return activities.first
+        }
+        // Même place que dans NotchRootView : décalée de 6 points à droite de la forme, 4 sous le haut.
+        guard activities.count > 1, !viewModel.showsAlert else { return nil }
+        let size = viewModel.activityHeight - 8
+        let bubble = NSRect(x: hot.maxX + viewModel.topRadius + 6, y: hot.maxY - 2 - 4 - size, width: size, height: size)
+        return bubble.insetBy(dx: -8, dy: -6).contains(mouse) ? activities[1] : nil
+    }
+
     /// Repliée, l'encoche ne s'ouvre qu'avec le curseur collé en haut de l'écran, au-dessus d'elle.
     private func openingRect() -> NSRect {
         let hot = hotRect()
@@ -158,6 +181,13 @@ final class NotchWindowController {
     private func handle(_ type: NSEvent.EventType) {
         switch type {
         case .leftMouseDown:
+            if let activity = activityUnderMouse() {
+                pendingToggle?.cancel()
+                pendingToggle = nil
+                settings.tab = activity.tab
+                setOpen(true)
+                return
+            }
             dragStartedInside = viewModel.isOpen && hotRect().contains(NSEvent.mouseLocation)
             dragChangeCount = NSPasteboard(name: .drag).changeCount
         case .leftMouseDragged:
@@ -184,7 +214,9 @@ final class NotchWindowController {
             return
         }
         alerts.setHovering(false, from: ObjectIdentifier(self))
-        if !viewModel.isOpen { panel.ignoresMouseEvents = true }
+        // Repliée, elle ne prend les clics que sur une activité en direct (qui ouvre son onglet) :
+        // ailleurs, ils passent à l'app en dessous.
+        if !viewModel.isOpen { panel.ignoresMouseEvents = activityUnderMouse() == nil }
 
         if isFullScreen, !handleFullScreenReveal(mouse) { return }
 

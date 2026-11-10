@@ -37,3 +37,13 @@ struct MotionArtworkTests {
         #expect(MusicExtras.motionArtworkURL(inAlbumPage: #"{"artwork":{"url":"https://is1-ssl.mzstatic.com/x.jpg"}}"#) == nil)
     }
 }
+
+struct ActivityTabTests {
+    @Test func activitiesOpenTheirTab() {
+        #expect(LiveActivity.music.tab == .music)
+        #expect(LiveActivity.claudeWaiting.tab == .claude)
+        #expect(LiveActivity.claudeWorking.tab == .claude)
+        #expect(LiveActivity.meeting.tab == .calendar)
+        #expect(LiveActivity.timer.tab == .home)
+    }
+}

@@ -4,6 +4,16 @@ import SwiftUI
 enum LiveActivity: Hashable {
     case call, claudeWaiting, privacy, meeting, timer, download, claudeWorking, music, focus
 
+    /// Onglet ouvert d'un clic sur l'activité.
+    var tab: NotchTab {
+        switch self {
+        case .music: .music
+        case .claudeWaiting, .claudeWorking: .claude
+        case .meeting: .calendar
+        case .call, .privacy, .timer, .download, .focus: .home
+        }
+    }
+
     /// Activités en cours, la plus importante d'abord.
     @MainActor
     static func active(
