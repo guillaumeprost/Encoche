@@ -7,6 +7,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var screenManager: NotchScreenManager?
     private var lockScreen: LockScreenController?
+    private var screenSaver: ScreenSaverOverlay?
     private var settingsWindow: SettingsWindowController?
     /// Empêche « App Nap » : macOS suspendrait sinon les minuteurs d'une app sans fenêtre
     /// au premier plan, et le presse-papier ou les notifications ne seraient plus suivis.
@@ -35,5 +36,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.settingsWindow = settingsWindow
         screenManager = NotchScreenManager(services: services)
         lockScreen = LockScreenController(services: services)
+        screenSaver = ScreenSaverOverlay(services: services)
     }
 }

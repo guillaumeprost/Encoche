@@ -97,7 +97,8 @@ private struct LockTimerCard: View {
     }
 }
 
-private struct LockClaudeCard: View {
+/// Session Claude Code : écran verrouillé et économiseur d'écran.
+struct LockClaudeCard: View {
     let session: ClaudeCodeSession
 
     var body: some View {
