@@ -36,5 +36,9 @@ PASS=$(/usr/bin/openssl rand -hex 12)
 /usr/bin/openssl pkcs12 -export -inkey "$WORK/key.pem" -in "$WORK/cert.pem" \
   -name "$NAME" -out "$WORK/notch.p12" -passout "pass:$PASS" 2>/dev/null
 security import "$WORK/notch.p12" -k "$KEYCHAIN" -P "$PASS" -T /usr/bin/codesign -T /usr/bin/security
+# Approuvé pour la signature de code : sans ça, le Trousseau rattache ses autorisations
+# (« Toujours autoriser ») à chaque build et redemande l'accès après chaque compilation.
+# macOS demande ton mot de passe pour l'approuver.
+security add-trusted-cert -r trustRoot -p codeSign -k "$KEYCHAIN" "$WORK/cert.pem"
 
-echo "Certificat « $NAME » créé."
+echo "Certificat « $NAME » créé et approuvé."
