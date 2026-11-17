@@ -6,6 +6,8 @@ import Observation
 @MainActor
 final class ClaudeCodeMonitor {
     private static let staleAfter: TimeInterval = 2 * 3600
+    /// Sans nouvelle d'une session qui travaille depuis ce délai, on regarde si tu l'as interrompue.
+    static let quietAfter: TimeInterval = 20
     /// Sessions gardées dans le sélecteur (les plus récentes).
     static let recentLimit = 5
 
@@ -26,6 +28,9 @@ final class ClaudeCodeMonitor {
 
     /// L'app de la session (terminal, app Claude) est au premier plan : pas besoin de notification.
     @ObservationIgnored var isSessionAppInFront: @MainActor (pid_t?) -> Bool = ClaudeCodeMonitor.isAppInFront
+    /// Le processus Claude Code d'une session tourne encore (remplaçable dans les tests).
+    @ObservationIgnored var isProcessAlive: (pid_t) -> Bool = ClaudeCodeMonitor.processExists
+    @ObservationIgnored private var isCheckingSessions = false
 
     /// `listens: false` (tests) : ni serveur de hooks, ni minuteurs, ni lecture des transcriptions.
     init(listens: Bool = true) {
@@ -38,10 +43,20 @@ final class ClaudeCodeMonitor {
         self.server = server
 
         // Ajoute les hooks apparus depuis l'installation (ex. demandes de permission).
-        if hooksInstalled { try? ClaudeHooksInstaller.install() }
+        if hooksInstalled {
+            do {
+                try ClaudeHooksInstaller.install()
+            } catch {
+                NSLog("[Encoche] Claude hooks update failed: \(error)")
+                hooksError = error.localizedDescription
+            }
+        }
 
-        cleanupTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.markStaleSessionsInactive() }
+        cleanupTimer = Timer.scheduledTimer(withTimeInterval: 15, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                Task { await self.checkSessions() }
+            }
         }
         loadRecentSessions()
     }
@@ -70,6 +85,12 @@ final class ClaudeCodeMonitor {
     }
 
     var waitingCount: Int { sessions.filter { $0.state == .waiting }.count }
+    /// Sessions qui travaillent en même temps.
+    var workingCount: Int { sessions.filter { $0.state == .working }.count }
+    /// Une session a donné signe de vie récemment (pour suivre les quotas sans interroger le service pour rien).
+    var hasRecentActivity: Bool {
+        sessions.contains { $0.state != .inactive && Date().timeIntervalSince($0.updatedAt) < 15 * 60 }
+    }
     /// L'encoche repliée signale en continu les sessions qui t'attendent
     /// (les fins de tâche passent par une notification).
     var needsAttention: Bool { waitingCount > 0 }
@@ -306,7 +327,7 @@ final class ClaudeCodeMonitor {
         if isAskSession(cwd) { return }
 
         // Tout événement qui suit montre que la demande a été tranchée ailleurs.
-        if ["PreToolUse", "PostToolUse", "UserPromptSubmit", "Stop", "SessionEnd"].contains(name) {
+        if ["PreToolUse", "PostToolUse", "UserPromptSubmit", "Stop", "SessionEnd", "PreCompact"].contains(name) {
             resolvePermissions(of: id)
             clearWaitingAlert(of: id)
         }
@@ -317,6 +338,7 @@ final class ClaudeCodeMonitor {
                 $0.state = .inactive
                 $0.detail = nil
                 $0.pid = nil
+                $0.workStartedAt = nil
             }
             trimSessions()
             return
@@ -333,9 +355,16 @@ final class ClaudeCodeMonitor {
 
         switch name {
         case "SessionStart":
+            // Après une compaction, la session reprend là où elle en était.
+            let afterCompact = event["source"] as? String == "compact"
             upsert(id, cwd: cwd) {
-                $0.state = .idle
-                $0.detail = nil
+                if afterCompact {
+                    if $0.detail == ClaudeActivity.compacting { $0.detail = nil }
+                } else {
+                    $0.state = .idle
+                    $0.detail = nil
+                    $0.workStartedAt = nil
+                }
             }
             readTranscript(of: id)
         case "UserPromptSubmit":
@@ -343,6 +372,7 @@ final class ClaudeCodeMonitor {
             upsert(id, cwd: cwd) { session in
                 session.state = .working
                 session.detail = nil
+                session.workStartedAt = Date()
                 session.prompt = prompt?.isEmpty == false ? prompt : session.prompt
                 session.agents = []
                 session.lastMessage = nil
@@ -358,6 +388,7 @@ final class ClaudeCodeMonitor {
             if let toolUseID { lastToolUse[id] = (tool, toolUseID) }
             upsert(id, cwd: cwd) { session in
                 session.state = .working
+                if session.workStartedAt == nil { session.workStartedAt = Date() }
                 session.detail = ClaudeActivity.describe(tool: tool, input: input)
                 ClaudeActivity.applyPlan(tool: tool, input: input, to: &session.plan)
                 if let choices = ClaudeActivity.suggestedReplies(tool: tool, input: input) { session.choices = choices }
@@ -375,11 +406,24 @@ final class ClaudeCodeMonitor {
             upsert(id, cwd: cwd) { session in
                 session.state = .working
                 guard ClaudeActivity.agentTools.contains(tool) else { return }
+                // Agent lancé en arrière-plan : il continue, sa fin arrive avec « SubagentStop ».
+                if input["run_in_background"] as? Bool == true { return }
                 let name = input["description"] as? String
                 let index =
                     session.agents.firstIndex { $0.id == toolUseID }
                     ?? session.agents.firstIndex { $0.isRunning && $0.name == name }
                 if let index { session.agents[index].isRunning = false }
+            }
+        case "SubagentStop":
+            // L'événement ne dit pas quel appel a lancé l'agent : le plus ancien encore en cours.
+            update(id) { session in
+                if let index = session.agents.firstIndex(where: \.isRunning) { session.agents[index].isRunning = false }
+            }
+        case "PreCompact":
+            upsert(id, cwd: cwd) { session in
+                session.state = .working
+                if session.workStartedAt == nil { session.workStartedAt = Date() }
+                session.detail = ClaudeActivity.compacting
             }
         case "Notification":
             let message = event["message"] as? String ?? ""
@@ -402,6 +446,7 @@ final class ClaudeCodeMonitor {
             upsert(id, cwd: cwd) { session in
                 session.state = .done
                 session.detail = nil
+                session.workStartedAt = nil
                 for index in session.agents.indices { session.agents[index].isRunning = false }
             }
             announceDone(id, reply: event["last_assistant_message"] as? String)
@@ -504,13 +549,60 @@ final class ClaudeCodeMonitor {
         return info
     }
 
-    /// Une session muette depuis longtemps est sans doute fermée : elle devient inactive.
-    private func markStaleSessionsInactive() {
-        let limit = Date().addingTimeInterval(-Self.staleAfter)
+    /// Fait le ménage dans les sessions dont Claude Code ne donne plus de nouvelles :
+    /// - processus Claude Code disparu (terminal fermé sans `SessionEnd`) : session fermée ;
+    /// - interrompue avec Échap (aucun `Stop` n'est envoyé) : elle redevient prête ;
+    /// - muette depuis longtemps : sans doute fermée.
+    func checkSessions(now: Date = Date()) async {
+        guard !isCheckingSessions else { return }
+        isCheckingSessions = true
+        defer { isCheckingSessions = false }
+
+        for index in sessions.indices where sessions[index].state != .inactive {
+            let session = sessions[index]
+            // Un événement tout juste reçu peut venir d'un processus intermédiaire : on laisse une minute.
+            guard let pid = session.pid, now.timeIntervalSince(session.updatedAt) > 60, !isProcessAlive(pid) else { continue }
+            resolvePermissions(of: session.id)
+            clearWaitingAlert(of: session.id)
+            sessions[index].state = .inactive
+            sessions[index].detail = nil
+            sessions[index].pid = nil
+            sessions[index].workStartedAt = nil
+        }
+
+        let quiet = sessions.filter {
+            $0.state == .working && $0.transcriptPath != nil && now.timeIntervalSince($0.updatedAt) > Self.quietAfter
+                && permission(for: $0.id) == nil
+        }
+        if !quiet.isEmpty {
+            let checks = quiet.map { ($0.id, $0.transcriptPath ?? "") }
+            let interrupted = await Task.detached(priority: .utility) {
+                checks.filter { _, path in Self.transcriptTail(at: path).map(Self.endsWithInterruption) ?? false }.map(\.0)
+            }.value
+            for id in interrupted {
+                // Un événement est arrivé pendant la lecture : la session a repris.
+                guard let session = sessions.first(where: { $0.id == id }), session.state == .working,
+                    now.timeIntervalSince(session.updatedAt) > Self.quietAfter
+                else { continue }
+                update(id) { session in
+                    session.state = .idle
+                    session.detail = "Interrompue"
+                    session.workStartedAt = nil
+                    for index in session.agents.indices { session.agents[index].isRunning = false }
+                }
+            }
+        }
+
+        let limit = now.addingTimeInterval(-Self.staleAfter)
         for index in sessions.indices where sessions[index].updatedAt < limit && sessions[index].state != .inactive {
             sessions[index].state = .inactive
+            sessions[index].workStartedAt = nil
         }
         trimSessions()
+    }
+
+    nonisolated private static func processExists(_ pid: pid_t) -> Bool {
+        kill(pid, 0) == 0 || errno != ESRCH
     }
 
     /// Garde les sessions actives et complète avec les plus récentes, jusqu'à `recentLimit`.

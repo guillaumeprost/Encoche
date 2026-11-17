@@ -26,8 +26,24 @@ final class ClaudeUsage {
         }
     }
 
+    /// Consommation d'une journée, en tout, par projet et par modèle.
+    struct Day: Sendable {
+        var totals = Totals()
+        var byProject: [String: Totals] = [:]
+        var byModel: [String: Totals] = [:]
+
+        mutating func add(_ usage: Totals, project: String, model: String?) {
+            totals = totals + usage
+            byProject[project] = (byProject[project] ?? Totals()) + usage
+            if let model { byModel[model] = (byModel[model] ?? Totals()) + usage }
+        }
+    }
+
     private(set) var today = Totals()
     private(set) var week = Totals()
+    /// Sur 7 jours, les plus gros consommateurs d'abord.
+    private(set) var weekByProject: [(name: String, totals: Totals)] = []
+    private(set) var weekByModel: [(name: String, totals: Totals)] = []
     private(set) var isLoaded = false
 
     @ObservationIgnored private let scanner = Scanner()
@@ -42,8 +58,11 @@ final class ClaudeUsage {
             let calendar = Calendar.current
             let startOfToday = calendar.startOfDay(for: Date())
             let weekStart = calendar.date(byAdding: .day, value: -6, to: startOfToday) ?? startOfToday
-            today = days[startOfToday] ?? Totals()
-            week = days.filter { $0.key >= weekStart }.values.reduce(Totals(), +)
+            let lastWeek = days.filter { $0.key >= weekStart }.values
+            today = days[startOfToday]?.totals ?? Totals()
+            week = lastWeek.map(\.totals).reduce(Totals(), +)
+            weekByProject = Self.ranked(lastWeek.map(\.byProject))
+            weekByModel = Self.ranked(lastWeek.map(\.byModel))
             isLoaded = true
             isRefreshing = false
         }
@@ -58,6 +77,27 @@ final class ClaudeUsage {
         }
     }
 
+    /// Additionne les répartitions de plusieurs jours, la plus grosse part d'abord.
+    nonisolated static func ranked(_ parts: [[String: Totals]]) -> [(name: String, totals: Totals)] {
+        let merged = parts.reduce(into: [String: Totals]()) { result, part in
+            result.merge(part, uniquingKeysWith: +)
+        }
+        return merged.map { (name: $0.key, totals: $0.value) }.sorted { $0.totals.total > $1.totals.total }
+    }
+
+    /// « claude-opus-4-5-20251101 » → « Opus 4.5 » ; `nil` pour les réponses sans modèle réel.
+    nonisolated static func modelName(_ id: String?) -> String? {
+        guard var id, !id.isEmpty, !id.hasPrefix("<") else { return nil }
+        if id.hasPrefix("claude-") { id.removeFirst("claude-".count) }
+        // Date de version en fin d'identifiant.
+        var parts = id.split(separator: "-").map(String.init)
+        if let last = parts.last, last.count == 8, Int(last) != nil { parts.removeLast() }
+        // « opus-4-5 » comme « 3-5-sonnet » (anciens identifiants) : la famille, puis la version.
+        guard let family = parts.first(where: { Int($0) == nil }) else { return nil }
+        let version = parts.filter { Int($0) != nil }.joined(separator: ".")
+        return family.prefix(1).uppercased() + family.dropFirst() + (version.isEmpty ? "" : " \(version)")
+    }
+
     // MARK: - Lecture
 
     /// Lecture des fichiers hors du fil principal, en gardant où on s'est arrêté dans chacun.
@@ -65,14 +105,14 @@ final class ClaudeUsage {
         private var offsets: [String: UInt64] = [:]
         /// Réponses déjà comptées, avec leur jour (oubliées avec les jours trop anciens).
         private var seenMessages: [String: Date] = [:]
-        private var days: [Date: Totals] = [:]
+        private var days: [Date: Day] = [:]
         private let isoFormatter: ISO8601DateFormatter = {
             let formatter = ISO8601DateFormatter()
             formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
             return formatter
         }()
 
-        func scan() -> [Date: Totals] {
+        func scan() -> [Date: Day] {
             let fm = FileManager.default
             let root = fm.homeDirectoryForCurrentUser.appendingPathComponent(".claude/projects")
             let since = Date().addingTimeInterval(-8 * 86_400)
@@ -122,12 +162,16 @@ final class ClaudeUsage {
                 let day = Calendar.current.startOfDay(for: date)
                 guard !id.isEmpty, seenMessages.updateValue(day, forKey: id) == nil else { continue }
 
-                var totals = days[day] ?? Totals()
-                totals.input += usage["input_tokens"] as? Int ?? 0
-                totals.output += usage["output_tokens"] as? Int ?? 0
-                totals.cacheWrite += usage["cache_creation_input_tokens"] as? Int ?? 0
-                totals.cacheRead += usage["cache_read_input_tokens"] as? Int ?? 0
-                days[day] = totals
+                let totals = Totals(
+                    input: usage["input_tokens"] as? Int ?? 0,
+                    output: usage["output_tokens"] as? Int ?? 0,
+                    cacheWrite: usage["cache_creation_input_tokens"] as? Int ?? 0,
+                    cacheRead: usage["cache_read_input_tokens"] as? Int ?? 0)
+                // Projet : le dossier de travail, sinon le dossier de la transcription.
+                let project =
+                    (entry["cwd"] as? String).map(ClaudeCodeSession.projectName(for:))
+                    ?? url.deletingLastPathComponent().lastPathComponent
+                days[day, default: Day()].add(totals, project: project, model: ClaudeUsage.modelName(message["model"] as? String))
             }
             return UInt64(complete.count)
         }
@@ -174,6 +218,18 @@ struct ClaudeUsageLabel: View {
                 + "\(ClaudeUsage.format(totals.output)) écrits, \(ClaudeUsage.format(totals.input + totals.cacheWrite)) lus, "
                 + "\(ClaudeUsage.format(totals.cacheRead)) relus en cache"
         }
-        return [line("Aujourd'hui", usage.today), line("7 derniers jours", usage.week)].joined(separator: "\n")
+        func top(_ title: String, _ list: [(name: String, totals: ClaudeUsage.Totals)]) -> String? {
+            let shown = list.prefix(5).filter { $0.totals.total > 0 }
+            guard !shown.isEmpty, usage.week.total > 0 else { return nil }
+            let lines = shown.map { item in
+                let share = Int((Double(item.totals.total) / Double(usage.week.total) * 100).rounded())
+                return "  \(item.name) : \(ClaudeUsage.format(item.totals.total)) (\(share) %)"
+            }
+            return ([title] + lines).joined(separator: "\n")
+        }
+        return [
+            line("Aujourd'hui", usage.today), line("7 derniers jours", usage.week),
+            top("\nPar projet (7 j)", usage.weekByProject), top("\nPar modèle (7 j)", usage.weekByModel),
+        ].compactMap { $0 }.joined(separator: "\n")
     }
 }

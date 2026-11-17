@@ -190,6 +190,72 @@ struct ClaudeCodeMonitorTests {
         #expect(monitor.permissions.isEmpty)
         #expect(state() == .waiting)
     }
+
+    // MARK: - Sessions sans nouvelles
+
+    @Test func closedTerminalMakesTheSessionInactive() async {
+        send("PreToolUse", ["tool_name": "Bash", "_claude_pid": Int32(4242)])
+        monitor.isProcessAlive = { _ in false }
+        // Événement tout juste reçu : on attend encore.
+        await monitor.checkSessions()
+        #expect(state() == .working)
+        await monitor.checkSessions(now: Date().addingTimeInterval(120))
+        #expect(state() == .inactive)
+        #expect(monitor.workingSession == nil)
+    }
+
+    @Test func interruptedSessionStopsWorking() async throws {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).jsonl")
+        defer { try? FileManager.default.removeItem(at: file) }
+        try #"{"type":"user","message":{"content":[{"type":"text","text":"[Request interrupted by user]"}]}}"#
+            .write(to: file, atomically: true, encoding: .utf8)
+        send("UserPromptSubmit", ["prompt": "Fais ça", "transcript_path": file.path])
+        #expect(monitor.sessions.first?.workStartedAt != nil)
+
+        await monitor.checkSessions(now: Date().addingTimeInterval(30))
+        #expect(state() == .idle)
+        #expect(monitor.sessions.first?.detail == "Interrompue")
+        #expect(monitor.sessions.first?.workStartedAt == nil)
+    }
+
+    @Test func compactionShowsAndKeepsWorking() {
+        send("UserPromptSubmit", ["prompt": "Go"])
+        send("PreCompact")
+        #expect(monitor.sessions.first?.detail == ClaudeActivity.compacting)
+        send("SessionStart", ["source": "compact"])
+        #expect(state() == .working)
+        #expect(monitor.sessions.first?.detail == nil)
+    }
+
+    @Test func backgroundAgentEndsWithSubagentStop() {
+        let input: [String: Any] = ["description": "Fouille", "run_in_background": true]
+        send("PreToolUse", ["tool_name": "Agent", "tool_use_id": "t1", "tool_input": input])
+        send("PostToolUse", ["tool_name": "Agent", "tool_use_id": "t1", "tool_input": input])
+        #expect(monitor.sessions.first?.agents.first?.isRunning == true)
+        send("SubagentStop")
+        #expect(monitor.sessions.first?.agents.first?.isRunning == false)
+    }
+
+    @Test func parallelSessionsAreCounted() {
+        send("PreToolUse", session: "a", ["tool_name": "Bash"])
+        send("PreToolUse", session: "b", ["tool_name": "Bash"])
+        #expect(monitor.workingCount == 2)
+    }
+
+    @Test func quotaAlertsOncePerThreshold() {
+        let quota = ClaudeQuota()
+        quota.alerts = alerts
+        let reset = Date().addingTimeInterval(3600)
+        quota.set(fiveHour: .init(used: 0.82, resetsAt: reset), week: nil)
+        quota.checkThresholds()
+        #expect(alerts.current?.title == "Quota de 5 heures presque atteint")
+        alerts.dismiss()
+        quota.checkThresholds()
+        #expect(alerts.current == nil)
+        quota.set(fiveHour: .init(used: 0.96, resetsAt: reset), week: nil)
+        quota.checkThresholds()
+        #expect(alerts.current != nil)
+    }
 }
 
 /// Lecture des requêtes HTTP envoyées par les hooks.
@@ -266,4 +332,5 @@ struct ClaudeAlertsTests {
             reply: testReply())
         #expect(ClaudeAlerts.question(permission, decide: { _ in }, focus: {}) == nil)
     }
+
 }

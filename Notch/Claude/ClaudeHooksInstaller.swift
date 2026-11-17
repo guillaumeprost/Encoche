@@ -18,7 +18,8 @@ enum ClaudeHooksInstaller {
     }
 
     static let events = [
-        "SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PermissionRequest", "Notification", "Stop", "SessionEnd",
+        "SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PermissionRequest", "Notification", "Stop",
+        "SubagentStop", "PreCompact", "SessionEnd",
     ]
     /// Les événements d'outils (`PreToolUse`…) exigent un matcher.
     private static let toolEvents: Set<String> = ["PreToolUse", "PostToolUse", "PermissionRequest"]

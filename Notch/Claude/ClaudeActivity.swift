@@ -5,6 +5,8 @@ import Foundation
 enum ClaudeActivity {
     /// Outils qui lancent un sous-agent.
     static let agentTools: Set<String> = ["Agent", "Task"]
+    /// Activité affichée pendant que Claude Code résume la conversation pour libérer du contexte.
+    static let compacting = "Compacte la conversation"
 
     static func describe(tool: String, input: [String: Any]) -> String {
         func file(_ key: String = "file_path") -> String {
@@ -60,8 +62,9 @@ enum ClaudeActivity {
         case "Bash":
             value = input["command"] as? String
         case "Edit", "MultiEdit", "Write", "Read", "NotebookEdit":
-            value = (input["file_path"] as? String ?? input["notebook_path"] as? String)
+            let file = (input["file_path"] as? String ?? input["notebook_path"] as? String)
                 .map { URL(fileURLWithPath: $0).lastPathComponent }
+            value = [file, diffStat(tool: tool, input: input)].compactMap { $0 }.joined(separator: " · ")
         case "WebFetch":
             value = input["url"] as? String
         case "WebSearch":
@@ -70,6 +73,64 @@ enum ClaudeActivity {
             value = input["description"] as? String
         }
         return shorten(value ?? tool, 140)
+    }
+
+    /// Ligne d'un aperçu de modification : retirée, ajoutée, ou « … » pour les lignes masquées.
+    struct DiffLine: Equatable, Identifiable {
+        enum Kind: Equatable { case removed, added, more }
+        let id: Int
+        let kind: Kind
+        let text: String
+    }
+
+    /// Ce que va changer `Edit`, `MultiEdit` ou `Write` : lignes retirées puis ajoutées, sans les
+    /// lignes identiques au début et à la fin. `nil` pour les autres outils.
+    static func diff(tool: String, input: [String: Any], limit: Int = 12) -> [DiffLine]? {
+        var raw: [(DiffLine.Kind, String)] = []
+        switch tool {
+        case "Edit":
+            raw = changedLines(old: input["old_string"] as? String ?? "", new: input["new_string"] as? String ?? "")
+        case "MultiEdit":
+            for edit in input["edits"] as? [[String: Any]] ?? [] {
+                raw += changedLines(old: edit["old_string"] as? String ?? "", new: edit["new_string"] as? String ?? "")
+            }
+        case "Write":
+            raw = lines(input["content"] as? String ?? "").map { (.added, $0) }
+        default:
+            return nil
+        }
+        guard !raw.isEmpty else { return nil }
+        var result = raw.prefix(limit).enumerated().map { DiffLine(id: $0, kind: $1.0, text: $1.1) }
+        if raw.count > limit {
+            result.append(DiffLine(id: limit, kind: .more, text: "\(raw.count - limit) lignes de plus"))
+        }
+        return result
+    }
+
+    /// Nombre de lignes retirées et ajoutées (« +3 −1 »), pour le résumé d'une demande.
+    static func diffStat(tool: String, input: [String: Any]) -> String? {
+        guard let lines = diff(tool: tool, input: input, limit: .max) else { return nil }
+        let added = lines.filter { $0.kind == .added }.count
+        let removed = lines.filter { $0.kind == .removed }.count
+        return removed > 0 ? "+\(added) −\(removed)" : "+\(added)"
+    }
+
+    private static func changedLines(old: String, new: String) -> [(DiffLine.Kind, String)] {
+        var before = lines(old)[...]
+        var after = lines(new)[...]
+        while let a = before.first, let b = after.first, a == b {
+            before.removeFirst()
+            after.removeFirst()
+        }
+        while let a = before.last, let b = after.last, a == b {
+            before.removeLast()
+            after.removeLast()
+        }
+        return before.map { (.removed, $0) } + after.map { (.added, $0) }
+    }
+
+    private static func lines(_ text: String) -> [String] {
+        text.isEmpty ? [] : text.components(separatedBy: "\n")
     }
 
     /// Réponses proposées à la fin d'une réponse : la question et les boutons de réponse

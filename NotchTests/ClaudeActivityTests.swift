@@ -134,4 +134,64 @@ struct QuestionAnsweredElsewhereTests {
             """
         #expect(!ClaudeCodeMonitor.containsResult(in: transcript, for: "toolu_A"))
     }
+
+    // MARK: - Aperçu des modifications
+
+    @Test func editDiffKeepsOnlyChangedLines() {
+        let input: [String: Any] = ["old_string": "a\nb\nc", "new_string": "a\nB\nB2\nc"]
+        let diff = ClaudeActivity.diff(tool: "Edit", input: input)
+        #expect(diff?.map(\.kind) == [.removed, .added, .added])
+        #expect(diff?.map(\.text) == ["b", "B", "B2"])
+        #expect(ClaudeActivity.summarize(tool: "Edit", input: input.merging(["file_path": "/x/A.swift"]) { $1 }) == "A.swift · +2 −1")
+    }
+
+    @Test func longWriteIsCutWithACount() {
+        let content = (1...20).map(String.init).joined(separator: "\n")
+        let diff = ClaudeActivity.diff(tool: "Write", input: ["content": content], limit: 5)
+        #expect(diff?.count == 6)
+        #expect(diff?.last?.kind == .more)
+        #expect(diff?.last?.text == "15 lignes de plus")
+        #expect(ClaudeActivity.diff(tool: "Bash", input: ["command": "ls"]) == nil)
+    }
+
+    // MARK: - Interruption, durée, consommation, quotas
+
+    @Test func interruptionIsTheLastExchange() {
+        let interrupted = """
+            {"type":"assistant","message":{"content":[{"type":"text","text":"Je regarde"}]}}
+            {"type":"user","message":{"content":[{"type":"text","text":"[Request interrupted by user]"}]}}
+            {"type":"system","content":"x"}
+            """
+        #expect(ClaudeCodeMonitor.endsWithInterruption(interrupted))
+        let resumed = interrupted + "\n" + #"{"type":"assistant","message":{"content":[{"type":"text","text":"Ok"}]}}"#
+        #expect(!ClaudeCodeMonitor.endsWithInterruption(resumed))
+        let toolUse = #"{"type":"user","message":{"content":"[Request interrupted by user for tool use]"}}"#
+        #expect(ClaudeCodeMonitor.endsWithInterruption(toolUse))
+    }
+
+    @Test func elapsedTimeReadsNaturally() {
+        let start = Date(timeIntervalSince1970: 0)
+        #expect(ClaudeCodeSession.elapsed(since: start, now: start.addingTimeInterval(42)) == "42 s")
+        #expect(ClaudeCodeSession.elapsed(since: start, now: start.addingTimeInterval(185)) == "3 min")
+        #expect(ClaudeCodeSession.elapsed(since: start, now: start.addingTimeInterval(3900)) == "1 h 05")
+    }
+
+    @Test func modelNamesAreShort() {
+        #expect(ClaudeUsage.modelName("claude-opus-4-5-20251101") == "Opus 4.5")
+        #expect(ClaudeUsage.modelName("claude-haiku-4-5") == "Haiku 4.5")
+        #expect(ClaudeUsage.modelName("claude-3-5-sonnet-20241022") == "Sonnet 3.5")
+        #expect(ClaudeUsage.modelName("<synthetic>") == nil)
+    }
+
+    @Test func usageIsRankedAcrossDays() {
+        let ranked = ClaudeUsage.ranked([["A": .init(output: 5)], ["B": .init(output: 8), "A": .init(output: 4)]])
+        #expect(ranked.map(\.name) == ["A", "B"])
+        #expect(ranked.first?.totals.output == 9)
+    }
+
+    @Test func quotaLevels() {
+        #expect(ClaudeQuota.level(for: 0.5) == nil)
+        #expect(ClaudeQuota.level(for: 0.85) == 0.8)
+        #expect(ClaudeQuota.level(for: 0.97) == 0.95)
+    }
 }

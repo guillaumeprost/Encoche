@@ -16,6 +16,8 @@ struct ClaudeCodeSession: Identifiable, Equatable {
     var state: State
     var detail: String?
     var updatedAt: Date
+    /// Début de la demande en cours (pour afficher depuis combien de temps Claude travaille).
+    var workStartedAt: Date?
     /// Processus Claude Code (envoyé par les hooks) : sert à retrouver son app.
     var pid: pid_t?
     /// Titre donné à la session par Claude Code (lu dans la transcription).
@@ -48,6 +50,16 @@ struct ClaudeCodeSession: Identifiable, Equatable {
         let id: String
         var name: String
         var isRunning: Bool
+    }
+
+    /// « 45 s », « 3 min », « 1 h 05 » : durée de la demande en cours.
+    static func elapsed(since start: Date, now: Date = Date()) -> String {
+        let seconds = max(Int(now.timeIntervalSince(start)), 0)
+        switch seconds {
+        case ..<60: return "\(seconds) s"
+        case ..<3600: return "\(seconds / 60) min"
+        default: return String(format: "%d h %02d", seconds / 3600, (seconds % 3600) / 60)
+        }
     }
 
     var planProgress: (done: Int, total: Int) {
@@ -113,4 +125,6 @@ final class PendingPermission: Identifiable {
     }
 
     var canAllowAlways: Bool { !suggestions.isEmpty }
+    /// Aperçu de la modification demandée (fichiers modifiés ou écrits).
+    var diff: [ClaudeActivity.DiffLine]? { ClaudeActivity.diff(tool: toolName, input: input) }
 }

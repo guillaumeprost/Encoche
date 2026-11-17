@@ -97,6 +97,7 @@ private struct SessionDetail: View {
                 VStack(alignment: .leading, spacing: 6) {
                     status
                     if let permission = monitor.permission(for: session.id) {
+                        if let diff = permission.diff { DiffPreview(lines: diff) }
                         permissionButtons(permission)
                     }
                     ForEach(session.agents) { agent in
@@ -165,12 +166,19 @@ private struct SessionDetail: View {
                 .lineLimit(2)
                 .contentTransition(.opacity)
                 .animation(.snappy, value: statusText)
+            if session.state == .working, let start = session.workStartedAt {
+                Spacer(minLength: 4)
+                ClaudeElapsedText(start: start)
+                    .font(.system(size: 11.5, weight: .medium).monospacedDigit())
+                    .foregroundStyle(.primary.opacity(0.45))
+                    .fixedSize()
+            }
         }
     }
 
     private var statusText: String {
         switch session.state {
-        case .idle: return "Prête"
+        case .idle: return session.detail ?? "Prête"
         case .working: return session.detail ?? "Réfléchit…"
         case .waiting: return session.detail ?? "T'attend"
         case .done: return "Terminé"
@@ -200,6 +208,50 @@ private struct SessionDetail: View {
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// Aperçu de la modification que Claude demande à faire : lignes retirées en rouge, ajoutées en vert.
+private struct DiffPreview: View {
+    let lines: [ClaudeActivity.DiffLine]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            ForEach(lines) { line in
+                HStack(alignment: .firstTextBaseline, spacing: 5) {
+                    Text(marker(line.kind))
+                        .foregroundStyle(color(line.kind))
+                        .frame(width: 8)
+                    Text(line.text.isEmpty ? " " : line.text)
+                        .foregroundStyle(.primary.opacity(line.kind == .more ? 0.4 : 0.85))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                }
+                .padding(.horizontal, 6)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(color(line.kind).opacity(line.kind == .more ? 0 : 0.12))
+            }
+        }
+        .font(.system(size: 10.5, design: .monospaced))
+        .padding(.vertical, 4)
+        .background(.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 6))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    private func marker(_ kind: ClaudeActivity.DiffLine.Kind) -> String {
+        switch kind {
+        case .removed: "−"
+        case .added: "+"
+        case .more: "…"
+        }
+    }
+
+    private func color(_ kind: ClaudeActivity.DiffLine.Kind) -> Color {
+        switch kind {
+        case .removed: .red
+        case .added: .green
+        case .more: .clear
+        }
     }
 }
 

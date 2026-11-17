@@ -294,11 +294,28 @@ struct CollapsedClaudeWorkingView: View {
             ClaudeMascot(mood: .working)
                 .frame(width: 28)
         } trailing: {
-            // Avancement du plan, ou anneau qui tourne sans plan.
-            ProgressRing(fraction: session?.planFraction, tint: .claude)
-                .frame(width: 15, height: 15)
+            HStack(spacing: 3) {
+                // Avancement du plan, ou anneau qui tourne sans plan.
+                ProgressRing(fraction: session?.planFraction, tint: .claude)
+                    .frame(width: 15, height: 15)
+                // Plusieurs sessions au travail en même temps.
+                if monitor.workingCount > 1 {
+                    Text("\(monitor.workingCount)")
+                        .font(.system(size: 11, weight: .bold).monospacedDigit())
+                        .foregroundStyle(Color.claude)
+                        .contentTransition(.numericText())
+                }
+            }
         }
-        .help(session.map { "\($0.title ?? $0.projectName) · \($0.detail ?? "en cours")" } ?? "Claude travaille")
+        .help(help(session))
+    }
+
+    private func help(_ session: ClaudeCodeSession?) -> String {
+        guard let session else { return "Claude travaille" }
+        var text = "\(session.title ?? session.projectName) · \(session.detail ?? "en cours")"
+        if let start = session.workStartedAt { text += " · \(ClaudeCodeSession.elapsed(since: start))" }
+        if monitor.workingCount > 1 { text += "\n\(monitor.workingCount) sessions au travail" }
+        return text
     }
 }
 

@@ -95,6 +95,9 @@ struct AppServices {
         }
         claudeUsage = ClaudeUsage()
         claudeQuota = ClaudeQuota()
+        claudeQuota.alerts = alerts
+        let claudeMonitor = claudeCode
+        claudeQuota.watch { claudeMonitor.hasRecentActivity }
         launchAtLogin = LaunchAtLogin()
         let focusMonitor = focus
         systemNotifications = SystemNotificationWatcher(alerts: alerts, settings: settings) {

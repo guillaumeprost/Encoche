@@ -78,9 +78,12 @@ struct ClaudeLiveLineView: View {
     @Environment(ClaudeCodeMonitor.self) private var monitor
 
     var body: some View {
+        let session = monitor.workingSession
         // Entre la question et le premier outil, Claude n'a pas encore d'action à montrer.
-        let detail = monitor.workingSession?.detail.flatMap { $0.isEmpty ? nil : $0 } ?? "Réfléchit…"
-        HStack(spacing: 7) {
+        var detail = session?.detail.flatMap { $0.isEmpty ? nil : $0 } ?? "Réfléchit…"
+        // Plusieurs sessions au travail : on précise laquelle parle.
+        if monitor.workingCount > 1, let session { detail = "\(session.projectName) · \(detail)" }
+        return HStack(spacing: 7) {
             Image(systemName: "sparkle")
                 .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(Color.claude)
@@ -95,8 +98,26 @@ struct ClaudeLiveLineView: View {
                     .transition(.blurReplace(.upUp))
             }
             .animation(.smooth(duration: 0.35), value: detail)
+            if let start = session?.workStartedAt {
+                ClaudeElapsedText(start: start)
+                    .font(.system(size: 11, weight: .medium).monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.5))
+                    .fixedSize()
+            }
         }
         .frame(maxWidth: .infinity)
+    }
+}
+
+/// Depuis combien de temps Claude travaille (« 3 min »), mis à jour tout seul.
+struct ClaudeElapsedText: View {
+    let start: Date
+
+    var body: some View {
+        TimelineView(.periodic(from: start, by: 1)) { context in
+            Text(ClaudeCodeSession.elapsed(since: start, now: context.date))
+                .contentTransition(.numericText())
+        }
     }
 }
 

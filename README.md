@@ -24,7 +24,7 @@ Encoche vit dans l'encoche de l'écran. Noire en haut pour se fondre avec celle 
 - **Étagère** : les dernières captures d'écran, à glisser où tu veux.
 - **Presse-papier** : l'historique de ce que tu as copié (textes, images, fichiers), avec des éléments à épingler. Les mots de passe des gestionnaires sont ignorés.
 - **Notifications** : l'historique des notifications, conservé d'un redémarrage à l'autre.
-- **Claude** : ta consommation de tokens du jour et de la semaine, tes 5 dernières sessions Claude Code, avec leur progression, leurs agents et leur conversation, un champ pour **répondre à une session** ou poser une question rapide.
+- **Claude** : ta consommation de tokens du jour et de la semaine (détaillée par projet et par modèle au survol), tes 5 dernières sessions Claude Code, avec leur progression, leurs agents, leur conversation et depuis combien de temps elles travaillent, un champ pour **répondre à une session** ou poser une question rapide. Une demande de modification de fichier montre les lignes changées avant que tu l'autorises, et l'encoche te prévient quand ton quota de 5 heures ou de la semaine dépasse 80 % puis 95 %.
 
 Quand une musique est chargée, une mini-pochette avec lecture/pause et suivant s'affiche en haut à droite, à côté du bouton **minuteur** (Pomodoro, pause, 1 à 60 minutes). **Glisse un fichier sur l'encoche** pour le poser sur l'Étagère.
 

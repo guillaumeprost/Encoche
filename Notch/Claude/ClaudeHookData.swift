@@ -50,4 +50,23 @@ extension ClaudeCodeMonitor {
             .replacingOccurrences(of: "`", with: "")
         return cleaned.count > 400 ? String(cleaned.prefix(400)) + "…" : cleaned
     }
+
+    /// La conversation se termine par ton interruption (Échap) : dernier échange = « [Request interrupted by user…] ».
+    nonisolated static func endsWithInterruption(_ text: String) -> Bool {
+        for line in text.split(separator: "\n").reversed() {
+            guard let entry = try? JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any],
+                let type = entry["type"] as? String, type == "user" || type == "assistant",
+                entry["isSidechain"] as? Bool != true
+            else { continue }
+            guard type == "user", let message = entry["message"] as? [String: Any] else { return false }
+            let texts: [String]
+            if let content = message["content"] as? String {
+                texts = [content]
+            } else {
+                texts = (message["content"] as? [[String: Any]] ?? []).compactMap { $0["text"] as? String }
+            }
+            return texts.contains { $0.hasPrefix("[Request interrupted by user") }
+        }
+        return false
+    }
 }
