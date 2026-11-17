@@ -73,6 +73,20 @@ struct KaraokeLyricsTests {
     }
 }
 
+struct BluetoothAudioTests {
+    @Test func readsTheAddressInTheAudioDeviceUID() {
+        #expect(BluetoothMonitor.address(inUID: "1C-77-54-6F-6B-3C:output") == "1C:77:54:6F:6B:3C")
+        #expect(BluetoothMonitor.address(inUID: "BuiltInSpeakerDevice") == nil)
+    }
+
+    @Test func ignoresDevicesThatReconnectInTheBackground() {
+        #expect(BluetoothMonitor.isBackgroundDevice("Apple Watch de Guillaume"))
+        #expect(BluetoothMonitor.isBackgroundDevice("iPhone de Guillaume"))
+        #expect(!BluetoothMonitor.isBackgroundDevice("AirPods de Guy"))
+        #expect(!BluetoothMonitor.isBackgroundDevice("Guy's Magic mouse 1"))
+    }
+}
+
 @MainActor
 struct TopBarWidthTests {
     @Test func openNotchFitsTheTopBar() {

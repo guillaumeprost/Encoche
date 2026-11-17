@@ -74,6 +74,16 @@ enum AudioHardware {
         return devices
     }
 
+    /// Propriété texte (nom, identifiant…), ou `nil` si absente.
+    static func string(_ selector: AudioObjectPropertySelector, on object: AudioObjectID) -> String? {
+        var address = address(selector)
+        guard AudioObjectHasProperty(object, &address) else { return nil }
+        var value: Unmanaged<CFString>?
+        var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        guard AudioObjectGetPropertyData(object, &address, 0, nil, &size, &value) == noErr else { return nil }
+        return value?.takeRetainedValue() as String?
+    }
+
     /// L'appareil a des canaux d'entrée (micro).
     static func hasInput(_ device: AudioObjectID) -> Bool {
         var address = address(kAudioDevicePropertyStreams, .input)
