@@ -110,6 +110,69 @@ enum ClaudeReply {
         }
     }
 
+    /// Interrompt la session, comme Échap dans Claude Code : envoyé dans son onglet (iTerm,
+    /// Terminal), sinon à son app (app Claude, autres terminaux) mise au premier plan.
+    static func interrupt(process pid: pid_t, sessionTitle: String? = nil) async -> Outcome {
+        guard let app = ProcessOwner.app(of: pid) else { return .failed("Session introuvable") }
+        let appName = app.localizedName ?? "l'app"
+        let appPID = pid_t(app.processIdentifier)
+        let escape: CGKeyCode = 53
+        switch (app.bundleIdentifier, ProcessOwner.ttyPath(of: pid)) {
+        case (iTermID, let tty?):
+            // iTerm : le caractère Échap écrit directement dans la session.
+            let script = """
+                tell application id "\(iTermID)"
+                    repeat with w in windows
+                        repeat with t in tabs of w
+                            repeat with s in sessions of t
+                                if tty of s is "\(tty)" then
+                                    tell s to write text (ASCII character 27) newline no
+                                    return "ok"
+                                end if
+                            end repeat
+                        end repeat
+                    end repeat
+                end tell
+                return "missing"
+                """
+            return await AppleScriptRunner.run(script, cached: false)?.stringValue == "ok"
+                ? .sent(app: appName) : .failed("Onglet iTerm introuvable")
+        case (terminalID, let tty?):
+            let script = """
+                tell application id "\(terminalID)"
+                    repeat with w in windows
+                        repeat with t in tabs of w
+                            if tty of t is "\(tty)" then
+                                set selected of t to true
+                                set index of w to 1
+                                activate
+                                return "ok"
+                            end if
+                        end repeat
+                    end repeat
+                end tell
+                return "missing"
+                """
+            guard await AppleScriptRunner.run(script, cached: false)?.stringValue == "ok" else {
+                return .failed("Onglet Terminal introuvable")
+            }
+            try? await Task.sleep(for: .milliseconds(250))
+            AX.press(key: escape, to: appPID)
+            return .sent(app: appName)
+        case (claudeAppID, _):
+            guard app.activate() else { return .failed("Impossible d'ouvrir \(appName)") }
+            try? await Task.sleep(for: .milliseconds(400))
+            await Task.detached { raiseMainWindow(ofAppWith: appPID) }.value
+            AX.press(key: escape, to: appPID)
+            return .sent(app: appName)
+        default:
+            guard app.activate() else { return .failed("Impossible d'ouvrir \(appName)") }
+            try? await Task.sleep(for: .milliseconds(300))
+            AX.press(key: escape, to: appPID)
+            return .sent(app: appName)
+        }
+    }
+
     /// Commande shell qui ouvre Claude Code dans ce dossier avec ce premier message.
     nonisolated static func sessionCommand(prompt: String, in cwd: String, cli: URL?) -> String {
         func quoted(_ text: String) -> String { "'" + text.replacingOccurrences(of: "'", with: "'\\''") + "'" }

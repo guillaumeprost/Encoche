@@ -148,3 +148,34 @@ struct ClaudeSessionReactionTests {
         #expect(monitor.recentProjects.count == 2)
     }
 }
+
+/// « Toujours » quand Claude Code ne suggère pas de règle.
+struct ClaudePermissionRulesTests {
+    @Test func bashKeepsCommandAndSubcommand() {
+        #expect(ClaudePermissionRules.commandPrefix("npm test -- --watch") == "npm test")
+        #expect(ClaudePermissionRules.commandPrefix("git push origin main") == "git push")
+        #expect(ClaudePermissionRules.commandPrefix("ls -la") == "ls")
+        #expect(ClaudePermissionRules.commandPrefix("FOO=1 swift build && echo ok") == "swift build")
+        #expect(ClaudePermissionRules.commandPrefix("git -C x status") == "git")
+    }
+
+    @Test func riskyCommandsAreNeverAlwaysAllowed() {
+        #expect(ClaudePermissionRules.commandPrefix("rm -rf build") == nil)
+        #expect(ClaudePermissionRules.commandPrefix("sudo make install") == nil)
+        #expect(ClaudePermissionRules.rule(tool: "Bash", input: ["command": "rm x"]) == nil)
+    }
+
+    @Test func rulesForOtherTools() {
+        #expect(
+            ClaudePermissionRules.rule(tool: "WebFetch", input: ["url": "https://docs.swift.org/x"])
+                == .init(toolName: "WebFetch", content: "domain:docs.swift.org"))
+        #expect(ClaudePermissionRules.rule(tool: "Edit", input: [:]) == .init(toolName: "Edit", content: nil))
+        #expect(ClaudePermissionRules.rule(tool: "AskUserQuestion", input: [:]) == nil)
+    }
+
+    @Test func describesUpdates() {
+        let update = ClaudePermissionRules.update(for: .init(toolName: "Bash", content: "npm test:*"))
+        #expect(ClaudePermissionRules.describe([update]) == "Bash(npm test:*)")
+        #expect(update["destination"] as? String == "localSettings")
+    }
+}

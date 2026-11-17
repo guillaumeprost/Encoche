@@ -148,6 +148,9 @@ private struct SessionDetail: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
+            if session.state == .working || session.state == .waiting {
+                StopSessionButton(session: session)
+            }
             Button {
                 monitor.focus(session.id)
             } label: {
@@ -198,9 +201,21 @@ private struct SessionDetail: View {
             smallButton("Refuser", color: .red) { monitor.decide(permission, .deny) }
             if permission.canAllowAlways {
                 smallButton("Toujours", color: .claude) { monitor.decide(permission, .allowAlways) }
+                    .help(permission.alwaysDescription.map { "Ne plus demander dans ce projet : \($0)" } ?? "")
             }
             smallButton("Autoriser", color: .claude, filled: true) { monitor.decide(permission, .allow) }
         }
+        .overlay(alignment: .bottomLeading) {
+            if let rule = permission.alwaysDescription {
+                Text("Toujours : \(rule)")
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.primary.opacity(0.45))
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .offset(y: 16)
+            }
+        }
+        .padding(.bottom, permission.alwaysDescription == nil ? 0 : 16)
     }
 
     private func smallButton(_ label: String, color: Color, filled: Bool = false, action: @escaping () -> Void) -> some View {
@@ -214,6 +229,45 @@ private struct SessionDetail: View {
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// Interrompt la session (Échap dans Claude Code), avec une confirmation d'un second clic.
+private struct StopSessionButton: View {
+    @Environment(ClaudeCodeMonitor.self) private var monitor
+    let session: ClaudeCodeSession
+    @State private var armed = false
+    @State private var failure: String?
+
+    var body: some View {
+        Button {
+            guard armed else {
+                armed = true
+                // Second clic attendu dans les 3 s, sinon le bouton se désarme.
+                Task {
+                    try? await Task.sleep(for: .seconds(3))
+                    armed = false
+                }
+                return
+            }
+            armed = false
+            Task {
+                if case .failed(let reason) = await monitor.interrupt(session.id) { failure = reason }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "stop.fill").font(.system(size: 9, weight: .bold))
+                if armed { Text("Arrêter ?").font(.system(size: 11, weight: .semibold)) }
+            }
+            .foregroundStyle(armed ? .white : .red)
+            .padding(.horizontal, armed ? 8 : 0)
+            .frame(minWidth: 22, minHeight: 22)
+            .background(Capsule().fill(armed ? Color.red : Color.red.opacity(0.15)))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .animation(.snappy, value: armed)
+        .help(failure ?? "Interrompre la session (Échap)")
     }
 }
 

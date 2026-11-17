@@ -151,7 +151,17 @@ final class PendingPermission: Identifiable {
         self.reply = reply
     }
 
-    var canAllowAlways: Bool { !suggestions.isEmpty }
+    /// Règles ajoutées par « Toujours » : celles suggérées par Claude Code, sinon une règle
+    /// déduite de la demande (préfixe de la commande, domaine…), pour ce projet.
+    var alwaysRules: [[String: Any]] {
+        if !suggestions.isEmpty { return suggestions }
+        return ClaudePermissionRules.rule(tool: toolName, input: input).map { [ClaudePermissionRules.update(for: $0)] } ?? []
+    }
+
+    var canAllowAlways: Bool { !alwaysRules.isEmpty }
+
+    /// Ce que « Toujours » autorisera, lisible (« Bash(npm test:*) »).
+    var alwaysDescription: String? { ClaudePermissionRules.describe(alwaysRules) }
     /// Aperçu de la modification demandée (fichiers modifiés ou écrits).
     var diff: [ClaudeActivity.DiffLine]? { ClaudeActivity.diff(tool: toolName, input: input) }
 }

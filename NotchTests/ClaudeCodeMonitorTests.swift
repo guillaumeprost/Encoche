@@ -295,7 +295,7 @@ struct ClaudeAlertsTests {
     }
 
     @Test func doneUsesTheSessionTitle() {
-        let alert = ClaudeAlerts.done(session(title: "Ménage"), reply: "## Fait", choose: { _ in }, focus: {})
+        let alert = ClaudeAlerts.done(session(title: "Ménage"), reply: "## Fait", choose: { _ in }, focus: {}, open: {})
         #expect(alert.title == "Terminé · Ménage")
         #expect(alert.body == "Fait")
         #expect(alert.source == "Encoche")
@@ -305,7 +305,7 @@ struct ClaudeAlertsTests {
     @Test func doneOffersAtMostThreeReplies() {
         var chosen: String?
         let choices = ClaudeCodeSession.Choices(question: "Laquelle ?", options: ["A", "B", "C", "D"])
-        let alert = ClaudeAlerts.done(session(choices: choices), reply: nil, choose: { chosen = $0 }, focus: {})
+        let alert = ClaudeAlerts.done(session(choices: choices), reply: nil, choose: { chosen = $0 }, focus: {}, open: {})
         #expect(alert.title == "Encoche te demande")
         #expect(alert.buttons.map(\.label) == ["Plus tard", "A", "B", "C"])
         alert.buttons[2].action()
@@ -314,15 +314,28 @@ struct ClaudeAlertsTests {
 
     @Test func permissionButtonsDecide() throws {
         var decisions: [PendingPermission.Decision] = []
-        var focused = false
+        var opened = false
         let permission = PendingPermission(
             sessionID: "s", projectName: "Encoche", toolName: "Bash", summary: "ls", suggestions: [],
             reply: testReply())
-        let alert = ClaudeAlerts.permission(permission, decide: { decisions.append($0) }, focus: { focused = true })
+        let alert = ClaudeAlerts.permission(
+            permission, decide: { decisions.append($0) }, focus: {}, open: { opened = true })
         for button in alert.buttons { button.action() }
         #expect(decisions == [.deny, .terminal, .allow])
+        // Un clic sur la demande l'ouvre dans l'encoche.
         if case .run(let block) = alert.action { block() }
-        #expect(focused)
+        #expect(opened)
+    }
+
+    @Test func permissionOffersAnAlwaysRuleOfItsOwn() {
+        let permission = PendingPermission(
+            sessionID: "s", projectName: "Encoche", toolName: "Bash", summary: "npm test", suggestions: [],
+            input: ["command": "npm test"], reply: testReply())
+        #expect(permission.canAllowAlways)
+        #expect(permission.alwaysDescription == "Bash(npm test:*)")
+        let alert = ClaudeAlerts.permission(permission, decide: { _ in }, focus: {}, open: {})
+        #expect(alert.buttons.map(\.label) == ["Refuser", "Terminal", "Toujours", "Autoriser"])
+        #expect(alert.body == "npm test\nToujours : Bash(npm test:*)")
     }
 
     @Test func multipleQuestionsStayInTheTerminal() {

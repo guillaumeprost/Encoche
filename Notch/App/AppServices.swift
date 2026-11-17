@@ -90,6 +90,11 @@ struct AppServices {
         volume.setReplacesSystemHUD(settings.replaceSystemVolumeHUD)
         ask = ClaudeAsk()
         ask.alerts = alerts
+        // Un clic sur une notification de session : l'encoche s'ouvrira sur elle, dans l'onglet Claude.
+        claudeCode.openInNotch = { [weak ask] id in
+            appSettings.tab = .claude
+            ask?.target = .session(id)
+        }
         // Un clic sur la réponse : l'encoche s'ouvrira sur l'onglet Claude, en question rapide.
         ask.openAnswer = { [weak ask] in
             appSettings.tab = .claude

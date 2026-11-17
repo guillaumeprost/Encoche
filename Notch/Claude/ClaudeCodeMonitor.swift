@@ -24,6 +24,8 @@ final class ClaudeCodeMonitor {
     private var server: HookServer?
     /// Pour signaler dans l'encoche une session qui t'attend ou qui a fini.
     var alerts: AlertCenter?
+    /// Affiche une session dans l'encoche (onglet Claude), branché par l'app.
+    @ObservationIgnored var openInNotch: @MainActor (String) -> Void = { _ in }
     private var cleanupTimer: Timer?
 
     /// L'app de la session (terminal, app Claude) est au premier plan : pas besoin de notification.
@@ -189,6 +191,23 @@ final class ClaudeCodeMonitor {
         return await ClaudeReply.send(text, toProcess: pid, sessionTitle: session.title, asChoice: asChoice)
     }
 
+    /// Interrompt ce que fait la session (comme Échap dans Claude Code).
+    func interrupt(_ sessionID: String) async -> ClaudeReply.Outcome {
+        guard let session = sessions.first(where: { $0.id == sessionID }), let pid = session.pid else {
+            return .failed("Session introuvable")
+        }
+        resolvePermissions(of: sessionID)
+        let outcome = await ClaudeReply.interrupt(process: pid, sessionTitle: session.title)
+        if case .sent = outcome {
+            update(sessionID) {
+                $0.state = .idle
+                $0.detail = "Interrompue"
+                $0.workStartedAt = nil
+            }
+        }
+        return outcome
+    }
+
     func dismiss(_ session: ClaudeCodeSession) {
         resolvePermissions(of: session.id)
         sessions.removeAll { $0.id == session.id }
@@ -202,7 +221,7 @@ final class ClaudeCodeMonitor {
         case .allow:
             output = ["behavior": "allow"]
         case .allowAlways:
-            output = ["behavior": "allow", "updatedPermissions": permission.suggestions]
+            output = ["behavior": "allow", "updatedPermissions": permission.alwaysRules]
         case .deny:
             output = ["behavior": "deny", "message": "Refusé depuis Encoche."]
         case .answer(let label):
@@ -281,10 +300,11 @@ final class ClaudeCodeMonitor {
             if let permission { self?.decide(permission, decision) }
         }
         let focus: @MainActor () -> Void = { [weak self] in self?.focus(sessionID) }
+        let open: @MainActor () -> Void = { [weak self] in self?.openInNotch(sessionID) }
         // Question à choix : un bouton par réponse.
         let alert =
             (tool == "AskUserQuestion" ? ClaudeAlerts.question(permission, decide: decide, focus: focus) : nil)
-            ?? ClaudeAlerts.permission(permission, decide: decide, focus: focus)
+            ?? ClaudeAlerts.permission(permission, decide: decide, focus: focus, open: open)
         permission.alertID = alert.id
         postClaudeAlert(alert, of: sessionID)
     }
@@ -551,7 +571,8 @@ final class ClaudeCodeMonitor {
             let alert = ClaudeAlerts.done(
                 session, reply: reply ?? info?.lastMessage,
                 choose: { [weak self] option in self?.sendChoice(option, to: id) },
-                focus: { [weak self] in self?.focus(id) })
+                focus: { [weak self] in self?.focus(id) },
+                open: { [weak self] in self?.openInNotch(id) })
             // Réponses proposées : retirée si tu réponds directement dans Claude.
             if session.choices != nil { trackWaitingAlert(alert, of: id) }
             postClaudeAlert(alert, of: id)

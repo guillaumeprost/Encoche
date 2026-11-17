@@ -16,6 +16,28 @@ struct AlertBannerView: View {
             content
             if !alert.buttons.isEmpty {
                 HStack(spacing: 6) {
+                    // D'autres demandes attendent : leur nombre, et de quoi passer à la suivante.
+                    if alerts.current?.id == alert.id, alerts.requestsWaiting > 0 {
+                        Button {
+                            alerts.showNextRequest()
+                        } label: {
+                            HStack(spacing: 3) {
+                                Text("+\(alerts.requestsWaiting)")
+                                    .font(.system(size: 11, weight: .bold).monospacedDigit())
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 8, weight: .heavy))
+                            }
+                            .foregroundStyle(.primary.opacity(0.7))
+                            .padding(.horizontal, 8)
+                            .frame(height: 22)
+                            .background(Capsule().fill(.primary.opacity(0.1)))
+                            .contentShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .help(
+                            alerts.requestsWaiting == 1
+                                ? "1 autre demande : voir la suivante" : "\(alerts.requestsWaiting) autres demandes : voir la suivante")
+                    }
                     Spacer(minLength: 0)
                     ForEach(alert.buttons) { button in
                         AlertButtonView(button: button) { alerts.press(button) }

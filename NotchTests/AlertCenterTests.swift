@@ -50,6 +50,22 @@ struct AlertCenterTests {
         #expect(center.current?.title == "Question")
     }
 
+    @Test func requestsCanBeCycled() {
+        let center = AlertCenter(historyURL: nil)
+        center.post(withButton("Q1"))
+        center.post(withButton("Q2"))
+        center.post(withButton("Q3"))
+        #expect(center.current?.title == "Q1")
+        #expect(center.requestsWaiting == 2)
+        // La suivante s'affiche ; celle d'avant attend au bout de la file.
+        center.showNextRequest()
+        #expect(center.current?.title == "Q2")
+        center.showNextRequest()
+        center.showNextRequest()
+        #expect(center.current?.title == "Q1")
+        #expect(center.requestsWaiting == 2)
+    }
+
     @Test func mutedAppsAreDroppedAndRecentDuplicatesRemoved() {
         let center = AlertCenter(historyURL: nil)
         center.post(alert("Relayée", app: "com.anthropic.claudefordesktop"))

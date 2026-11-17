@@ -189,6 +189,18 @@ final class AlertCenter {
     }
 
     /// Clic sur un bouton de la notification.
+    /// Demandes (Claude Code…) qui attendent derrière celle affichée.
+    var requestsWaiting: Int { queue.filter(\.isPersistent).count }
+
+    /// Passe à la demande suivante ; celle affichée retourne au bout de la file.
+    func showNextRequest() {
+        guard let current, current.isPersistent, requestsWaiting > 0 else { return }
+        dismissTask?.cancel()
+        queue.append(current)
+        self.current = nil
+        showNext()
+    }
+
     func press(_ button: NotchAlert.Button) {
         button.action()
         if current?.buttons.contains(where: { $0.id == button.id }) == true { dismiss() }
