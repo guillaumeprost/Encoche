@@ -5,7 +5,10 @@ import SwiftUI
 /// ouvert/fermé ; la musique, le calendrier et les réglages sont partagés.
 @MainActor
 final class NotchWindowController {
-    private static let panelSize = CGSize(width: 880, height: 280)
+    /// Assez large pour l'accueil le plus large (avec la colonne ClickUp) et ses arrondis.
+    private static let panelSize = CGSize(
+        width: NotchViewModel.expandedBodyWidth + NotchViewModel.homeExtraWidth + NotchViewModel.clickUpExtraWidth + 60,
+        height: 280)
 
     private let viewModel = NotchViewModel()
     private let music: MusicController
@@ -98,6 +101,7 @@ final class NotchWindowController {
         // Écran sans encoche : on en simule une, à la hauteur de la barre de menus.
         viewModel.notchSize = screen.notchSize
         viewModel.hasPhysicalNotch = screen.hasNotch
+        viewModel.screenWidth = screen.frame.width
 
         panel.setFrame(ScreenLayout.topCenter(Self.panelSize, in: screen.frame), display: true)
     }

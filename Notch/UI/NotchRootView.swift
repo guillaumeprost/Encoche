@@ -17,6 +17,7 @@ struct NotchRootView: View {
     @Environment(CallMonitor.self) private var calls
     @Environment(ClaudeCodeMonitor.self) private var claudeCode
     @Environment(AlertCenter.self) private var alerts
+    @Environment(ClickUpController.self) private var clickUp
     /// Apparence du Mac (clair / sombre).
     @Environment(\.colorScheme) private var systemColorScheme
 
@@ -44,6 +45,7 @@ struct NotchRootView: View {
                         case .home: HomeTab().transition(tabTransition)
                         case .calendar: CalendarTab().transition(tabTransition)
                         case .reminders: RemindersTab().transition(tabTransition)
+                        case .clickUp: ClickUpTab().transition(tabTransition)
                         case .music: MusicTab().transition(tabTransition)
                         case .house: HomeControlView().transition(tabTransition)
                         case .shelf: ShelfView().transition(tabTransition)
@@ -176,6 +178,9 @@ struct NotchRootView: View {
         .onChange(of: hud.current, initial: true) { vm.showsHUD = hud.current != nil }
         .onChange(of: liveLine, initial: true) { vm.showsLiveLine = liveLine != nil }
         .animation(spring, value: vm.showsLiveLine)
+        .onChange(of: vm.isOpen) { _, open in if open { clickUp.notchOpened() } }
+        .onChange(of: clickUp.isActive && clickUp.hasToken, initial: true) { _, shows in vm.homeShowsClickUp = shows }
+        .animation(spring, value: vm.homeShowsClickUp)
         // Mode karaoké : les paroles se chargent aussi onglet Musique fermé.
         .onChange(of: music.track, initial: true) { if settings.karaoke { extras.refreshLyrics() } }
         .onChange(of: settings.karaoke) { if settings.karaoke { extras.refreshLyrics() } }

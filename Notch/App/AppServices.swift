@@ -22,6 +22,7 @@ struct AppServices {
     let volume: VolumeController
     let calendar: CalendarController
     let reminders: RemindersController
+    let clickUp: ClickUpController
     let clipboard: ClipboardController
     let shelf: ShelfController
     let screenshots: ScreenshotWatcher
@@ -66,6 +67,12 @@ struct AppServices {
         let eventStore = EKEventStore()
         calendar = CalendarController(store: eventStore)
         reminders = RemindersController(store: eventStore)
+        clickUp = ClickUpController()
+        clickUp.alerts = alerts
+        clickUp.dueAlertsEnabled = { appSettings.clickUpDueAlerts }
+        // ClickUp fermée : son onglet disparaît, l'encoche rouvrira sur l'Accueil.
+        clickUp.onAppQuit = { if appSettings.tab == .clickUp { appSettings.tab = .home } }
+        if settings.tab == .clickUp, !clickUp.isActive { settings.tab = .home }
         clipboard = ClipboardController()
         shelf = ShelfController()
         screenshots = ScreenshotWatcher()
@@ -147,6 +154,7 @@ extension View {
             .environment(services.volume)
             .environment(services.calendar)
             .environment(services.reminders)
+            .environment(services.clickUp)
             .environment(services.clipboard)
             .environment(services.shelf)
             .environment(services.screenshots)

@@ -72,3 +72,25 @@ struct KaraokeLyricsTests {
         #expect(!MusicExtras.sameSong(a, nil))
     }
 }
+
+@MainActor
+struct TopBarWidthTests {
+    @Test func openNotchFitsTheTopBar() {
+        let vm = NotchViewModel()
+        vm.isOpen = true
+        vm.topBarWidth = 500
+        let narrow = vm.shapeSize(showsActivity: false, tab: .music).width
+        vm.topBarWidth = 900
+        let wide = vm.shapeSize(showsActivity: false, tab: .music).width
+        #expect(wide > narrow)
+        #expect(wide >= 900 + 2 * NotchViewModel.topBarPadding)
+    }
+
+    @Test func openNotchNeverExceedsTheScreen() {
+        let vm = NotchViewModel()
+        vm.isOpen = true
+        vm.screenWidth = 800
+        vm.topBarWidth = 1200
+        #expect(vm.shapeSize(showsActivity: false, tab: .home).width <= 800 - 2 * NotchViewModel.screenMargin)
+    }
+}

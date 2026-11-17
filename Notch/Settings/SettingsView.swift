@@ -165,6 +165,8 @@ struct SettingsView: View {
                     Text("Claude")
                 }
 
+                ClickUpSettingsSection()
+
                 Section("À propos") {
                     LabeledContent(
                         "Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—")
@@ -174,6 +176,54 @@ struct SettingsView: View {
             .formStyle(.grouped)
         }
         .frame(minWidth: 480, minHeight: 560)
+    }
+}
+
+/// ClickUp : le jeton personnel de l'API, gardé dans le Trousseau.
+private struct ClickUpSettingsSection: View {
+    @Environment(ClickUpController.self) private var clickUp
+    @Environment(AppSettings.self) private var settings
+    @State private var token = ""
+
+    var body: some View {
+        @Bindable var settings = settings
+        Section {
+            if clickUp.hasToken {
+                LabeledContent("Compte") {
+                    if case .failed(let message) = clickUp.state {
+                        StatusLabel(granted: false, text: message)
+                    } else {
+                        StatusLabel(granted: true, text: clickUp.userName ?? "Relié")
+                    }
+                }
+                Toggle("Prévenir 5 min avant l'heure d'une tâche", isOn: $settings.clickUpDueAlerts)
+                Button("Délier ClickUp", role: .destructive) { clickUp.removeToken() }
+            } else {
+                LabeledContent {
+                    Button("Obtenir un jeton…", action: clickUp.openTokenPage)
+                } label: {
+                    Text("Jeton d'API personnel")
+                    Text("Dans ClickUp : Réglages → Apps → API Token (commence par « pk_ »).")
+                }
+                HStack {
+                    SecureField("pk_…", text: $token)
+                        .onSubmit(save)
+                    Button("Enregistrer", action: save)
+                        .disabled(token.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+            }
+        } header: {
+            Text("ClickUp")
+        } footer: {
+            Text(
+                "Quand l'app ClickUp est ouverte : un onglet avec tes tâches du jour, en retard et en cours (et un champ pour en créer), et les mêmes sur l'Accueil."
+            )
+        }
+    }
+
+    private func save() {
+        clickUp.setToken(token)
+        token = ""
     }
 }
 

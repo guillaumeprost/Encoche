@@ -87,6 +87,11 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(claudeLive, forKey: "claudeLive") }
     }
 
+    /// Prévenir dans l'encoche quelques minutes avant l'heure d'une tâche ClickUp.
+    var clickUpDueAlerts: Bool = UserDefaults.standard.object(forKey: "clickUpDueAlerts") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(clickUpDueAlerts, forKey: "clickUpDueAlerts") }
+    }
+
     var showTrackChanges: Bool = UserDefaults.standard.object(forKey: "showTrackChanges") as? Bool ?? true {
         didSet { UserDefaults.standard.set(showTrackChanges, forKey: "showTrackChanges") }
     }

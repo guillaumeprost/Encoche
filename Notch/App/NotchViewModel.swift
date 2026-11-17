@@ -24,11 +24,31 @@ final class NotchViewModel {
     var showsHUD = false
     /// Ligne en direct sous l'encoche repliée : paroles (karaoké) ou ce que fait Claude.
     var showsLiveLine = false
+    /// L'accueil porte une colonne ClickUp (app ouverte et compte relié).
+    var homeShowsClickUp = false
+    /// Largeur dont la barre du haut a besoin (onglets, puces, actions), mesurée à l'affichage ;
+    /// `nil` tant qu'elle ne s'est jamais affichée sur cet écran.
+    var topBarWidth: CGFloat?
+    /// Largeur de l'écran : l'encoche ouverte n'en dépasse jamais.
+    var screenWidth: CGFloat = .infinity
 
     static let expandedBodyWidth: CGFloat = 640
-    /// Largeur ouverte en plus de l'encoche physique : 8 onglets, minuteur et Concentration à
-    /// gauche, mini-lecteur et actions à droite.
+    /// Largeur en plus de l'encoche physique, avant la première mesure de la barre du haut.
     static let sideSpaceAroundNotch: CGFloat = 520
+    /// Marges de la barre du haut dans l'encoche ouverte.
+    static let topBarPadding: CGFloat = 18
+    /// Espace laissé de chaque côté de l'écran quand l'encoche ouverte est plafonnée.
+    static let screenMargin: CGFloat = 24
+
+    /// Largeur du corps de l'encoche ouverte : celle du contenu de l'onglet, élargie pour que la
+    /// barre du haut tienne sans chevauchement, et plafonnée à la largeur de l'écran.
+    private func openBodyWidth(extraWidth: CGFloat) -> CGFloat {
+        let topBar =
+            topBarWidth.map { $0 + 2 * Self.topBarPadding }
+            ?? (hasPhysicalNotch ? notchSize.width + Self.sideSpaceAroundNotch : 0)
+        let wanted = max(Self.expandedBodyWidth + extraWidth, topBar)
+        return min(wanted, screenWidth - 2 * Self.screenMargin - 2 * topRadius)
+    }
     static let expandedContentHeight: CGFloat = 136
     /// Hauteur en plus pour l'accueil, qui porte le champ Claude sous la musique et le calendrier.
     static let homeExtraHeight: CGFloat = 42
@@ -36,17 +56,21 @@ final class NotchViewModel {
     static let claudeExtraHeight: CGFloat = 110
     /// Largeur en plus pour l'accueil, qui porte une colonne de rappels.
     static let homeExtraWidth: CGFloat = 150
+    /// Colonne ClickUp de l'accueil, et la place pour la séparer des rappels.
+    static let clickUpColumnWidth: CGFloat = 180
+    static let clickUpExtraWidth: CGFloat = clickUpColumnWidth + 21
 
     /// Largeur ajoutée à l'encoche ouverte selon l'onglet.
-    private static func extraWidth(for tab: NotchTab) -> CGFloat {
-        tab == .home ? homeExtraWidth : 0
+    private func extraWidth(for tab: NotchTab) -> CGFloat {
+        guard tab == .home else { return 0 }
+        return Self.homeExtraWidth + (homeShowsClickUp ? Self.clickUpExtraWidth : 0)
     }
 
     /// Hauteur ajoutée à l'encoche ouverte selon l'onglet.
     private static func extraHeight(for tab: NotchTab) -> CGFloat {
         switch tab {
         case .home: return homeExtraHeight
-        case .calendar, .music, .reminders: return calendarExtraHeight
+        case .calendar, .music, .reminders, .clickUp: return calendarExtraHeight
         case .claude: return claudeExtraHeight
         default: return 0
         }
@@ -71,17 +95,14 @@ final class NotchViewModel {
 
     /// Taille totale de la forme, évasements du haut compris.
     func shapeSize(showsActivity: Bool, tab: NotchTab) -> CGSize {
-        let extraWidth = Self.extraWidth(for: tab)
+        let extraWidth = extraWidth(for: tab)
         let extraHeight = Self.extraHeight(for: tab)
         let bodyWidth: CGFloat
         let height: CGFloat
         if isOpen {
             // Avec une encoche physique, les onglets se répartissent de chaque côté de la caméra :
             // un peu plus de largeur pour que les boutons de gauche et de droite tiennent à côté.
-            bodyWidth =
-                hasPhysicalNotch
-                ? max(Self.expandedBodyWidth + extraWidth, notchSize.width + Self.sideSpaceAroundNotch)
-                : Self.expandedBodyWidth + extraWidth
+            bodyWidth = openBodyWidth(extraWidth: extraWidth)
             height = notchSize.height + Self.expandedContentHeight + extraHeight
         } else if showsAlert {
             bodyWidth = max(alertHasButtons ? 440 : Self.alertBodyWidth, notchSize.width + 2 * activitySlotWidth)

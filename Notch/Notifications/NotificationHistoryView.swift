@@ -31,7 +31,8 @@ struct NotificationHistoryView: View {
     }
 }
 
-private struct HistoryRow: View {
+/// Une notification de l'historique (aussi dans l'onglet ClickUp).
+struct HistoryRow: View {
     @Environment(AlertCenter.self) private var alerts
     let alert: NotchAlert
     @State private var hovering = false

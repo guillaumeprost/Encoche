@@ -4,6 +4,7 @@ enum NotchTab: String, CaseIterable {
     case home
     case calendar
     case reminders
+    case clickUp
     case music
     case house
     case shelf
@@ -16,6 +17,7 @@ enum NotchTab: String, CaseIterable {
         case .home: "music.note.house"
         case .calendar: "calendar"
         case .reminders: "checklist"
+        case .clickUp: "checkmark.rectangle.stack"
         case .music: "music.note"
         case .house: "square.2.layers.3d"
         case .shelf: "tray.full"
@@ -30,6 +32,7 @@ enum NotchTab: String, CaseIterable {
         case .home: "Accueil"
         case .calendar: "Calendrier"
         case .reminders: "Rappels"
+        case .clickUp: "ClickUp"
         case .music: "Musique"
         case .house: "Raccourcis"
         case .shelf: "Étagère"
@@ -50,6 +53,12 @@ struct TopBar: View {
     @Environment(AlertCenter.self) private var alerts
     @Environment(ShelfController.self) private var shelf
     @Environment(MusicController.self) private var music
+    @Environment(ClickUpController.self) private var clickUp
+
+    /// Onglets affichés : celui de ClickUp seulement pendant que l'app est ouverte.
+    private var visibleTabs: [NotchTab] {
+        NotchTab.allCases.filter { $0 != .clickUp || clickUp.isActive }
+    }
 
     /// Onglets centrés ; avec une encoche physique, répartis de part et d'autre de la caméra.
     var body: some View {
@@ -64,6 +73,8 @@ struct TopBar: View {
                         .frame(maxWidth: sideSpace, alignment: .leading)
                     Spacer()
                     actions
+                        .fixedSize()
+                        .onGeometryChange(for: CGFloat.self, of: \.size.width) { actionsWidth = $0 }
                         .frame(maxWidth: sideSpace, alignment: .trailing)
                 }
             }
@@ -71,30 +82,49 @@ struct TopBar: View {
         }
         .foregroundStyle(.primary)
         .animation(.snappy(duration: 0.2), value: settings.tab)
+        .animation(.snappy(duration: 0.2), value: clickUp.isActive)
+        // Largeurs réelles des puces et des actions : l'encoche ouverte s'adapte à son contenu.
+        .background(alignment: .leading) {
+            // Puces dans leur version complète, même quand elles s'affichent compactées.
+            StatusChips()
+                .fixedSize()
+                .hidden()
+                .onGeometryChange(for: CGFloat.self, of: \.size.width) { chipsWidth = $0 }
+        }
+        .onChange(of: requiredWidth, initial: true) { vm.topBarWidth = requiredWidth }
+    }
+
+    @State private var chipsWidth: CGFloat = 0
+    @State private var actionsWidth: CGFloat = 0
+
+    /// Largeur dont la barre a besoin : les onglets au centre, et de chaque côté la place du plus
+    /// large des deux bords (puces à gauche, actions à droite), puisque les onglets restent centrés.
+    private var requiredWidth: CGFloat {
+        tabsWidth + 2 * (max(chipsWidth, actionsWidth) + 16)
     }
 
     /// Avec une encoche physique, les onglets sont répartis en deux moitiés de part et d'autre.
-    private static let tabsPerSide = (NotchTab.allCases.count + 1) / 2
-    private static let sideWidth = CGFloat(tabsPerSide) * (TabButton.width + 4)
+    private var tabsPerSide: Int { (visibleTabs.count + 1) / 2 }
+    private var sideWidth: CGFloat { CGFloat(tabsPerSide) * (TabButton.width + 4) }
 
     /// Largeur occupée au centre par les onglets (et l'encoche physique).
     private var tabsWidth: CGFloat {
-        guard vm.hasPhysicalNotch else { return CGFloat(NotchTab.allCases.count) * (TabButton.width + 4) }
-        return 2 * Self.sideWidth + vm.notchSize.width + 16
+        guard vm.hasPhysicalNotch else { return CGFloat(visibleTabs.count) * (TabButton.width + 4) }
+        return 2 * sideWidth + vm.notchSize.width + 16
     }
 
     @ViewBuilder
     private var tabs: some View {
         if vm.hasPhysicalNotch {
             HStack(spacing: 0) {
-                tabRow(Array(NotchTab.allCases.prefix(Self.tabsPerSide)))
-                    .frame(width: Self.sideWidth, alignment: .trailing)
+                tabRow(Array(visibleTabs.prefix(tabsPerSide)))
+                    .frame(width: sideWidth, alignment: .trailing)
                 Color.clear.frame(width: vm.notchSize.width + 16)
-                tabRow(Array(NotchTab.allCases.dropFirst(Self.tabsPerSide)))
-                    .frame(width: Self.sideWidth, alignment: .leading)
+                tabRow(Array(visibleTabs.dropFirst(tabsPerSide)))
+                    .frame(width: sideWidth, alignment: .leading)
             }
         } else {
-            tabRow(NotchTab.allCases)
+            tabRow(visibleTabs)
         }
     }
 
@@ -171,6 +201,8 @@ private struct TabButton: View {
                     // Le petit personnage de Claude Code plutôt qu'un symbole.
                     ClaudeMascot(mood: .idle, color: .primary)
                         .frame(width: 17)
+                } else if tab == .clickUp {
+                    ClickUpLogo().frame(width: 15, height: 15)
                 } else {
                     Image(systemName: symbol)
                         .font(.system(size: 12, weight: .semibold))
@@ -214,6 +246,7 @@ private struct IconButton: View {
 struct HomeTab: View {
     @Environment(AppSettings.self) private var settings
     @Environment(ClaudeAsk.self) private var ask
+    @Environment(ClickUpController.self) private var clickUp
     var body: some View {
         VStack(spacing: 10) {
             HStack(spacing: 20) {
@@ -224,6 +257,13 @@ struct HomeTab: View {
                 divider
                 RemindersColumn()
                     .frame(width: 140)
+                // Les tâches ClickUp dans leur propre colonne, pendant que l'app est ouverte.
+                if clickUp.isActive, clickUp.hasToken {
+                    divider
+                    ClickUpColumn()
+                        .frame(width: NotchViewModel.clickUpColumnWidth)
+                        .transition(.opacity)
+                }
             }
             // Même champ que l'onglet Claude. Par défaut, une nouvelle conversation dans Claude Chat ;
             // la réponse à une question rapide s'affiche dans l'onglet Claude.
