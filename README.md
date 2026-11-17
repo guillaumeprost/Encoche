@@ -36,6 +36,7 @@ Quand une musique est chargée, une mini-pochette avec lecture/pause et suivant 
 - **Réunions** : un rappel une minute avant, avec un bouton **Préparer** (Claude résume l'invitation et propose des questions) et un bouton **Rejoindre** pour Meet, Zoom, Teams, Webex, FaceTime ou Whereby. Pendant l'appel, l'encoche ouverte propose de **couper le micro**, de **couper la caméra** (Meet, Zoom, Teams) et de **quitter l'appel**.
 - **Volume, luminosité, batterie** : affichés sous l'encoche, sans masquer l'activité en cours.
 - **Appareils Bluetooth** : AirPods, casque ou clavier qui se connectent, avec leur batterie.
+- **Gardien anti-distraction** (bouton ✋ à côté du minuteur) : après 30 secondes sur un site ou une app de ta liste (YouTube, Instagram, Facebook…), une pince sort de l'encoche, attrape l'onglet et l'emporte dans l'encoche. Clique sur elle pour la chasser : elle revient 2 minutes plus tard.
 - **Écran de verrouillage** : un cadenas dans l'encoche qui s'ouvre au déverrouillage, les activités sous l'horloge, le lecteur de musique au-dessus de la photo de profil, et un son au choix.
 
 ### Et aussi

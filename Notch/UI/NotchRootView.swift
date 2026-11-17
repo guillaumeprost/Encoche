@@ -18,6 +18,7 @@ struct NotchRootView: View {
     @Environment(ClaudeCodeMonitor.self) private var claudeCode
     @Environment(AlertCenter.self) private var alerts
     @Environment(ClickUpController.self) private var clickUp
+    @Environment(FocusGuard.self) private var focusGuard
     /// Apparence du Mac (clair / sombre).
     @Environment(\.colorScheme) private var systemColorScheme
 
@@ -161,6 +162,8 @@ struct NotchRootView: View {
         }
         .animation(spring, value: activities)
         .contextMenu {
+            @Bindable var focusGuard = focusGuard
+            Toggle("Gardien anti-distraction", isOn: $focusGuard.isEnabled)
             Button("Réglages…") { settings.openSettings() }
             Divider()
             Button("Quitter Encoche") { NSApp.terminate(nil) }

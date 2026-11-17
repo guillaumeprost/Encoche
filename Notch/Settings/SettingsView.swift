@@ -171,6 +171,8 @@ struct SettingsView: View {
 
                 ClickUpSettingsSection()
 
+                FocusGuardSettingsSection()
+
                 Section("À propos") {
                     LabeledContent(
                         "Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—")
@@ -180,6 +182,61 @@ struct SettingsView: View {
             .formStyle(.grouped)
         }
         .frame(minWidth: 480, minHeight: 560)
+    }
+}
+
+/// Gardien anti-distraction : les sites et apps qu'il vient fermer.
+private struct FocusGuardSettingsSection: View {
+    @Environment(FocusGuard.self) private var focusGuard
+    @State private var newSite = ""
+
+    var body: some View {
+        @Bindable var focusGuard = focusGuard
+        Section {
+            Toggle("Activer le gardien", isOn: $focusGuard.isEnabled)
+            ForEach(focusGuard.blockedSites, id: \.self) { site in
+                LabeledContent {
+                    removeButton { focusGuard.blockedSites.removeAll { $0 == site } }
+                } label: {
+                    Label(site, systemImage: "globe")
+                }
+            }
+            HStack {
+                TextField("Ajouter un site (reddit.com…)", text: $newSite)
+                    .onSubmit(addSite)
+                Button("Ajouter", action: addSite)
+                    .disabled(FocusGuardRules.normalizedDomain(newSite) == nil)
+            }
+            ForEach(focusGuard.blockedApps, id: \.self) { bundleID in
+                LabeledContent {
+                    removeButton { focusGuard.blockedApps.removeAll { $0 == bundleID } }
+                } label: {
+                    Label(FocusGuard.appName(bundleID), systemImage: "app")
+                }
+            }
+            Menu("Ajouter une app ouverte") {
+                ForEach(focusGuard.candidateApps, id: \.processIdentifier) { app in
+                    Button(app.localizedName ?? app.bundleIdentifier ?? "?") {
+                        if let id = app.bundleIdentifier { focusGuard.addApp(id) }
+                    }
+                }
+            }
+        } header: {
+            Text("Gardien anti-distraction")
+        } footer: {
+            Text(
+                "Activé, après 30 secondes sur un site ou une app de la liste, une pince sort de l'encoche pour fermer l'onglet ou l'app. Clique sur elle pour la chasser : elle revient 2 minutes plus tard si tu y es encore. Safari, Chrome, Arc, Brave, Edge, Vivaldi et Opera, grâce à l'autorisation Accessibilité."
+            )
+        }
+    }
+
+    private func removeButton(_ action: @escaping () -> Void) -> some View {
+        Button(action: action) { Image(systemName: "minus.circle.fill").foregroundStyle(.red) }
+            .buttonStyle(.plain)
+    }
+
+    private func addSite() {
+        if focusGuard.addSite(newSite) { newSite = "" }
     }
 }
 

@@ -82,3 +82,31 @@ struct UtilityTests {
         restored.stop()
     }
 }
+
+/// Gardien anti-distraction : domaines tapés et adresses couvertes.
+struct FocusGuardRulesTests {
+    @Test func normalizesTypedDomains() {
+        #expect(FocusGuardRules.normalizedDomain("https://www.Reddit.com/r/swift?x=1") == "reddit.com")
+        #expect(FocusGuardRules.normalizedDomain("  youtube.com  ") == "youtube.com")
+        #expect(FocusGuardRules.normalizedDomain("localhost:3000") == nil)
+        #expect(FocusGuardRules.normalizedDomain("pas un site") == nil)
+        #expect(FocusGuardRules.normalizedDomain("") == nil)
+    }
+
+    @Test func matchesSubdomainsOnly() {
+        let sites = ["youtube.com", "x.com"]
+        #expect(FocusGuardRules.matchingSite(host: "www.youtube.com", in: sites) == "youtube.com")
+        #expect(FocusGuardRules.matchingSite(host: "M.YouTube.com", in: sites) == "youtube.com")
+        #expect(FocusGuardRules.matchingSite(host: "x.com", in: sites) == "x.com")
+        // « dropbox.com » finit par « x.com » sans en être un sous-domaine.
+        #expect(FocusGuardRules.matchingSite(host: "dropbox.com", in: sites) == nil)
+    }
+}
+
+extension FocusGuardRulesTests {
+    /// La touche « W » existe dans la disposition de clavier en cours (AZERTY : pas la 13).
+    @MainActor @Test func findsTheWKey() {
+        let code = FocusGuard.keyCode(for: "w")
+        #expect(code != nil)
+    }
+}

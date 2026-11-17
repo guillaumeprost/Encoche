@@ -35,6 +35,7 @@ struct AppServices {
     let launchAtLogin: LaunchAtLogin
     let systemNotifications: SystemNotificationWatcher
     let bannerSuppressor: BannerSuppressor
+    let focusGuard: FocusGuard
 
     init() {
         settings = AppSettings()
@@ -116,6 +117,7 @@ struct AppServices {
             })
         claudeBriefing.start()
         launchAtLogin = LaunchAtLogin()
+        focusGuard = FocusGuard()
         let focusMonitor = focus
         systemNotifications = SystemNotificationWatcher(alerts: alerts, settings: settings) {
             focusMonitor.activeMode != nil
@@ -185,5 +187,6 @@ extension View {
             .environment(services.claudeQuota)
             .environment(services.launchAtLogin)
             .environment(services.systemNotifications)
+            .environment(services.focusGuard)
     }
 }

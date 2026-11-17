@@ -25,6 +25,7 @@ struct StatusChips: View {
                 MeetingControls()
             } else {
                 TimerMenu()
+                FocusGuardButton()
                 SidecarButton()
             }
             if let mode = focus.activeMode {
