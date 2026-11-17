@@ -170,8 +170,13 @@ final class ClickUpController {
     nonisolated static let minimumRefreshInterval: TimeInterval = 15
 
     init() {
-        token = Keychain.read()
-        state = token == nil ? .noToken : .loading
+        // Le Trousseau peut demander l'autorisation (nouvelle compilation…) et attendre la
+        // réponse : lu hors du fil principal, pour ne pas bloquer toute l'app en attendant.
+        state = .loading
+        Task { [weak self] in
+            let saved = await Task.detached { Keychain.read() }.value
+            self?.tokenLoaded(saved)
+        }
         isAppRunning = !NSRunningApplication.runningApplications(withBundleIdentifier: Self.bundleID).isEmpty
 
         let center = NSWorkspace.shared.notificationCenter
@@ -198,6 +203,14 @@ final class ClickUpController {
             }
         }
         if isAppRunning { startRefreshing() }
+    }
+
+    private func tokenLoaded(_ saved: String?) {
+        // Un jeton saisi entre-temps garde la priorité.
+        guard token == nil else { return }
+        token = saved
+        state = saved == nil ? .noToken : .loading
+        if saved != nil, isAppRunning { refresh() }
     }
 
     var hasToken: Bool { token != nil }
