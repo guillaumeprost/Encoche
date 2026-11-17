@@ -69,7 +69,8 @@ enum ClaudeAlerts {
                 icon: .symbol("checkmark", .green),
                 source: session.projectName,
                 title: "Terminé · \(name)",
-                body: reply.map(ClaudeCodeMonitor.plainSummary),
+                body: [session.changeSummary, reply.map(ClaudeCodeMonitor.plainSummary)].compactMap { $0 }
+                    .joined(separator: " — "),
                 action: .run(focus)
             )
         }

@@ -152,6 +152,10 @@ struct SettingsView: View {
                     if let error = claudeCode.hooksError {
                         Text(error).foregroundStyle(.orange)
                     }
+                    Toggle(isOn: $settings.claudeBriefing) {
+                        Text("Briefing du matin")
+                        Text("À la première ouverture du Mac avant midi : ta journée résumée par Claude (agenda, tâches ClickUp, rappels).")
+                    }
                     LabeledContent("Questions rapides") {
                         if ask.cliURL == nil {
                             StatusLabel(granted: false, text: "Claude Code introuvable")

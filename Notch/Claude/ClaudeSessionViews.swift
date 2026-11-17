@@ -120,6 +120,9 @@ private struct SessionDetail: View {
                     if !session.plan.isEmpty {
                         PlanView(session: session)
                     }
+                    if !session.editedFiles.isEmpty || session.testsPassed != nil {
+                        ChangesView(session: session)
+                    }
                 }
                 .padding(.bottom, 4)
             }
@@ -131,6 +134,9 @@ private struct SessionDetail: View {
 
     private var header: some View {
         HStack(spacing: 6) {
+            ClaudeMascot(mood: monitor.mood(of: session))
+                .frame(width: 22)
+                .animation(.snappy, value: monitor.mood(of: session))
             Text(session.title ?? session.projectName)
                 .font(.system(size: 15, weight: .bold))
                 .lineLimit(1)
@@ -255,6 +261,58 @@ private struct DiffPreview: View {
     }
 }
 
+/// Bilan de la demande : fichiers modifiés (un clic les ouvre) et résultat des tests.
+private struct ChangesView: View {
+    let session: ClaudeCodeSession
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 6) {
+                Image(systemName: "doc.badge.ellipsis")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.primary.opacity(0.5))
+                    .frame(width: 16)
+                Text("Modifications")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.primary.opacity(0.55))
+                if session.linesAdded + session.linesRemoved > 0 {
+                    Text("+\(session.linesAdded)").foregroundStyle(.green)
+                    Text("−\(session.linesRemoved)").foregroundStyle(.red)
+                }
+                Spacer(minLength: 0)
+                if let passed = session.testsPassed {
+                    Label(passed ? "Tests OK" : "Tests en échec", systemImage: passed ? "checkmark.seal.fill" : "xmark.seal.fill")
+                        .foregroundStyle(passed ? .green : .red)
+                }
+            }
+            .font(.system(size: 11.5, weight: .semibold).monospacedDigit())
+            ForEach(session.editedFiles.suffix(5), id: \.self) { path in
+                Button {
+                    NSWorkspace.shared.open(URL(fileURLWithPath: path))
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "pencil").font(.system(size: 9)).frame(width: 16)
+                        Text(URL(fileURLWithPath: path).lastPathComponent)
+                            .font(.system(size: 12))
+                            .lineLimit(1)
+                    }
+                    .foregroundStyle(.primary.opacity(0.7))
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(path)
+            }
+            if session.editedFiles.count > 5 {
+                Text("et \(session.editedFiles.count - 5) autres")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.primary.opacity(0.4))
+                    .padding(.leading, 22)
+            }
+        }
+        .padding(.top, 2)
+    }
+}
+
 /// Plan de Claude : avancement et étapes.
 private struct PlanView: View {
     let session: ClaudeCodeSession
@@ -357,7 +415,7 @@ struct CollapsedClaudeView: View {
 
     var body: some View {
         CollapsedActivityLayout(slotWidth: slotWidth) {
-            ClaudeMascot(mood: monitor.waitingCount > 0 ? .waiting : .idle)
+            ClaudeMascot(mood: monitor.waitingCount > 0 ? .waiting : .celebrating)
                 .frame(width: 28)
         } trailing: {
             Group {

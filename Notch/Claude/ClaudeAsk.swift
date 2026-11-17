@@ -24,7 +24,7 @@ final class ClaudeAsk {
         la langue de la question.
         """
 
-    private static let cliCandidates = [
+    nonisolated private static let cliCandidates = [
         "~/.local/bin/claude",
         "~/.claude/local/claude",
         "/opt/homebrew/bin/claude",
@@ -43,6 +43,8 @@ final class ClaudeAsk {
         case session(String)
         /// Nouvelle conversation dans l'app Claude.
         case newConversation
+        /// Nouvelle session Claude Code dans ce dossier, ouverte dans un terminal.
+        case newSession(cwd: String)
         /// Question rapide, répondue dans l'encoche.
         case quickQuestion
     }
@@ -60,9 +62,14 @@ final class ClaudeAsk {
     /// La dernière erreur vient d'une connexion expirée ou absente.
     private(set) var needsLogin = false
 
-    let cliURL: URL? = ClaudeAsk.cliCandidates
-        .map { URL(fileURLWithPath: NSString(string: $0).expandingTildeInPath) }
-        .first { FileManager.default.isExecutableFile(atPath: $0.path) }
+    /// La commande `claude`, là où ses installations la rangent.
+    nonisolated static var defaultCLI: URL? {
+        cliCandidates
+            .map { URL(fileURLWithPath: NSString(string: $0).expandingTildeInPath) }
+            .first { FileManager.default.isExecutableFile(atPath: $0.path) }
+    }
+
+    let cliURL: URL? = ClaudeAsk.defaultCLI
 
     /// Session Claude Code de la conversation : reprise à chaque question pour garder le fil.
     private var sessionID: String?
@@ -76,22 +83,42 @@ final class ClaudeAsk {
 
     func send() {
         let text = question.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, let cliURL else { return }
+        guard !text.isEmpty else { return }
+        question = ""
+        start(text, label: text, files: [])
+    }
 
+    /// Demande préparée par l'encoche (presse-papier, étagère, briefing…) : `label` s'affiche à
+    /// la place du texte complet envoyé à Claude, et Claude peut lire `files` (images, documents).
+    /// Elle ouvre une nouvelle conversation, puis l'onglet Claude pour suivre la réponse.
+    func ask(_ prompt: String, label: String, files: [URL] = []) {
+        reset()
+        start(prompt, label: label, files: files)
+        openAnswer()
+    }
+
+    func ask(_ request: ClaudePrompts.Request) {
+        ask(request.prompt, label: request.label, files: request.files)
+    }
+
+    private func start(_ text: String, label: String, files: [URL]) {
+        guard let cliURL else {
+            errorMessage = "Claude Code est introuvable : installe-le pour poser des questions."
+            return
+        }
         cancel()
         // L'échange précédent (terminé) rejoint l'historique de la conversation.
         if !askedQuestion.isEmpty, !answer.isEmpty {
             history.append(Exchange(question: askedQuestion, answer: answer))
         }
-        askedQuestion = text
-        question = ""
+        askedQuestion = label
         answer = ""
         errorMessage = nil
         needsLogin = false
         isStreaming = true
 
         task = Task { [weak self] in
-            await self?.run(text, cli: cliURL)
+            await self?.run(text, cli: cliURL, files: files)
             // Une question annulée a été remplacée : ne pas toucher à l'état de la suivante.
             guard !Task.isCancelled, let self else { return }
             self.isStreaming = false
@@ -132,7 +159,7 @@ final class ClaudeAsk {
         needsLogin = false
     }
 
-    private func run(_ text: String, cli: URL) async {
+    private func run(_ text: String, cli: URL, files: [URL]) async {
         let process = Process()
         process.executableURL = cli
         process.currentDirectoryURL = Self.workingDirectory
@@ -142,9 +169,8 @@ final class ClaudeAsk {
                 "--output-format", "stream-json",
                 "--verbose",
                 "--include-partial-messages",
-                "--tools", "",
                 "--system-prompt", Self.systemPrompt,
-            ] + (sessionID.map { ["--resume", $0] } ?? [])
+            ] + Self.toolArguments(for: files) + (sessionID.map { ["--resume", $0] } ?? [])
         // Une app lancée depuis le Finder n'a qu'un PATH minimal.
         var environment = ProcessInfo.processInfo.environment
         environment["PATH"] = [
@@ -177,6 +203,13 @@ final class ClaudeAsk {
         } catch {
             if !Task.isCancelled { errorMessage = "Lecture de la réponse interrompue." }
         }
+    }
+
+    /// Sans fichier, aucun outil. Avec des fichiers, la lecture seule, limitée à leurs dossiers.
+    nonisolated static func toolArguments(for files: [URL]) -> [String] {
+        guard !files.isEmpty else { return ["--tools", ""] }
+        let folders = Set(files.map { $0.deletingLastPathComponent().path }).sorted()
+        return ["--tools", "Read", "--allowedTools", "Read"] + folders.flatMap { ["--add-dir", $0] }
     }
 
     private func handle(_ event: [String: Any]) {

@@ -87,6 +87,51 @@ final class ClaudeCodeMonitor {
     var waitingCount: Int { sessions.filter { $0.state == .waiting }.count }
     /// Sessions qui travaillent en même temps.
     var workingCount: Int { sessions.filter { $0.state == .working }.count }
+
+    /// Session qui vient de finir : le personnage saute de joie quelques secondes.
+    private(set) var celebratingSessionID: String?
+    /// Session dont un outil vient d'échouer : le personnage s'inquiète quelques secondes.
+    private(set) var worriedSessionID: String?
+    @ObservationIgnored private var moodGeneration = 0
+    static let moodDuration: Duration = .seconds(4)
+
+    var isCelebrating: Bool { celebratingSessionID != nil }
+
+    /// Humeur du personnage pour une session.
+    func mood(of session: ClaudeCodeSession) -> ClaudeMascot.Mood {
+        if session.id == worriedSessionID, session.state == .working { return .worried }
+        switch session.state {
+        case .working: return .working
+        case .waiting: return .waiting
+        case .done: return session.id == celebratingSessionID ? .celebrating : .idle
+        case .idle: return .idle
+        case .inactive: return .sleeping
+        }
+    }
+
+    private func setMood(celebrating: String? = nil, worried: String? = nil) {
+        celebratingSessionID = celebrating
+        worriedSessionID = worried
+        moodGeneration += 1
+        let generation = moodGeneration
+        Task { [weak self] in
+            try? await Task.sleep(for: Self.moodDuration)
+            guard let self, self.moodGeneration == generation else { return }
+            self.celebratingSessionID = nil
+            self.worriedSessionID = nil
+        }
+    }
+
+    /// Dossiers des dernières sessions, pour en démarrer une nouvelle au même endroit.
+    var recentProjects: [String] {
+        var seen: Set<String> = []
+        return sortedSessions.map(\.cwd).filter { !$0.isEmpty && seen.insert($0).inserted }
+    }
+
+    /// Démarre une session Claude Code dans ce dossier, dans un nouvel onglet de terminal.
+    func startSession(in cwd: String, prompt: String) async -> ClaudeReply.Outcome {
+        await ClaudeReply.startCodeSession(prompt, in: cwd, cli: ClaudeAsk.defaultCLI)
+    }
     /// Une session a donné signe de vie récemment (pour suivre les quotas sans interroger le service pour rien).
     var hasRecentActivity: Bool {
         sessions.contains { $0.state != .inactive && Date().timeIntervalSince($0.updatedAt) < 15 * 60 }
@@ -377,6 +422,7 @@ final class ClaudeCodeMonitor {
                 session.agents = []
                 session.lastMessage = nil
                 session.choices = nil
+                session.resetChanges()
                 // Plan terminé : il appartenait à la demande précédente.
                 if session.plan.allSatisfy({ $0.status == .completed }) { session.plan = [] }
             }
@@ -390,6 +436,10 @@ final class ClaudeCodeMonitor {
                 session.state = .working
                 if session.workStartedAt == nil { session.workStartedAt = Date() }
                 session.detail = ClaudeActivity.describe(tool: tool, input: input)
+                // Tests lancés : en échec jusqu'à preuve du contraire (un échec n'envoie pas toujours PostToolUse).
+                if tool == "Bash", ClaudeActivity.isTestCommand(input["command"] as? String ?? "") {
+                    session.testsPassed = false
+                }
                 ClaudeActivity.applyPlan(tool: tool, input: input, to: &session.plan)
                 if let choices = ClaudeActivity.suggestedReplies(tool: tool, input: input) { session.choices = choices }
                 if ClaudeActivity.agentTools.contains(tool) {
@@ -403,8 +453,21 @@ final class ClaudeCodeMonitor {
             let tool = event["tool_name"] as? String ?? ""
             let toolUseID = event["tool_use_id"] as? String
             let input = event["tool_input"] as? [String: Any] ?? [:]
+            let failed = ClaudeActivity.didFail(event["tool_response"])
+            if failed { setMood(worried: id) }
             upsert(id, cwd: cwd) { session in
                 session.state = .working
+                if tool == "Bash", ClaudeActivity.isTestCommand(input["command"] as? String ?? "") {
+                    session.testsPassed = !failed
+                }
+                if ClaudeActivity.editTools.contains(tool), !failed,
+                    let path = input["file_path"] as? String ?? input["notebook_path"] as? String
+                {
+                    if !session.editedFiles.contains(path) { session.editedFiles.append(path) }
+                    let counts = ClaudeActivity.lineCounts(tool: tool, input: input)
+                    session.linesAdded += counts.added
+                    session.linesRemoved += counts.removed
+                }
                 guard ClaudeActivity.agentTools.contains(tool) else { return }
                 // Agent lancé en arrière-plan : il continue, sa fin arrive avec « SubagentStop ».
                 if input["run_in_background"] as? Bool == true { return }
@@ -449,6 +512,7 @@ final class ClaudeCodeMonitor {
                 session.workStartedAt = nil
                 for index in session.agents.indices { session.agents[index].isRunning = false }
             }
+            setMood(celebrating: id)
             announceDone(id, reply: event["last_assistant_message"] as? String)
         default:
             return

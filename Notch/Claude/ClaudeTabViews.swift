@@ -39,6 +39,7 @@ struct ClaudeTab: View {
                 switch ClaudeTabField.resolve(ask.target, default: selectedSession, among: monitor.sessions) {
                 case .session(let session): SessionConversation(session: session)
                 case .newConversation: NewConversationHint()
+                case .newSession(let cwd): NewSessionHint(cwd: cwd)
                 case .quickQuestion: AskPanel()
                 }
             }
@@ -121,6 +122,31 @@ struct ClaudeElapsedText: View {
     }
 }
 
+/// Nouvelle session Claude Code choisie : où elle va s'ouvrir.
+private struct NewSessionHint: View {
+    let cwd: String
+
+    var body: some View {
+        VStack(spacing: 6) {
+            ClaudeMascot(mood: .idle)
+                .frame(width: 44)
+            Text(
+                "Ton message démarrera une session Claude Code dans **\(ClaudeCodeSession.projectName(for: cwd))**, dans un nouvel onglet de terminal"
+            )
+            .font(.system(size: 12))
+            .foregroundStyle(.primary.opacity(0.5))
+            .multilineTextAlignment(.center)
+            Text(cwd)
+                .font(.system(size: 10.5))
+                .foregroundStyle(.primary.opacity(0.35))
+                .lineLimit(1)
+                .truncationMode(.head)
+        }
+        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
 /// Nouvelle conversation choisie : ce qui va se passer.
 private struct NewConversationHint: View {
     var body: some View {
@@ -159,6 +185,7 @@ struct ClaudeTabField: View {
     enum Resolved {
         case session(ClaudeCodeSession)
         case newConversation
+        case newSession(cwd: String)
         case quickQuestion
     }
 
@@ -170,6 +197,7 @@ struct ClaudeTabField: View {
         case .session(let id):
             if let chosen = sessions.first(where: { $0.id == id }) { return .session(chosen) }
         case .newConversation: return .newConversation
+        case .newSession(let cwd): return .newSession(cwd: cwd)
         case .quickQuestion: return .quickQuestion
         case nil: break
         }
@@ -189,6 +217,8 @@ struct ClaudeTabField: View {
                     TextField("Répondre à \(session.title ?? session.projectName)…", text: $reply)
                 case .newConversation:
                     TextField("Nouvelle conversation dans Claude…", text: $reply)
+                case .newSession(let cwd):
+                    TextField("Que doit faire Claude Code dans \(ClaudeCodeSession.projectName(for: cwd)) ?", text: $reply)
                 case .quickQuestion:
                     TextField("Question rapide à Claude…", text: $ask.question)
                 }
@@ -229,6 +259,17 @@ struct ClaudeTabField: View {
         .onDisappear { vm.holdOpen = false }
     }
 
+    /// Dossier d'une nouvelle session, choisi dans le Finder.
+    private static func chooseFolder() -> String? {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.prompt = "Démarrer ici"
+        panel.message = "Dossier où démarrer la session Claude Code"
+        NSApp.activate()
+        return panel.runModal() == .OK ? panel.url?.path : nil
+    }
+
     private func currentText(_ resolved: Resolved) -> String {
         if case .quickQuestion = resolved { return ask.question }
         return reply
@@ -255,6 +296,17 @@ struct ClaudeTabField: View {
                 target = .newConversation
             } label: {
                 Label("Nouvelle conversation dans Claude", systemImage: "square.and.pencil")
+            }
+            Menu {
+                ForEach(monitor.recentProjects.prefix(6), id: \.self) { cwd in
+                    Button(ClaudeCodeSession.projectName(for: cwd)) { target = .newSession(cwd: cwd) }
+                }
+                if !monitor.recentProjects.isEmpty { Divider() }
+                Button("Choisir un dossier…") {
+                    if let cwd = Self.chooseFolder() { target = .newSession(cwd: cwd) }
+                }
+            } label: {
+                Label("Nouvelle session Claude Code", systemImage: "terminal")
             }
             Divider()
             Button {
@@ -287,6 +339,7 @@ struct ClaudeTabField: View {
         switch resolved {
         case .session(let session): session.title ?? session.projectName
         case .newConversation: "Nouvelle conversation"
+        case .newSession(let cwd): "Session · \(ClaudeCodeSession.projectName(for: cwd))"
         case .quickQuestion: "Question rapide"
         }
     }
@@ -295,6 +348,7 @@ struct ClaudeTabField: View {
         switch resolved {
         case .session: "arrowshape.turn.up.left.fill"
         case .newConversation: "square.and.pencil"
+        case .newSession: "terminal"
         case .quickQuestion: "sparkle"
         }
     }
@@ -332,6 +386,10 @@ struct ClaudeTabField: View {
             let outcome: ClaudeReply.Outcome
             if case .session(let session) = resolved {
                 outcome = await monitor.reply(text, to: session.id)
+            } else if case .newSession(let cwd) = resolved {
+                outcome = await monitor.startSession(in: cwd, prompt: text)
+                // La session apparaîtra avec ses hooks : on la suivra comme les autres.
+                if case .sent = outcome { target = nil }
             } else {
                 outcome = await ClaudeReply.startNewConversation(text)
                 // La nouvelle conversation devient la plus récente : on y répondra ensuite.

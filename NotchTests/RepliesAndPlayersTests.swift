@@ -122,6 +122,7 @@ struct RepliesAndPlayersTests {
             switch resolved {
             case .session(let session): session.id
             case .newConversation: "new"
+            case .newSession(let cwd): "session:\(cwd)"
             case .quickQuestion: "quick"
             }
         }
@@ -132,5 +133,6 @@ struct RepliesAndPlayersTests {
         #expect(id(ClaudeTabField.resolve(.session("gone"), default: working, among: all)) == "a")
         #expect(id(ClaudeTabField.resolve(.quickQuestion, default: working, among: all)) == "quick")
         #expect(id(ClaudeTabField.resolve(.newConversation, default: working, among: all)) == "new")
+        #expect(id(ClaudeTabField.resolve(.newSession(cwd: "/p/C"), default: working, among: all)) == "session:/p/C")
     }
 }

@@ -107,6 +107,47 @@ enum ClaudeActivity {
         return result
     }
 
+    /// Outils qui modifient un fichier.
+    static let editTools: Set<String> = ["Edit", "MultiEdit", "Write", "NotebookEdit"]
+
+    /// Lignes ajoutées et retirées par une modification.
+    static func lineCounts(tool: String, input: [String: Any]) -> (added: Int, removed: Int) {
+        guard let lines = diff(tool: tool, input: input, limit: .max) else { return (0, 0) }
+        return (lines.filter { $0.kind == .added }.count, lines.filter { $0.kind == .removed }.count)
+    }
+
+    /// Commande qui lance des tests (npm test, pytest, xcodebuild test, ./scripts/test.sh…).
+    static func isTestCommand(_ command: String) -> Bool {
+        let text = command.lowercased()
+        let patterns = [
+            "npm test", "npm run test", "yarn test", "pnpm test", "bun test", "pytest", "jest", "vitest",
+            "xcodebuild test", "xcodebuild -", "swift test", "cargo test", "go test", "rspec", "phpunit",
+            "mvn test", "gradle test", "./gradlew test", "test.sh", "make test", "rake test", "mix test",
+        ]
+        return patterns.contains { pattern in
+            // « xcodebuild - » ne compte que s'il lance bien des tests.
+            pattern == "xcodebuild -" ? text.contains("xcodebuild") && text.hasSuffix(" test") : text.contains(pattern)
+        }
+    }
+
+    /// Le résultat d'un outil (PostToolUse) signale une erreur.
+    static func didFail(_ response: Any?) -> Bool {
+        if let text = response as? String {
+            return text.hasPrefix("Error") || text.contains("<tool_use_error>") || failedExitCode(in: text)
+        }
+        guard let response = response as? [String: Any] else { return false }
+        if response["is_error"] as? Bool == true || response["isError"] as? Bool == true { return true }
+        if let error = response["error"] as? String, !error.isEmpty { return true }
+        if let code = (response["exitCode"] ?? response["exit_code"]) as? Int, code != 0 { return true }
+        return [response["stdout"], response["stderr"], response["output"]].contains { ($0 as? String).map(failedExitCode) ?? false }
+    }
+
+    /// « Exit code 1 » écrit par Claude Code quand une commande échoue.
+    private static func failedExitCode(in text: String) -> Bool {
+        guard let match = text.firstMatch(of: /Exit code (\d+)/), let code = Int(match.1) else { return false }
+        return code != 0
+    }
+
     /// Nombre de lignes retirées et ajoutées (« +3 −1 »), pour le résumé d'une demande.
     static func diffStat(tool: String, input: [String: Any]) -> String? {
         guard let lines = diff(tool: tool, input: input, limit: .max) else { return nil }

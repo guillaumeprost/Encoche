@@ -64,6 +64,8 @@ final class CalendarController {
     private let store: EKEventStore
     /// Pour les rappels de réunion dans l'encoche.
     @ObservationIgnored var alerts: AlertCenter?
+    /// Préparer une réunion avec Claude (bouton du rappel d'une minute avant).
+    @ObservationIgnored var onPrepare: (@MainActor (ClaudePrompts.Meeting) -> Void)?
     @ObservationIgnored private var remindedIDs: Set<String> = []
     @ObservationIgnored private var reminderTimer: Timer?
     @ObservationIgnored private var countdownEnd: Task<Void, Never>?
@@ -198,14 +200,50 @@ final class CalendarController {
             body: [when, event.location].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "),
             action: openEvent
         )
+        var buttons: [NotchAlert.Button] = []
+        if let onPrepare {
+            let meeting = Self.meeting(from: event)
+            buttons.append(.init(label: "Préparer", role: .normal) { onPrepare(meeting) })
+        }
         if let url = MeetingLink.find(in: event) {
             // Avec un lien de visio : la notification attend une réponse.
-            alert.buttons = [
-                .init(label: "Ignorer", role: .normal) {},
-                .init(label: "Rejoindre", role: .primary) { NSWorkspace.shared.open(url) },
-            ]
+            buttons.insert(.init(label: "Ignorer", role: .normal) {}, at: 0)
+            buttons.append(.init(label: "Rejoindre", role: .primary) { NSWorkspace.shared.open(url) })
         }
+        // Sans visio, « Préparer » seul ne doit pas garder la notification affichée.
+        if buttons.count > 1 { alert.buttons = buttons }
         alerts?.post(alert)
+    }
+
+    /// Détails d'un événement pour Claude : lieu, description et participants.
+    func meetingDetails(for event: CalendarEvent) -> ClaudePrompts.Meeting? {
+        guard access == .granted else { return nil }
+        let predicate = store.predicateForEvents(withStart: event.start, end: event.end, calendars: nil)
+        guard let match = store.events(matching: predicate).first(where: { $0.calendarItemIdentifier == event.itemID })
+        else { return nil }
+        return Self.meeting(from: match)
+    }
+
+    /// Événements avec horaire d'une journée, pour le briefing du matin.
+    func meetings(on day: Date) -> [ClaudePrompts.Meeting] {
+        guard access == .granted else { return [] }
+        let start = calendar.startOfDay(for: day)
+        guard let end = calendar.date(byAdding: .day, value: 1, to: start) else { return [] }
+        return store.events(matching: store.predicateForEvents(withStart: start, end: end, calendars: nil))
+            .filter { !$0.isAllDay }
+            .sorted { $0.startDate < $1.startDate }
+            .map(Self.meeting(from:))
+    }
+
+    private static func meeting(from event: EKEvent) -> ClaudePrompts.Meeting {
+        ClaudePrompts.Meeting(
+            title: event.title?.isEmpty == false ? event.title! : "Sans titre",
+            start: event.startDate,
+            end: event.endDate,
+            location: event.location,
+            notes: event.notes,
+            attendees: (event.attendees ?? []).compactMap { $0.name ?? $0.url.absoluteString.replacingOccurrences(of: "mailto:", with: "") }
+        )
     }
 
     func open(_ event: CalendarEvent) {

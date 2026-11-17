@@ -78,6 +78,7 @@ private struct SectionLabel: View {
 private struct ScreenshotTile: View {
     @Environment(ShelfController.self) private var shelf
     @Environment(ScreenshotWatcher.self) private var screenshots
+    @Environment(ClaudeAsk.self) private var ask
     let screenshot: ScreenshotWatcher.Screenshot
     @State private var hovering = false
 
@@ -122,6 +123,11 @@ private struct ScreenshotTile: View {
             Button("Ouvrir") { shelf.open(screenshot.url) }
             Button("Afficher dans le Finder") { shelf.revealInFinder(screenshot.url) }
             Button("Envoyer par AirDrop") { shelf.airDrop([screenshot.url]) }
+            Button {
+                ask.ask(ClaudePrompts.image(screenshot.url))
+            } label: {
+                Label("Décrire avec Claude", systemImage: "sparkle")
+            }
             Divider()
             Button("Garder sur l'étagère") { withAnimation(.snappy) { shelf.add([screenshot.url]) } }
         }
@@ -130,6 +136,7 @@ private struct ScreenshotTile: View {
 
 private struct ShelfItem: View {
     @Environment(ShelfController.self) private var shelf
+    @Environment(ClaudeAsk.self) private var ask
     let url: URL
     @State private var hovering = false
 
@@ -163,6 +170,11 @@ private struct ShelfItem: View {
             Button("Ouvrir") { shelf.open(url) }
             Button("Afficher dans le Finder") { shelf.revealInFinder(url) }
             Button("Envoyer par AirDrop") { shelf.airDrop([url]) }
+            Button {
+                ask.ask(ClaudePrompts.file(url))
+            } label: {
+                Label("Demander à Claude", systemImage: "sparkle")
+            }
             Divider()
             Button("Retirer de l'étagère") {
                 withAnimation(.snappy) { shelf.remove(url) }

@@ -4,6 +4,7 @@ import SwiftUI
 /// prêt à être collé avec ⌘V.
 struct ClipboardView: View {
     @Environment(ClipboardController.self) private var clipboard
+    @Environment(ClaudeAsk.self) private var ask
     @State private var copiedID: UUID?
 
     var body: some View {
@@ -28,6 +29,7 @@ struct ClipboardView: View {
                                 Button(item.pinned ? "Désépingler" : "Épingler") {
                                     withAnimation(.snappy) { clipboard.togglePin(item) }
                                 }
+                                claudeActions(item)
                                 Divider()
                                 Button("Supprimer", role: .destructive) {
                                     withAnimation(.snappy) { clipboard.delete(item) }
@@ -39,6 +41,36 @@ struct ClipboardView: View {
             }
             .scrollIndicators(.never)
             .scrollClipDisabled()
+        }
+    }
+
+    /// Demander à Claude : expliquer, traduire, corriger un texte, décrire une image, résumer des fichiers.
+    @ViewBuilder
+    private func claudeActions(_ item: ClipItem) -> some View {
+        Divider()
+        switch item.content {
+        case .text(let text):
+            ForEach(ClaudePrompts.textActions(for: text), id: \.self) { action in
+                Button {
+                    ask.ask(ClaudePrompts.text(action, text))
+                } label: {
+                    Label("\(action.title) avec Claude", systemImage: action.symbol)
+                }
+            }
+        case .image:
+            if let url = clipboard.imageURL(of: item) {
+                Button {
+                    ask.ask(ClaudePrompts.image(url))
+                } label: {
+                    Label("Décrire avec Claude", systemImage: "sparkle")
+                }
+            }
+        case .files(let urls):
+            Button {
+                ask.ask(urls.count == 1 ? ClaudePrompts.file(urls[0]) : ClaudePrompts.files(urls))
+            } label: {
+                Label("Résumer avec Claude", systemImage: "sparkle")
+            }
         }
     }
 

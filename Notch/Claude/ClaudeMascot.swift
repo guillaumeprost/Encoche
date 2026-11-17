@@ -13,6 +13,12 @@ struct ClaudeMascot: View {
         case working
         /// Il t'attend : il agite les bras.
         case waiting
+        /// Tâche terminée : il saute, les deux bras en l'air.
+        case celebrating
+        /// Une commande ou un outil vient d'échouer : il tremble, les yeux plissés.
+        case worried
+        /// Session fermée : yeux fermés, il respire lentement.
+        case sleeping
     }
 
     var mood: Mood = .idle
@@ -31,11 +37,12 @@ struct ClaudeMascot: View {
 
     var body: some View {
         // Au repos, on ne redessine qu'aux deux moments du clignement (et non en continu).
-        TimelineView(mood == .idle ? AnyTimelineSchedule(BlinkSchedule()) : AnyTimelineSchedule(.periodic(from: .now, by: Self.step))) {
-            context in
+        TimelineView(schedule) { context in
             let time = context.date.timeIntervalSinceReferenceDate
             let tick = Int(time / Self.step)
-            let blinking = mood == .idle && time.truncatingRemainder(dividingBy: Self.blinkPeriod) < Self.blinkLength
+            let blinking =
+                mood == .sleeping
+                || (mood == .idle && time.truncatingRemainder(dividingBy: Self.blinkPeriod) < Self.blinkLength)
             Canvas { canvas, size in
                 draw(in: &canvas, size: size, tick: tick, blinking: blinking)
             }
@@ -44,20 +51,39 @@ struct ClaudeMascot: View {
         .accessibilityLabel("Claude Code")
     }
 
+    /// Au repos, on ne redessine qu'aux deux moments du clignement ; endormi, une respiration
+    /// toutes les 1,2 s ; sinon une image toutes les 0,12 s.
+    private var schedule: AnyTimelineSchedule {
+        switch mood {
+        case .idle: AnyTimelineSchedule(BlinkSchedule())
+        case .sleeping: AnyTimelineSchedule(.periodic(from: .now, by: 1.2))
+        default: AnyTimelineSchedule(.periodic(from: .now, by: Self.step))
+        }
+    }
+
     // MARK: - Dessin
 
     private func draw(in canvas: inout GraphicsContext, size: CGSize, tick: Int, blinking: Bool) {
         let pixelWidth = size.width / CGFloat(Self.columns)
         let pixelHeight = size.height / CGFloat(Self.rows)
-        // Au travail, il rebondit d'un tiers de pixel à chaque pas.
-        let bounce: CGFloat = mood == .working && tick % 2 == 0 ? -pixelHeight * 0.35 : 0
+        // Au travail, il rebondit d'un tiers de pixel à chaque pas ; content, il saute plus haut ;
+        // endormi, il respire.
+        var bounce: CGFloat = 0
+        var shake: CGFloat = 0
+        switch mood {
+        case .working: bounce = tick % 2 == 0 ? -pixelHeight * 0.35 : 0
+        case .celebrating: bounce = [0, -0.5, -0.9, -0.5][tick % 4] * pixelHeight
+        case .sleeping: bounce = (tick / 10) % 2 == 0 ? pixelHeight * 0.15 : 0
+        case .worried: shake = tick % 2 == 0 ? -pixelWidth * 0.3 : pixelWidth * 0.3
+        default: break
+        }
 
         // Tous les pixels forment un seul tracé, rempli d'un coup : pas de fines lignes entre eux.
         var shape = Path()
         func fill(_ x: Int, _ y: Int, dy: CGFloat = 0) {
             shape.addRect(
                 CGRect(
-                    x: CGFloat(x) * pixelWidth,
+                    x: CGFloat(x) * pixelWidth + shake,
                     y: CGFloat(y) * pixelHeight + dy,
                     width: pixelWidth,
                     height: pixelHeight
@@ -67,10 +93,14 @@ struct ClaudeMascot: View {
         // Corps : deux lignes pleines ; les yeux sont des trous, refermés quand il cligne.
         for x in 3...14 { fill(x, 0, dy: bounce) }
         for x in 3...14 where blinking || (x != 5 && x != 12) { fill(x, 1, dy: bounce) }
+        // Inquiet : les yeux se plissent (un demi-pixel refermé).
+        if mood == .worried {
+            for x in [5, 12] { fill(x, 1, dy: bounce - pixelHeight * 0.5) }
+        }
 
-        // Bras : en attente, ils se lèvent l'un après l'autre.
-        let leftUp = mood == .waiting && tick % 4 < 2
-        let rightUp = mood == .waiting && tick % 4 >= 2
+        // Bras : en attente, ils se lèvent l'un après l'autre ; content, les deux à la fois.
+        let leftUp = (mood == .waiting && tick % 4 < 2) || (mood == .celebrating && tick % 4 != 0)
+        let rightUp = (mood == .waiting && tick % 4 >= 2) || (mood == .celebrating && tick % 4 != 0)
         for x in 3...14 { fill(x, 2, dy: bounce) }
         fill(1, leftUp ? 1 : 2, dy: bounce)
         fill(2, 2, dy: bounce)
@@ -82,7 +112,9 @@ struct ClaudeMascot: View {
         let legs = [4, 6, 11, 13]
         for (index, x) in legs.enumerated() {
             let lifted = mood == .working && (index % 2 == tick % 2)
-            fill(x, 4, dy: lifted ? -pixelHeight * 0.45 : 0)
+            // En sautant, les pattes suivent le corps.
+            let jump = mood == .celebrating ? bounce : 0
+            fill(x, 4, dy: lifted ? -pixelHeight * 0.45 : jump)
         }
         canvas.fill(shape, with: .color(color))
     }
@@ -93,6 +125,9 @@ struct ClaudeMascot: View {
         ClaudeMascot(mood: .idle).frame(width: 90)
         ClaudeMascot(mood: .working).frame(width: 90)
         ClaudeMascot(mood: .waiting).frame(width: 90)
+        ClaudeMascot(mood: .celebrating).frame(width: 90)
+        ClaudeMascot(mood: .worried).frame(width: 90)
+        ClaudeMascot(mood: .sleeping).frame(width: 90)
     }
     .padding(30)
     .background(.black)

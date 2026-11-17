@@ -31,6 +31,7 @@ struct AppServices {
     let ask: ClaudeAsk
     let claudeUsage: ClaudeUsage
     let claudeQuota: ClaudeQuota
+    let claudeBriefing: ClaudeBriefing
     let launchAtLogin: LaunchAtLogin
     let systemNotifications: SystemNotificationWatcher
     let bannerSuppressor: BannerSuppressor
@@ -98,6 +99,22 @@ struct AppServices {
         claudeQuota.alerts = alerts
         let claudeMonitor = claudeCode
         claudeQuota.watch { claudeMonitor.hasRecentActivity }
+        let claudeAsk = ask
+        calendar.onPrepare = { claudeAsk.ask(ClaudePrompts.meeting($0)) }
+        let calendarController = calendar
+        let remindersController = reminders
+        let clickUpController = clickUp
+        claudeBriefing = ClaudeBriefing(
+            ask: ask,
+            isEnabled: { appSettings.claudeBriefing && claudeAsk.cliURL != nil },
+            context: {
+                ClaudePrompts.Briefing(
+                    events: calendarController.meetings(on: Date()),
+                    tasks: clickUpController.isActive ? clickUpController.tasks.map { ClaudePrompts.taskLine($0) } : [],
+                    reminders: remindersController.reminders.filter { !$0.isCompleted }.map { ClaudePrompts.reminderLine($0) }
+                )
+            })
+        claudeBriefing.start()
         launchAtLogin = LaunchAtLogin()
         let focusMonitor = focus
         systemNotifications = SystemNotificationWatcher(alerts: alerts, settings: settings) {

@@ -23,7 +23,10 @@ enum LiveActivity: Hashable {
     ) -> [LiveActivity] {
         var list: [LiveActivity] = []
         if calls.isActive { list.append(.call) }
-        if claudeCode.needsAttention { list.append(.claudeWaiting) }
+        // Une session t'attend, ou vient de finir (le personnage saute de joie quelques secondes).
+        if claudeCode.needsAttention || (settings.showClaudeActivity && claudeCode.isCelebrating) {
+            list.append(.claudeWaiting)
+        }
         if privacy.isActive { list.append(.privacy) }
         if settings.showMeetingActivity, calendar.upcomingMeeting != nil { list.append(.meeting) }
         if timer.isActive { list.append(.timer) }
@@ -44,6 +47,7 @@ struct ActivityBubble: View {
     @Environment(CalendarController.self) private var calendar
     @Environment(TimerController.self) private var timer
     @Environment(FocusMonitor.self) private var focus
+    @Environment(ClaudeCodeMonitor.self) private var claudeCode
     let activity: LiveActivity
 
     /// Contenu seul : le fond (et la division depuis l'encoche) est dessiné par `MitosisBubble`.
@@ -57,7 +61,7 @@ struct ActivityBubble: View {
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(.green)
         case .claudeWaiting:
-            ClaudeMascot(mood: .waiting)
+            ClaudeMascot(mood: claudeCode.needsAttention ? .waiting : .celebrating)
                 .frame(width: 19)
         case .privacy:
             let indicator = PrivacyIndicator(privacy: privacy, meeting: meeting)
@@ -71,7 +75,7 @@ struct ActivityBubble: View {
             }
             .frame(width: 17, height: 17)
         case .claudeWorking:
-            ClaudeMascot(mood: .working)
+            ClaudeMascot(mood: claudeCode.workingSession.map(claudeCode.mood(of:)) ?? .working)
                 .frame(width: 19)
         case .meeting:
             if let meeting = calendar.upcomingMeeting {
@@ -291,7 +295,7 @@ struct CollapsedClaudeWorkingView: View {
     var body: some View {
         let session = monitor.workingSession
         CollapsedActivityLayout(slotWidth: slotWidth) {
-            ClaudeMascot(mood: .working)
+            ClaudeMascot(mood: session.map(monitor.mood(of:)) ?? .working)
                 .frame(width: 28)
         } trailing: {
             HStack(spacing: 3) {

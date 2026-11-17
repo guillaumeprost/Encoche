@@ -39,6 +39,33 @@ struct ClaudeCodeSession: Identifiable, Equatable {
     }
     var transcriptPath: String?
 
+    /// Fichiers modifiés pendant la demande en cours (chemins complets, dans l'ordre).
+    var editedFiles: [String] = []
+    var linesAdded = 0
+    var linesRemoved = 0
+    /// Résultat des derniers tests lancés pendant la demande (`nil` : pas de tests).
+    var testsPassed: Bool?
+
+    /// Bilan de la demande : « 3 fichiers modifiés · +120 −40 · tests OK », ou `nil` sans changement.
+    var changeSummary: String? {
+        var parts: [String] = []
+        if !editedFiles.isEmpty {
+            let count = editedFiles.count
+            parts.append(count == 1 ? "1 fichier modifié" : "\(count) fichiers modifiés")
+            if linesAdded + linesRemoved > 0 { parts.append("+\(linesAdded) −\(linesRemoved)") }
+        }
+        if let testsPassed { parts.append(testsPassed ? "tests OK" : "tests en échec") }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// Remet à zéro le bilan au début d'une demande.
+    mutating func resetChanges() {
+        editedFiles = []
+        linesAdded = 0
+        linesRemoved = 0
+        testsPassed = nil
+    }
+
     struct PlanItem: Equatable, Identifiable {
         enum Status: Equatable { case pending, inProgress, completed }
         let id: Int

@@ -87,6 +87,11 @@ final class AppSettings {
         didSet { UserDefaults.standard.set(claudeLive, forKey: "claudeLive") }
     }
 
+    /// Briefing du matin par Claude : agenda, tâches et rappels, à la première ouverture du Mac.
+    var claudeBriefing: Bool = UserDefaults.standard.object(forKey: "claudeBriefing") as? Bool ?? true {
+        didSet { UserDefaults.standard.set(claudeBriefing, forKey: "claudeBriefing") }
+    }
+
     /// Prévenir dans l'encoche quelques minutes avant l'heure d'une tâche ClickUp.
     var clickUpDueAlerts: Bool = UserDefaults.standard.object(forKey: "clickUpDueAlerts") as? Bool ?? true {
         didSet { UserDefaults.standard.set(clickUpDueAlerts, forKey: "clickUpDueAlerts") }

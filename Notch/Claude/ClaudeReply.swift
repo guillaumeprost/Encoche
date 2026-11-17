@@ -110,6 +110,41 @@ enum ClaudeReply {
         }
     }
 
+    /// Commande shell qui ouvre Claude Code dans ce dossier avec ce premier message.
+    nonisolated static func sessionCommand(prompt: String, in cwd: String, cli: URL?) -> String {
+        func quoted(_ text: String) -> String { "'" + text.replacingOccurrences(of: "'", with: "'\\''") + "'" }
+        let claude = cli.map { quoted($0.path) } ?? "claude"
+        let message = sanitized(prompt)
+        return "cd \(quoted(cwd)) && \(claude)" + (message.isEmpty ? "" : " \(quoted(message))")
+    }
+
+    /// Démarre une session Claude Code dans un nouvel onglet : iTerm s'il est ouvert, sinon Terminal.
+    static func startCodeSession(_ prompt: String, in cwd: String, cli: URL?) async -> Outcome {
+        guard FileManager.default.fileExists(atPath: cwd) else { return .failed("Dossier introuvable") }
+        let command = AppleScriptRunner.escape(sessionCommand(prompt: prompt, in: cwd, cli: cli))
+        let useITerm = !NSRunningApplication.runningApplications(withBundleIdentifier: iTermID).isEmpty
+        let script =
+            useITerm
+            ? """
+            tell application id "\(iTermID)"
+                activate
+                set w to (create window with default profile)
+                tell current session of w to write text "\(command)"
+            end tell
+            return "ok"
+            """
+            : """
+            tell application id "\(terminalID)"
+                activate
+                do script "\(command)"
+            end tell
+            return "ok"
+            """
+        let app = useITerm ? "iTerm" : "Terminal"
+        return await AppleScriptRunner.run(script, cached: false)?.stringValue == "ok"
+            ? .sent(app: app) : .failed("Impossible d'ouvrir \(app)")
+    }
+
     /// Démarre une nouvelle conversation dans l'app Claude, en mode Chat (pas Code), avec ce message.
     static func startNewConversation(_ text: String) async -> Outcome {
         let message = text.trimmingCharacters(in: .whitespacesAndNewlines)

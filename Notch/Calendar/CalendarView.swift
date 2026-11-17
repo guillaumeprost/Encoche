@@ -87,6 +87,7 @@ private struct DayCell: View {
 
 private struct Agenda: View {
     @Environment(CalendarController.self) private var calendar
+    @Environment(ClaudeAsk.self) private var ask
     /// Version agrandie de l'onglet Calendrier.
     var large = false
 
@@ -105,6 +106,16 @@ private struct Agenda: View {
                                 EventRow(event: event, now: context.date, large: large)
                                     .id(event.id)
                                     .onTapGesture { calendar.open(event) }
+                                    .contextMenu {
+                                        Button("Ouvrir dans Calendrier") { calendar.open(event) }
+                                        if !event.isAllDay, let meeting = calendar.meetingDetails(for: event) {
+                                            Button {
+                                                ask.ask(ClaudePrompts.meeting(meeting))
+                                            } label: {
+                                                Label("Préparer avec Claude", systemImage: "sparkle")
+                                            }
+                                        }
+                                    }
                             }
                         }
                     }

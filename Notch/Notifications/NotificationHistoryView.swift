@@ -3,6 +3,7 @@ import SwiftUI
 /// Onglet Notifications : les dernières notifications reçues, plus récentes d'abord.
 struct NotificationHistoryView: View {
     @Environment(AlertCenter.self) private var alerts
+    @Environment(ClaudeAsk.self) private var ask
 
     var body: some View {
         Group {
@@ -18,6 +19,7 @@ struct NotificationHistoryView: View {
             } else {
                 ScrollView(.vertical) {
                     LazyVStack(spacing: 4) {
+                        if alerts.history.count >= 3 { summarizeButton }
                         ForEach(alerts.history) { alert in
                             HistoryRow(alert: alert)
                         }
@@ -28,6 +30,34 @@ struct NotificationHistoryView: View {
         }
         .onAppear { alerts.markAllRead() }
         .onChange(of: alerts.unreadCount) { alerts.markAllRead() }
+    }
+}
+
+extension NotificationHistoryView {
+    /// Résume les notifications des dernières 24 heures (à défaut, les 20 dernières) avec Claude.
+    private var summarizeButton: some View {
+        HStack {
+            Spacer()
+            Button {
+                let since = Date().addingTimeInterval(-86_400)
+                let recent = alerts.history.filter { $0.date >= since }
+                let picked = recent.count >= 3 ? recent : Array(alerts.history.prefix(20))
+                ask.ask(
+                    ClaudePrompts.notifications(
+                        picked.map { .init(source: $0.source, title: $0.title, body: $0.body, date: $0.date) }))
+            } label: {
+                Label("Résumer avec Claude", systemImage: "sparkle")
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(Color.claude)
+                    .padding(.horizontal, 10)
+                    .frame(height: 24)
+                    .background(Capsule().fill(Color.claude.opacity(0.14)))
+                    .contentShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .help("Ce qui s'est passé, et ce qui demande une action")
+        }
+        .padding(.bottom, 2)
     }
 }
 
