@@ -31,12 +31,56 @@ final class FocusGuard {
         }
     }
 
+    /// Activé à la main (bouton ✋).
     var isEnabled: Bool = UserDefaults.standard.bool(forKey: "focusGuardEnabled") {
         didSet {
             UserDefaults.standard.set(isEnabled, forKey: "focusGuardEnabled")
-            isEnabled ? start() : stop()
+            check()
         }
     }
+
+    /// Activé de lui-même pendant un Pomodoro (hors pause).
+    var duringPomodoro: Bool = UserDefaults.standard.object(forKey: "focusGuardDuringPomodoro") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(duringPomodoro, forKey: "focusGuardDuringPomodoro")
+            check()
+        }
+    }
+
+    /// Activé de lui-même pendant un mode Concentration de macOS.
+    var duringFocus: Bool = UserDefaults.standard.bool(forKey: "focusGuardDuringFocus") {
+        didSet {
+            UserDefaults.standard.set(duringFocus, forKey: "focusGuardDuringFocus")
+            check()
+        }
+    }
+
+    @ObservationIgnored var timerController: TimerController?
+    @ObservationIgnored var focusMonitor: FocusMonitor?
+
+    /// Le Pomodoro ou la Concentration qui l'active en ce moment, s'il n'est pas activé à la main.
+    var automaticReason: String? {
+        guard !isEnabled else { return nil }
+        if duringPomodoro, let timer = timerController, timer.isActive, !timer.isPaused, timer.kind == .pomodoro {
+            return "Pomodoro"
+        }
+        if duringFocus, let mode = focusMonitor?.activeMode { return mode.name }
+        return nil
+    }
+
+    /// Le gardien surveille : à la main, ou pendant un Pomodoro ou une Concentration.
+    var isActive: Bool { isEnabled || automaticReason != nil }
+
+    /// Depuis quand tu es sur un site interdit (pour les yeux de l'encoche), `nil` sinon.
+    private(set) var watchingSince: Date?
+    /// La pince est sortie de l'encoche (ses yeux n'y guettent plus).
+    private(set) var isClawOut = false
+    /// La pince va sortir : le visage sous l'encoche se resserre en elle.
+    private(set) var isClawLaunching = false
+    /// Onglet attrapé à l'instant : le visage sous l'encoche est content quelques secondes.
+    private(set) var isHappy = false
+    /// Colère de la pince sur le site en cours : combien de fois tu l'as chassée.
+    private(set) var anger = 0
 
     /// Domaines interdits (« youtube.com » couvre aussi « m.youtube.com »).
     var blockedSites: [String] =
@@ -64,17 +108,34 @@ final class FocusGuard {
     /// Absence tolérée (lecture ratée, coup d'œil ailleurs) avant de remettre le délai à zéro.
     static let leaveTolerance: TimeInterval = 5
 
-    /// Une fois chassée, la pince revient au bout de ce temps si tu es toujours sur le site.
-    static let snoozeDuration: TimeInterval = 2 * 60
+    /// Une fois chassée, la pince revient au bout de ce temps si tu es toujours sur le site :
+    /// de plus en plus vite à chaque fois (2 min, 1 min, puis 30 s).
+    static func snoozeDuration(anger: Int) -> TimeInterval {
+        [2 * 60, 60, 30][min(max(anger - 1, 0), 2)]
+    }
+
+    /// Chassée autant de fois, elle ne se laisse plus faire.
+    static let maxChases = 2
 
     @ObservationIgnored private let overlay = GuardianOverlay()
     @ObservationIgnored private var snoozedUntil: [String: Date] = [:]
+    @ObservationIgnored private var angerByKey: [String: Int] = [:]
     @ObservationIgnored private var timer: Timer?
     @ObservationIgnored private var activationObserver: NSObjectProtocol?
     @ObservationIgnored private var checking = false
 
     init() {
-        if isEnabled { start() }
+        overlay.onFinished = { [weak self] grabbed in
+            self?.isClawOut = false
+            self?.isClawLaunching = false
+            guard grabbed else { return }
+            self?.isHappy = true
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(2.5))
+                self?.isHappy = false
+            }
+        }
+        start()
     }
 
     // MARK: - Listes
@@ -124,21 +185,26 @@ final class FocusGuard {
         check()
     }
 
-    private func stop() {
-        timer?.invalidate()
-        timer = nil
-        if let activationObserver { NSWorkspace.shared.notificationCenter.removeObserver(activationObserver) }
+    /// Plus de surveillance (désactivé, fin du Pomodoro) : tout est oublié.
+    private func reset() {
         pending = nil
-        activationObserver = nil
+        snoozedUntil.removeAll()
+        angerByKey.removeAll()
+        if watchingSince != nil { watchingSince = nil }
+        if anger != 0 { anger = 0 }
         overlay.leave()
     }
 
     private func check() {
-        guard isEnabled, overlay.isIdle, !checking else { return }
+        guard isActive else {
+            if pending != nil || !overlay.isIdle || !angerByKey.isEmpty { reset() }
+            return
+        }
+        guard overlay.isIdle, !checking else { return }
         checking = true
         Task {
             defer { checking = false }
-            guard isEnabled, overlay.isIdle else { return }
+            guard isActive, overlay.isIdle else { return }
             let now = Date()
             guard let target = await currentTarget() else {
                 // Une lecture ratée (page qui charge, vidéo en plein écran…) ne remet pas le
@@ -146,11 +212,20 @@ final class FocusGuard {
                 if let pending, now.timeIntervalSince(pending.lastSeen) > Self.leaveTolerance {
                     self.pending = nil
                     snoozedUntil.removeAll()
+                    angerByKey.removeAll()
+                    watchingSince = nil
+                    anger = 0
+                } else if pending == nil, snoozedUntil.isEmpty {
+                    if watchingSince != nil { watchingSince = nil }
+                    if anger != 0 { anger = 0 }
                 }
                 return
             }
-            // Un autre site : le répit de l'ancien est oublié.
+            // Un autre site : le répit et la colère de l'ancien sont oubliés.
             snoozedUntil = snoozedUntil.filter { $0.key == target.key }
+            angerByKey = angerByKey.filter { $0.key == target.key }
+            let currentAnger = angerByKey[target.key] ?? 0
+            if anger != currentAnger { anger = currentAnger }
             if let until = snoozedUntil[target.key] {
                 guard until <= now else { return }
                 // Chassée, elle revient d'elle-même à la fin du répit, sans nouveau délai.
@@ -161,11 +236,14 @@ final class FocusGuard {
             }
             guard let pending, pending.key == target.key else {
                 self.pending = (target.key, now, now)
+                watchingSince = now
                 return
             }
             self.pending?.lastSeen = now
+            if watchingSince != pending.since { watchingSince = pending.since }
             guard now.timeIntervalSince(pending.since) >= Self.gracePeriod else { return }
             self.pending = nil
+            watchingSince = nil
             await intercept(target)
         }
     }
@@ -204,14 +282,38 @@ final class FocusGuard {
         case .app(_, let name, _):
             tab.title = name
         }
-        guard isEnabled, overlay.isIdle else { return }
+        guard isActive, overlay.isIdle else { return }
+        watchingSince = nil
+        isClawLaunching = true
+        try? await Task.sleep(for: .seconds(0.45))
+        guard isActive, overlay.isIdle else {
+            isClawLaunching = false
+            return
+        }
+        // Le visage reste resserré jusqu'au retour de la pince (sinon il se redéploierait
+        // pendant qu'il disparaît).
+        isClawOut = true
+        let anger = angerByKey[target.key] ?? 0
         overlay.intercept(
             tab: tab,
             grabPoint: grabPoint,
+            anger: anger,
+            unchasable: anger >= Self.maxChases,
             // Toujours là au moment d'attraper ? Sinon elle remonte sans rien fermer.
             stillThere: { [weak self] in await self?.currentTarget() == target },
-            close: { Self.close(target) },
-            chased: { [weak self] in self?.snoozedUntil[target.key] = Date().addingTimeInterval(Self.snoozeDuration) }
+            close: { [weak self] in
+                Self.close(target)
+                // Onglet attrapé : sa colère retombe.
+                self?.angerByKey[target.key] = nil
+                self?.anger = 0
+            },
+            chased: { [weak self] in
+                guard let self else { return }
+                let anger = (angerByKey[target.key] ?? 0) + 1
+                angerByKey[target.key] = anger
+                self.anger = anger
+                snoozedUntil[target.key] = Date().addingTimeInterval(Self.snoozeDuration(anger: anger))
+            }
         )
     }
 
@@ -366,7 +468,8 @@ struct FocusGuardButton: View {
     @State private var hovering = false
 
     var body: some View {
-        let isOn = focusGuard.isEnabled
+        let isOn = focusGuard.isActive
+        let automatic = focusGuard.automaticReason
         Button {
             focusGuard.isEnabled.toggle()
         } label: {
@@ -375,14 +478,21 @@ struct FocusGuardButton: View {
                 .foregroundStyle(isOn ? Color.orange : Color.primary)
                 .frame(width: 26, height: 22)
                 .background(Capsule().fill(isOn ? Color.orange.opacity(0.18) : .primary.opacity(hovering ? 0.12 : 0)))
+                // Activé par un Pomodoro ou une Concentration : un liseré en pointillé.
+                .overlay {
+                    if automatic != nil {
+                        Capsule().strokeBorder(Color.orange.opacity(0.6), style: StrokeStyle(lineWidth: 1, dash: [2, 2]))
+                    }
+                }
                 .opacity(hovering || isOn ? 1 : 0.6)
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .help(
-            isOn
-                ? "Gardien activé : la pince ferme les sites interdits après 30 s. Cliquer pour désactiver."
-                : "Activer le gardien anti-distraction")
+            automatic.map { "Gardien activé pendant : \($0). Cliquer pour l'activer en permanence." }
+                ?? (focusGuard.isEnabled
+                    ? "Gardien activé : la pince ferme les sites interdits après 30 s. Cliquer pour désactiver."
+                    : "Activer le gardien anti-distraction"))
     }
 }

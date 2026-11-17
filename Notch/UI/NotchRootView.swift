@@ -160,6 +160,17 @@ struct NotchRootView: View {
                         ))
             }
         }
+        // Le gardien surveille : son visage prolonge l'encoche repliée par en dessous. Dessiné
+        // derrière elle, il ne recouvre rien de ce qu'elle affiche (activités, Claude…).
+        .background(alignment: .top) {
+            if showsGuardianPeek {
+                GuardianPeek(width: size.width - 2 * vm.topRadius)
+                    .offset(y: size.height - GuardianPeek.overlap)
+                    // Il descend de derrière l'encoche (de haut en bas), et y remonte.
+                    .transition(.offset(y: -GuardianPeek.travel))
+            }
+        }
+        .animation(spring, value: showsGuardianPeek)
         .animation(spring, value: activities)
         .contextMenu {
             @Bindable var focusGuard = focusGuard
@@ -221,6 +232,11 @@ struct NotchRootView: View {
     /// Une « live activity » occupe les côtés de l'encoche repliée, par priorité : Claude Code qui
     /// t'attend, caméra ou micro, téléchargement, Claude Code au travail, puis la musique.
     private var showsActivity: Bool { !activities.isEmpty }
+
+    /// Yeux du gardien sous l'encoche repliée, sauf quand la pince est sortie.
+    private var showsGuardianPeek: Bool {
+        focusGuard.isActive && !focusGuard.isClawOut && !vm.isOpen && !vm.showsAlert && !vm.showsHUD
+    }
 
     /// Ligne en direct sous l'encoche repliée.
     private enum LiveLine { case lyrics, claude }

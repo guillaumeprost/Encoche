@@ -110,3 +110,12 @@ extension FocusGuardRulesTests {
         #expect(code != nil)
     }
 }
+
+extension FocusGuardRulesTests {
+    /// Chassée, la pince revient de plus en plus vite.
+    @MainActor @Test func comesBackFasterWhenAngry() {
+        #expect(FocusGuard.snoozeDuration(anger: 1) == 120)
+        #expect(FocusGuard.snoozeDuration(anger: 2) == 60)
+        #expect(FocusGuard.snoozeDuration(anger: 5) == 30)
+    }
+}

@@ -494,6 +494,114 @@ struct CollapsedTimerView: View {
 }
 
 /// Mode Concentration actif : son symbole à gauche de l'encoche.
+/// Le visage de la pince, sous l'encoche repliée et sur toute sa largeur. Ses yeux suivent le
+/// curseur et clignent ; sur un site interdit, ils se plissent (orange, puis rouges une fois
+/// chassée) et une barre se vide jusqu'à ce que la pince sorte ; contents après une prise.
+struct GuardianPeek: View {
+    @Environment(FocusGuard.self) private var guardian
+    @State private var face = GuardianFace()
+    /// Largeur du corps de l'encoche (sans ses évasements du haut).
+    let width: CGFloat
+
+    private static let height: CGFloat = 30
+    /// Hauteur cachée sous l'encoche : elle comble ses coins arrondis du bas, pour que le
+    /// visage la prolonge sans couture.
+    static let overlap: CGFloat = 14
+    /// Distance dont il remonte pour se cacher derrière l'encoche.
+    static let travel: CGFloat = height + 4
+
+    var body: some View {
+        let launching = guardian.isClawLaunching
+        ZStack(alignment: .bottom) {
+            UnevenRoundedRectangle(bottomLeadingRadius: 13, bottomTrailingRadius: 13, style: .continuous)
+                .fill(.black)
+            GuardianEyes(
+                style: launching ? .focused : style,
+                color: GuardianEyes.color(anger: guardian.anger),
+                scale: 1.5,
+                spacing: launching ? 18 : width * 0.26,
+                blinking: face.blinking && !launching
+            )
+            // Au départ de la pince, les yeux se rejoignent au milieu…
+            .offset(x: launching ? 0 : face.look.width * width * 0.07, y: face.look.height * 3)
+            .animation(.easeOut(duration: 0.25), value: face.look)
+            .padding(.bottom, guardian.watchingSince == nil ? 9 : 11)
+            if let since = guardian.watchingSince {
+                // Seule la barre se redessine en continu, et seulement pendant le décompte.
+                TimelineView(.periodic(from: .now, by: 0.25)) { context in
+                    let left = max(FocusGuard.gracePeriod - context.date.timeIntervalSince(since), 0)
+                    Capsule()
+                        .fill(GuardianEyes.color(anger: max(guardian.anger, 1)))
+                        .frame(width: width * 0.4 * left / FocusGuard.gracePeriod, height: 2)
+                        .frame(width: width * 0.4)
+                        .animation(.linear(duration: 0.25), value: left)
+                }
+                .padding(.bottom, 4)
+            }
+        }
+        .frame(width: width, height: Self.height + Self.overlap)
+        // …et le visage remonte derrière l'encoche, d'où la pince va tomber.
+        .offset(y: launching ? -Self.travel : 0)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: guardian.watchingSince == nil)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: guardian.anger)
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: guardian.isHappy)
+        .animation(.easeIn(duration: 0.35), value: launching)
+        .allowsHitTesting(false)
+        .onAppear { face.start() }
+        .onDisappear { face.stop() }
+    }
+
+    private var style: GuardianEyes.Style {
+        if guardian.isHappy { return .happy }
+        if guardian.anger > 0 { return .angry }
+        return guardian.watchingSince != nil ? .focused : .normal
+    }
+}
+
+/// Regard et clignements du visage. Ne change (et ne fait redessiner) que quand le curseur
+/// bouge vraiment ou que les yeux clignent : le visage ne coûte presque rien au repos.
+@Observable
+@MainActor
+final class GuardianFace {
+    /// Direction du curseur vu de l'encoche : `width` de -1 (à gauche) à 1, `height` de 0 (en
+    /// haut) à 1 (en bas de l'écran), par crans.
+    private(set) var look: CGSize = .zero
+    private(set) var blinking = false
+
+    @ObservationIgnored private var timer: Timer?
+    @ObservationIgnored private var nextBlink = Date().addingTimeInterval(3)
+
+    func start() {
+        guard timer == nil else { return }
+        timer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.update() }
+        }
+    }
+
+    func stop() {
+        timer?.invalidate()
+        timer = nil
+    }
+
+    private func update() {
+        let now = Date()
+        let mouse = NSEvent.mouseLocation
+        if let screen = NSScreen.screens.first(where: { $0.frame.contains(mouse) }) ?? NSScreen.main {
+            let dx = min(max((mouse.x - screen.frame.midX) / (screen.frame.width / 2), -1), 1)
+            let dy = min(max((screen.frame.maxY - mouse.y) / screen.frame.height, 0), 1)
+            let new = CGSize(width: (dx * 12).rounded() / 12, height: (dy * 6).rounded() / 6)
+            if new != look { look = new }
+        }
+        // Clignement : 0,15 s, toutes les 3 à 6 secondes, parfois double.
+        if blinking, now >= nextBlink.addingTimeInterval(0.15) {
+            blinking = false
+            nextBlink = now.addingTimeInterval(Double.random(in: 0...1) < 0.2 ? 0.25 : .random(in: 3...6))
+        } else if !blinking, now >= nextBlink {
+            blinking = true
+        }
+    }
+}
+
 struct CollapsedFocusView: View {
     @Environment(FocusMonitor.self) private var focus
     let slotWidth: CGFloat

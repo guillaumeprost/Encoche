@@ -26,6 +26,8 @@ final class GuardianOverlay {
         var root: CGPoint?
         /// Posée devant l'encoche (onglet juste en dessous) : un liseré la détache du noir.
         var overNotch = false
+        /// Combien de fois tu l'as chassée de ce site : yeux orange, puis rouges.
+        var anger = 0
         var onTap: () -> Void = {}
     }
 
@@ -39,6 +41,8 @@ final class GuardianOverlay {
     /// `topMargin` du haut, centré sur `clawCenterX`. Au-dessus : la place du col de verre qui
     /// relie la pince à l'encoche pendant la mitose.
     static let topMargin: CGFloat = 90
+    /// Colère à partir de laquelle elle prévient qu'elle ne se laissera plus chasser.
+    static let lastWarning = 2
     private static let size = NSSize(width: 340, height: 110 + topMargin)
     /// Centré : l'onglet tenu peut être plus large que la pince.
     static let clawCenterX: CGFloat = 130
@@ -65,6 +69,10 @@ final class GuardianOverlay {
     /// Demi-largeur de la zone noire de l'encoche (avec ses activités de part et d'autre).
     private var notchHalfWidth: CGFloat = 150
 
+    /// Chassée trop souvent : elle ne se laisse plus faire.
+    private var unchasable = false
+    /// Rangée dans l'encoche à la fin d'une intervention.
+    var onFinished: (_ grabbed: Bool) -> Void = { _ in }
     private var stillThere: () async -> Bool = { false }
     private var close: () -> Void = {}
     private var chased: () -> Void = {}
@@ -80,6 +88,8 @@ final class GuardianOverlay {
     func intercept(
         tab: CarriedTab,
         grabPoint: NSPoint,
+        anger: Int,
+        unchasable: Bool,
         stillThere: @escaping () async -> Bool,
         close: @escaping () -> Void,
         chased: @escaping () -> Void
@@ -89,6 +99,8 @@ final class GuardianOverlay {
         guard let screen else { return }
         busy = true
         grabbed = false
+        self.unchasable = unchasable
+        model.anger = anger
         self.stillThere = stillThere
         self.close = close
         self.chased = chased
@@ -102,8 +114,8 @@ final class GuardianOverlay {
             // Encoche du Mac, élargie par les activités affichées de chaque côté.
             notchHalfWidth = (screen.frame.width - left.width - right.width) / 2 + 80
         }
-        // Cachée derrière l'encoche au départ.
-        hook = NSPoint(x: notchX, y: top + 10)
+        // Cachée derrière l'encoche au départ : le visage vient d'y remonter.
+        hook = NSPoint(x: notchX, y: railY + 26)
 
         model.openness = 0.25
         model.eyes = .normal
@@ -112,6 +124,9 @@ final class GuardianOverlay {
         model.wiggle = false
         model.overNotch = false
         clawPanel?.level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 2)
+        // Soudée à l'encoche dès la première image : griffes rentrées.
+        merging = true
+        model.openness = 0
         showPanels()
 
         // Griffes refermées pile sur l'onglet (le moyeu peut passer sur la barre de menus).
@@ -135,10 +150,18 @@ final class GuardianOverlay {
 
     private func run(tab: CarriedTab, to target: NSPoint) async {
         do {
-            // Elle bourgeonne de l'encoche et s'en détache…
+            // Une goutte gonfle sous l'encoche…
             merging = true
-            try await move(to: NSPoint(x: notchX, y: railY - Self.cruiseDepth), speed: 45)
+            try await move(to: NSPoint(x: notchX, y: railY - 18), speed: 90)
+            try await Task.sleep(for: .seconds(0.15))
+            // …se détache d'un coup et tombe, avec un petit rebond…
+            try await move(to: NSPoint(x: notchX, y: railY - Self.cruiseDepth), speed: 220, easing: .bounce)
             merging = false
+            // …et la pince s'ouvre : clac, clac.
+            for openness: CGFloat in [1, 0.05, 0.85, 0.45] {
+                model.openness = openness
+                try await Task.sleep(for: .seconds(0.16))
+            }
             // …glisse jusque sous l'onglet…
             try await move(to: NSPoint(x: target.x, y: railY - Self.cruiseDepth), speed: 220)
             // …se hisse au-dessus, griffes ouvertes, et se pose dessus.
@@ -149,7 +172,7 @@ final class GuardianOverlay {
 
             model.wiggle = true
             for count in [3, 2, 1] {
-                model.message = "\(count)…"
+                model.message = model.anger >= GuardianOverlay.lastWarning ? "Cette fois, c'est fini. \(count)…" : "\(count)…"
                 try await Task.sleep(for: .seconds(1))
             }
             model.wiggle = false
@@ -183,6 +206,15 @@ final class GuardianOverlay {
     /// Clic sur la pince : elle a peur, lâche tout et file dans l'encoche.
     private func chase() {
         guard busy, !grabbed else { return }
+        if unchasable {
+            // Elle ne bouge pas d'un pouce.
+            model.message = "Même pas peur !"
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(1.2))
+                if self?.model.message == "Même pas peur !" { self?.model.message = nil }
+            }
+            return
+        }
         script?.cancel()
         chased()
         model.wiggle = false
@@ -206,15 +238,36 @@ final class GuardianOverlay {
         clawPanel?.orderOut(nil)
         cablePanel?.orderOut(nil)
         model.carried = nil
+        let caught = grabbed
         grabbed = false
         busy = false
+        onFinished(caught)
     }
 
     // MARK: - Déplacement
 
-    /// Déplacement en douceur : la pince accélère au départ et ralentit à l'arrivée.
-    /// `speed` : vitesse moyenne, en points par seconde.
-    private func move(to destination: NSPoint, speed: CGFloat, cancellable: Bool = true) async throws {
+    /// Courbe de vitesse d'un déplacement.
+    enum Easing {
+        /// Accélère puis freine.
+        case smooth
+        /// Arrive un peu trop loin et revient, comme une chute qui rebondit.
+        case bounce
+
+        func callAsFunction(_ t: Double) -> Double {
+            switch self {
+            case .smooth: return t * t * (3 - 2 * t)
+            case .bounce:
+                let c1 = 1.9
+                let c3 = c1 + 1
+                return 1 + c3 * pow(t - 1, 3) + c1 * pow(t - 1, 2)
+            }
+        }
+    }
+
+    /// Déplacement en douceur, selon `easing`. `speed` : vitesse moyenne, en points par seconde.
+    private func move(
+        to destination: NSPoint, speed: CGFloat, easing: Easing = .smooth, cancellable: Bool = true
+    ) async throws {
         let start = hook
         let distance = hypot(destination.x - start.x, destination.y - start.y)
         guard distance > 0.5 else { return }
@@ -223,8 +276,7 @@ final class GuardianOverlay {
         while true {
             if cancellable { try Task.checkCancellation() }
             let t = min(Date().timeIntervalSince(began) / duration, 1)
-            // Accélération puis freinage (courbe « smoothstep »).
-            let eased = CGFloat(t * t * (3 - 2 * t))
+            let eased = CGFloat(easing(t))
             hook = NSPoint(
                 x: start.x + (destination.x - start.x) * eased,
                 y: start.y + (destination.y - start.y) * eased)
@@ -423,25 +475,66 @@ private struct ClawView: View {
     }
 
     private var eyes: some View {
-        HStack(spacing: 12) {
+        GuardianEyes(style: eyeStyle, color: GuardianEyes.color(anger: model.anger))
+    }
+
+    private var eyeStyle: GuardianEyes.Style {
+        switch model.eyes {
+        case .normal: model.anger > 0 ? .angry : .normal
+        case .focused: model.anger > 0 ? .angry : .focused
+        case .happy: .happy
+        case .worried: .worried
+        }
+    }
+}
+
+/// Les yeux de la pince, aussi affichés dans l'encoche repliée quand le gardien surveille.
+struct GuardianEyes: View {
+    enum Style { case normal, focused, angry, happy, worried }
+    var style: Style
+    var color: Color = .white
+    var scale: CGFloat = 1
+    /// Écart entre les yeux (par défaut, celui de la pince).
+    var spacing: CGFloat?
+    /// Paupières fermées (clignement).
+    var blinking = false
+
+    /// Blancs au calme, orange une fois chassée, rouges ensuite.
+    static func color(anger: Int) -> Color {
+        switch anger {
+        case 0: .white
+        case 1: .orange
+        default: .red
+        }
+    }
+
+    var body: some View {
+        HStack(spacing: spacing ?? 12 * scale) {
             eye(tilt: -1)
             eye(tilt: 1)
         }
+        // Un clignement écrase les yeux en un trait.
+        .scaleEffect(x: 1, y: blinking && style != .happy ? 0.15 : 1)
     }
 
     @ViewBuilder
     private func eye(tilt: Double) -> some View {
-        switch model.eyes {
+        switch style {
         case .normal:
-            RoundedRectangle(cornerRadius: 1.5).fill(.white).frame(width: 5, height: 8)
+            RoundedRectangle(cornerRadius: 1.5 * scale).fill(color).frame(width: 5 * scale, height: 8 * scale)
         case .focused:
-            // Il plisse les yeux en visant.
-            RoundedRectangle(cornerRadius: 1).fill(.white).frame(width: 7, height: 3)
+            // Elle plisse les yeux en visant.
+            RoundedRectangle(cornerRadius: scale).fill(color).frame(width: 7 * scale, height: 3 * scale)
                 .rotationEffect(.degrees(12 * tilt))
+        case .angry:
+            // Sourcils froncés : l'intérieur des yeux descend.
+            RoundedRectangle(cornerRadius: scale).fill(color).frame(width: 7 * scale, height: 3.5 * scale)
+                .rotationEffect(.degrees(-16 * tilt))
         case .happy:
-            HappyEye().stroke(.white, style: StrokeStyle(lineWidth: 2, lineCap: .round)).frame(width: 7, height: 4)
+            HappyEye().stroke(color, style: StrokeStyle(lineWidth: 2 * scale, lineCap: .round))
+                .frame(width: 7 * scale, height: 4 * scale)
         case .worried:
-            RoundedRectangle(cornerRadius: 2).fill(.white).frame(width: 6, height: 9)
+            RoundedRectangle(cornerRadius: 2 * scale).fill(color).frame(width: 6 * scale, height: 9 * scale)
                 .rotationEffect(.degrees(-10 * tilt))
         }
     }

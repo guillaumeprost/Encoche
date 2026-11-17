@@ -194,6 +194,8 @@ private struct FocusGuardSettingsSection: View {
         @Bindable var focusGuard = focusGuard
         Section {
             Toggle("Activer le gardien", isOn: $focusGuard.isEnabled)
+            Toggle("Pendant un Pomodoro", isOn: $focusGuard.duringPomodoro)
+            Toggle("Pendant un mode Concentration", isOn: $focusGuard.duringFocus)
             ForEach(focusGuard.blockedSites, id: \.self) { site in
                 LabeledContent {
                     removeButton { focusGuard.blockedSites.removeAll { $0 == site } }
@@ -225,7 +227,7 @@ private struct FocusGuardSettingsSection: View {
             Text("Gardien anti-distraction")
         } footer: {
             Text(
-                "Activé, après 30 secondes sur un site ou une app de la liste, une pince sort de l'encoche pour fermer l'onglet ou l'app. Clique sur elle pour la chasser : elle revient 2 minutes plus tard si tu y es encore. Safari, Chrome, Arc, Brave, Edge, Vivaldi et Opera, grâce à l'autorisation Accessibilité."
+                "Activé, après 30 secondes sur un site ou une app de la liste, une pince sort de l'encoche pour fermer l'onglet ou l'app. Clique sur elle pour la chasser : elle revient 2 min plus tard si tu y es encore, puis 1 min plus tard, et la troisième fois elle ne se laisse plus chasser. Safari, Chrome, Arc, Brave, Edge, Vivaldi et Opera, grâce à l'autorisation Accessibilité."
             )
         }
     }

@@ -118,6 +118,8 @@ struct AppServices {
         claudeBriefing.start()
         launchAtLogin = LaunchAtLogin()
         focusGuard = FocusGuard()
+        focusGuard.timerController = timer
+        focusGuard.focusMonitor = focus
         let focusMonitor = focus
         systemNotifications = SystemNotificationWatcher(alerts: alerts, settings: settings) {
             focusMonitor.activeMode != nil
