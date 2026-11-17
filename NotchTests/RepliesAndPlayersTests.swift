@@ -136,3 +136,18 @@ struct RepliesAndPlayersTests {
         #expect(id(ClaudeTabField.resolve(.newSession(cwd: "/p/C"), default: working, among: all)) == "session:/p/C")
     }
 }
+
+/// Le script iTerm vise la session de ce terminal et y lance la commande donnée.
+struct ITermScriptTests {
+    @Test func targetsTheSessionOfTheTerminal() {
+        let script = ClaudeReply.iTermScript(tty: "/dev/ttys004", "tell s to write text \"x\"")
+        #expect(script.contains(#"if tty of s is "/dev/ttys004" then"#))
+        #expect(script.contains(#"tell s to write text "x""#))
+        #expect(script.contains(#"return "missing""#))
+    }
+
+    @Test func escapesTheTerminalPath() {
+        let script = ClaudeReply.iTermScript(tty: #"a"b"#, "")
+        #expect(script.contains(#"if tty of s is "a\"b" then"#))
+    }
+}

@@ -113,9 +113,94 @@ extension FocusGuardRulesTests {
 
 extension FocusGuardRulesTests {
     /// Chassée, la pince revient de plus en plus vite.
-    @MainActor @Test func comesBackFasterWhenAngry() {
-        #expect(FocusGuard.snoozeDuration(anger: 1) == 120)
-        #expect(FocusGuard.snoozeDuration(anger: 2) == 60)
-        #expect(FocusGuard.snoozeDuration(anger: 5) == 30)
+    @Test func comesBackFasterWhenAngry() {
+        #expect(FocusGuardTracker.snoozeDuration(anger: 1) == 120)
+        #expect(FocusGuardTracker.snoozeDuration(anger: 2) == 60)
+        #expect(FocusGuardTracker.snoozeDuration(anger: 5) == 30)
+    }
+}
+
+/// Quand la pince sort : délai de grâce, absence tolérée, répit après avoir été chassée.
+struct FocusGuardTrackerTests {
+    private let start = Date(timeIntervalSince1970: 1_000_000)
+    private func at(_ seconds: TimeInterval) -> Date { start.addingTimeInterval(seconds) }
+    private func tracker() -> FocusGuardTracker { FocusGuardTracker(gracePeriod: 30, leaveTolerance: 5) }
+
+    @Test func waitsForTheGracePeriod() {
+        var tracker = tracker()
+        #expect(tracker.observe("youtube.com", at: at(0)) == .wait)
+        #expect(tracker.watchingSince == at(0))
+        #expect(tracker.observe("youtube.com", at: at(29)) == .wait)
+        #expect(tracker.observe("youtube.com", at: at(30)) == .intercept)
+        // Sortie : les yeux ne guettent plus, et le délai repart de zéro.
+        #expect(tracker.watchingSince == nil)
+        #expect(tracker.observe("youtube.com", at: at(31)) == .wait)
+    }
+
+    @Test func aMissedReadDoesNotRestartTheDelay() {
+        var tracker = tracker()
+        _ = tracker.observe("youtube.com", at: at(0))
+        _ = tracker.observe("youtube.com", at: at(10))
+        // Lecture ratée 3 s après la dernière vue : toléré.
+        #expect(tracker.observe(nil, at: at(13)) == .wait)
+        #expect(tracker.watchingSince == at(0))
+        #expect(tracker.observe("youtube.com", at: at(30)) == .intercept)
+    }
+
+    @Test func leavingForAWhileRestartsTheDelay() {
+        var tracker = tracker()
+        _ = tracker.observe("youtube.com", at: at(0))
+        _ = tracker.observe(nil, at: at(6))
+        #expect(tracker.watchingSince == nil)
+        #expect(tracker.observe("youtube.com", at: at(25)) == .wait)
+        #expect(tracker.observe("youtube.com", at: at(40)) == .wait)
+        #expect(tracker.observe("youtube.com", at: at(55)) == .intercept)
+    }
+
+    @Test func anotherSiteRestartsTheDelay() {
+        var tracker = tracker()
+        _ = tracker.observe("youtube.com", at: at(0))
+        #expect(tracker.observe("reddit.com", at: at(20)) == .wait)
+        #expect(tracker.observe("reddit.com", at: at(40)) == .wait)
+        #expect(tracker.observe("reddit.com", at: at(50)) == .intercept)
+    }
+
+    @Test func chasedItComesBackAfterTheSnoozeWithoutANewDelay() {
+        var tracker = tracker()
+        _ = tracker.observe("youtube.com", at: at(0))
+        _ = tracker.observe("youtube.com", at: at(30))
+        tracker.chased("youtube.com", at: at(31))
+        #expect(tracker.anger == 1)
+        // Premier répit : 2 minutes.
+        #expect(tracker.observe("youtube.com", at: at(31 + 119)) == .wait)
+        #expect(tracker.observe("youtube.com", at: at(31 + 120)) == .intercept)
+        tracker.chased("youtube.com", at: at(160))
+        #expect(tracker.anger == 2)
+        #expect(tracker.anger(for: "youtube.com") == 2)
+        #expect(tracker.observe("youtube.com", at: at(160 + 60)) == .intercept)
+    }
+
+    @Test func angerIsForgottenOnAnotherSiteOrOnceGrabbed() {
+        var tracker = tracker()
+        tracker.chased("youtube.com", at: at(0))
+        _ = tracker.observe("reddit.com", at: at(1))
+        #expect(tracker.anger == 0)
+        #expect(tracker.anger(for: "youtube.com") == 0)
+
+        tracker.chased("reddit.com", at: at(2))
+        tracker.grabbed("reddit.com")
+        #expect(tracker.anger == 0)
+        #expect(tracker.anger(for: "reddit.com") == 0)
+    }
+
+    @Test func resetForgetsEverything() {
+        var tracker = tracker()
+        _ = tracker.observe("youtube.com", at: at(0))
+        tracker.chased("youtube.com", at: at(1))
+        #expect(tracker.hasState)
+        tracker.reset()
+        #expect(!tracker.hasState)
+        #expect(tracker.watchingSince == nil)
+        #expect(tracker.anger == 0)
     }
 }

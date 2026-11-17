@@ -69,9 +69,4 @@ final class ClaudeBriefing {
         guard !day.isEmpty else { return }
         ask.ask(ClaudePrompts.briefing(day, date: now))
     }
-
-    /// Briefing à la demande (menu de l'onglet Claude), même déjà fait aujourd'hui.
-    func runNow() {
-        ask.ask(ClaudePrompts.briefing(context(), date: Date()))
-    }
 }

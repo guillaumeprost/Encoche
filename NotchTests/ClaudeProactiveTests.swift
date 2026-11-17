@@ -165,17 +165,62 @@ struct ClaudePermissionRulesTests {
         #expect(ClaudePermissionRules.rule(tool: "Bash", input: ["command": "rm x"]) == nil)
     }
 
+    @Test func riskyCommandsCannotHideBehindAPathOrABackslash() {
+        #expect(ClaudePermissionRules.commandPrefix("/bin/rm -rf build") == nil)
+        #expect(ClaudePermissionRules.commandPrefix("\\rm build") == nil)
+        #expect(ClaudePermissionRules.commandPrefix("/usr/bin/sudo ls") == nil)
+        #expect(ClaudePermissionRules.commandPrefix("FOO=1 kill 42") == nil)
+    }
+
+    /// « env:* » ou « bash:* » autoriseraient ensuite n'importe quelle commande.
+    @Test func commandLaunchersAreNeverAlwaysAllowed() {
+        for command in [
+            "env rm -rf /", "bash -c 'rm -rf x'", "sh script.sh", "xargs rm", "eval \"$X\"", "nohup make",
+            "find . -delete", "timeout 5 npm test", "osascript -e x",
+        ] {
+            #expect(ClaudePermissionRules.commandPrefix(command) == nil, "\(command)")
+        }
+    }
+
+    @Test func onlyTheFirstCommandOfAChainCounts() {
+        #expect(ClaudePermissionRules.commandPrefix("npm test | tee log") == "npm test")
+        #expect(ClaudePermissionRules.commandPrefix("make; rm -rf x") == "make")
+        #expect(ClaudePermissionRules.commandPrefix("rm x && npm test") == nil)
+        #expect(ClaudePermissionRules.commandPrefix("") == nil)
+        #expect(ClaudePermissionRules.commandPrefix("--version") == nil)
+    }
+
     @Test func rulesForOtherTools() {
         #expect(
             ClaudePermissionRules.rule(tool: "WebFetch", input: ["url": "https://docs.swift.org/x"])
                 == .init(toolName: "WebFetch", content: "domain:docs.swift.org"))
         #expect(ClaudePermissionRules.rule(tool: "Edit", input: [:]) == .init(toolName: "Edit", content: nil))
         #expect(ClaudePermissionRules.rule(tool: "AskUserQuestion", input: [:]) == nil)
+        #expect(
+            ClaudePermissionRules.rule(tool: "mcp__github__get_issue", input: [:])
+                == .init(toolName: "mcp__github__get_issue", content: nil))
+        #expect(ClaudePermissionRules.rule(tool: "WebFetch", input: ["url": "pas une url"]) == nil)
+        #expect(ClaudePermissionRules.rule(tool: "Bash", input: [:]) == nil)
     }
 
     @Test func describesUpdates() {
         let update = ClaudePermissionRules.update(for: .init(toolName: "Bash", content: "npm test:*"))
         #expect(ClaudePermissionRules.describe([update]) == "Bash(npm test:*)")
         #expect(update["destination"] as? String == "localSettings")
+        // Un outil entier : pas de « ruleContent ».
+        let whole = ClaudePermissionRules.update(for: .init(toolName: "Edit", content: nil))
+        #expect((whole["rules"] as? [[String: Any]])?.first?["ruleContent"] == nil)
+    }
+
+    @Test func describesSuggestionsOfEveryKind() {
+        let updates: [[String: Any]] = [
+            ["type": "setMode", "mode": "acceptEdits"],
+            ["type": "addDirectories", "directories": ["/tmp/a", "/tmp/b"]],
+            ["type": "addRules", "rules": [["toolName": "Read"], ["toolName": "Bash", "ruleContent": "ls:*"]]],
+        ]
+        #expect(
+            ClaudePermissionRules.describe(updates)
+                == "mode acceptEdits, dossier /tmp/a, dossier /tmp/b, Read, Bash(ls:*)")
+        #expect(ClaudePermissionRules.describe([]) == nil)
     }
 }

@@ -19,10 +19,11 @@ Encoche vit dans l'encoche de l'écran. Noire en haut pour se fondre avec celle 
 - **Accueil** : le morceau en cours avec ses commandes, l'agenda du jour, et un champ pour poser une question à Claude.
 - **Calendrier** : le mois à gauche, l'agenda du jour choisi à droite, avec les boutons pour rejoindre les visios.
 - **Rappels** : les rappels du jour et ceux en retard, à cocher directement dans l'encoche.
-- **Musique** : le lecteur (Musique, Spotify, et aussi YouTube dans le navigateur, Deezer, Podcasts…), et au choix les **paroles synchronisées** (la ligne chantée est mise en avant, un clic y saute) ou la **file d'attente** de Musique.
+- **Musique** : le lecteur (Musique, Spotify, et aussi YouTube dans le navigateur, Deezer, Podcasts…), et au choix les **paroles synchronisées** (la ligne chantée est mise en avant, un clic y saute) ou la **file d'attente** de Musique. Les albums qui en ont une affichent leur **pochette animée** d'Apple Music. Le bouton micro active le **mode karaoké** : la ligne chantée s'affiche sous l'encoche fermée.
 - **Raccourcis** : une tuile par raccourci du dossier « Encoche » de l'app Raccourcis (allumer une lampe, lancer une scène…).
 - **Étagère** : les dernières captures d'écran, à glisser où tu veux. Clic droit pour les faire décrire ou résumer par Claude.
 - **Presse-papier** : l'historique de ce que tu as copié (textes, images, fichiers), avec des éléments à épingler. Les mots de passe des gestionnaires sont ignorés. Clic droit pour **demander à Claude** : expliquer, traduire, corriger un texte, comprendre une erreur, décrire une image ou résumer un fichier.
+- **ClickUp** (quand l'app ClickUp est ouverte) : tes tâches en retard, du jour et en cours, à créer, reporter ou terminer depuis l'encoche, l'activité récente, et une alerte quelques minutes avant l'échéance d'une tâche. Le jeton d'API se règle dans les réglages et reste dans le trousseau.
 - **Notifications** : l'historique des notifications, conservé d'un redémarrage à l'autre, et un bouton pour le **résumer avec Claude**.
 - **Claude** : ta consommation de tokens du jour et de la semaine (détaillée par projet et par modèle au survol), tes 5 dernières sessions Claude Code, avec leur progression, leurs agents, leur conversation et depuis combien de temps elles travaillent, un champ pour **répondre à une session**, **démarrer une session Claude Code** dans un de tes projets (nouvel onglet de Terminal ou d'iTerm) ou poser une question rapide. À la fin d'une tâche, la notification fait le bilan (fichiers modifiés, lignes, tests). Une demande de modification de fichier montre les lignes changées avant que tu l'autorises, et l'encoche te prévient quand ton quota de 5 heures ou de la semaine dépasse 80 % puis 95 %.
 
@@ -31,13 +32,13 @@ Quand une musique est chargée, une mini-pochette avec lecture/pause et suivant 
 ### Autour de l'encoche fermée
 - **Activités en direct** : musique, Claude Code qui travaille (le petit personnage de Claude Code trottine), minuteur et Pomodoro, réunion dans moins de 10 minutes, mode Concentration, téléchargements, caméra et micro. L'encoche s'agrandit un peu, et une deuxième activité s'affiche dans une **bulle** à côté, comme sur iPhone.
 - **Notifications façon iPhone** : toutes les notifications du Mac s'affichent dans l'encoche à la place des bannières de macOS, sur l'écran principal. Au survol, elles se déplient et proposent de les fermer ; un clic ouvre l'app et ferme la notification.
-- **Claude Code** : quand Claude demande une autorisation ou pose une question, tu **réponds depuis l'encoche**. Ses réponses proposées en fin de tâche deviennent des boutons. Pas de notification quand tu es déjà dans l'app de la session (app Claude, terminal).
+- **Claude Code** : quand Claude demande une autorisation ou pose une question, tu **réponds depuis l'encoche**. **Toujours** autorise une règle pour le projet (préfixe de commande, domaine, outil), affichée avant le clic et jamais proposée pour `rm`, `sudo`, `kill` ou une commande qui en lance une autre (`env`, `bash -c`, `xargs`…). Un bouton **+N** passe aux demandes qui attendent derrière, un clic sur la notification ouvre la session dans l'encoche, et le bouton **stop** (deux clics) l'interrompt comme Échap. Ses réponses proposées en fin de tâche deviennent des boutons. Pas de notification quand tu es déjà dans l'app de la session (app Claude, terminal).
 - **Briefing du matin** : à la première ouverture du Mac avant midi, Claude résume ta journée (agenda, tâches ClickUp, rappels). Désactivable dans les réglages.
 - **Réunions** : un rappel une minute avant, avec un bouton **Préparer** (Claude résume l'invitation et propose des questions) et un bouton **Rejoindre** pour Meet, Zoom, Teams, Webex, FaceTime ou Whereby. Pendant l'appel, l'encoche ouverte propose de **couper le micro**, de **couper la caméra** (Meet, Zoom, Teams) et de **quitter l'appel**.
 - **Volume, luminosité, batterie** : affichés sous l'encoche, sans masquer l'activité en cours.
 - **Appareils Bluetooth** : AirPods, casque ou clavier qui se connectent, avec leur batterie.
-- **Gardien anti-distraction** (bouton ✋ à côté du minuteur) : après 30 secondes sur un site ou une app de ta liste (YouTube, Instagram, Facebook…), une pince sort de l'encoche, attrape l'onglet et l'emporte dans l'encoche. Clique sur elle pour la chasser : elle revient 2 minutes plus tard.
-- **Écran de verrouillage** : un cadenas dans l'encoche qui s'ouvre au déverrouillage, les activités sous l'horloge, le lecteur de musique au-dessus de la photo de profil, et un son au choix.
+- **Gardien anti-distraction** (bouton ✋ à côté du minuteur) : après 30 secondes sur un site ou une app de ta liste (YouTube, Instagram, Facebook…), une pince sort de l'encoche, attrape l'onglet et l'emporte dans l'encoche. Pendant qu'il guette, un visage sous l'encoche suit ta souris et plisse les yeux sur un site de la liste. Clique sur la pince pour la chasser : elle revient 2 minutes plus tard, puis plus vite et plus fâchée, et la troisième fois elle ne se laisse plus faire. Le gardien s'active aussi tout seul pendant un Pomodoro (et, au choix, pendant un mode Concentration).
+- **Écran de verrouillage** : un cadenas dans l'encoche qui s'ouvre au déverrouillage, les activités sous l'horloge, le lecteur de musique au-dessus de la photo de profil, et un son au choix. Pendant l'économiseur d'écran, une carte montre ce que fait Claude Code.
 
 ### Et aussi
 - Une encoche sur **chaque écran**.
@@ -158,7 +159,9 @@ swift scripts/make-icon.swift
 | `Notch/Home` | Onglet Raccourcis |
 | `Notch/Shelf` | Étagère et captures d'écran |
 | `Notch/Notifications` | Notifications macOS, bannières, historique |
-| `Notch/Claude` | Questions à Claude, sessions Claude Code, réponses, hooks |
+| `Notch/Claude` | Questions à Claude, sessions Claude Code, réponses, règles « Toujours », hooks |
+| `Notch/ClickUp` | Onglet ClickUp, tâches et alertes d'échéance |
+| `Notch/FocusGuard` | Gardien anti-distraction : la pince, son visage et quand elle sort (`FocusGuardTracker`) |
 | `Notch/HUD` | Activités en direct, téléchargements, Bluetooth, batterie, luminosité, caméra et micro |
 | `Notch/Volume` | Volume et touches du clavier |
 | `Notch/LockScreen` | Écran de verrouillage |

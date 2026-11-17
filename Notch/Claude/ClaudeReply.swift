@@ -18,7 +18,7 @@ enum ClaudeReply {
 
     private static let terminalID = "com.apple.Terminal"
     static let claudeAppID = "com.anthropic.claudefordesktop"
-    private static let iTermID = "com.googlecode.iterm2"
+    private nonisolated static let iTermID = "com.googlecode.iterm2"
 
     /// `sessionTitle` (titre de la session dans l'app Claude) permet d'y viser la bonne conversation.
     /// `asChoice` : la réponse est un choix proposé (question, réponses) : dans l'app Claude, on
@@ -41,46 +41,19 @@ enum ClaudeReply {
         switch (app.bundleIdentifier, tty) {
         case (iTermID, let tty?):
             // iTerm écrit directement dans la session, sans changer de fenêtre.
-            let script = """
-                tell application id "\(iTermID)"
-                    repeat with w in windows
-                        repeat with t in tabs of w
-                            repeat with s in sessions of t
-                                if tty of s is "\(tty)" then
-                                    tell s to write text "\(AppleScriptRunner.escape(message))" newline no
-                                    delay 0.25
-                                    tell s to write text ""
-                                    return "ok"
-                                end if
-                            end repeat
-                        end repeat
-                    end repeat
-                end tell
-                return "missing"
+            let script = iTermScript(
+                tty: tty,
                 """
+                tell s to write text "\(AppleScriptRunner.escape(message))" newline no
+                delay 0.25
+                tell s to write text ""
+                """)
             return await AppleScriptRunner.run(script, cached: false)?.stringValue == "ok"
                 ? .sent(app: appName) : .failed("Onglet iTerm introuvable")
 
         case (terminalID, let tty?):
             // Terminal : on affiche le bon onglet, puis on colle et on valide.
-            let script = """
-                tell application id "\(terminalID)"
-                    repeat with w in windows
-                        repeat with t in tabs of w
-                            if tty of t is "\(tty)" then
-                                set selected of t to true
-                                set index of w to 1
-                                activate
-                                return "ok"
-                            end if
-                        end repeat
-                    end repeat
-                end tell
-                return "missing"
-                """
-            guard await AppleScriptRunner.run(script, cached: false)?.stringValue == "ok" else {
-                return .failed("Onglet Terminal introuvable")
-            }
+            guard await selectTerminalTab(tty: tty) else { return .failed("Onglet Terminal introuvable") }
             try? await Task.sleep(for: .milliseconds(250))
             await paste(message, thenReturn: true, to: pid_t(app.processIdentifier))
             return .sent(app: appName)
@@ -120,42 +93,11 @@ enum ClaudeReply {
         switch (app.bundleIdentifier, ProcessOwner.ttyPath(of: pid)) {
         case (iTermID, let tty?):
             // iTerm : le caractère Échap écrit directement dans la session.
-            let script = """
-                tell application id "\(iTermID)"
-                    repeat with w in windows
-                        repeat with t in tabs of w
-                            repeat with s in sessions of t
-                                if tty of s is "\(tty)" then
-                                    tell s to write text (ASCII character 27) newline no
-                                    return "ok"
-                                end if
-                            end repeat
-                        end repeat
-                    end repeat
-                end tell
-                return "missing"
-                """
+            let script = iTermScript(tty: tty, "tell s to write text (ASCII character 27) newline no")
             return await AppleScriptRunner.run(script, cached: false)?.stringValue == "ok"
                 ? .sent(app: appName) : .failed("Onglet iTerm introuvable")
         case (terminalID, let tty?):
-            let script = """
-                tell application id "\(terminalID)"
-                    repeat with w in windows
-                        repeat with t in tabs of w
-                            if tty of t is "\(tty)" then
-                                set selected of t to true
-                                set index of w to 1
-                                activate
-                                return "ok"
-                            end if
-                        end repeat
-                    end repeat
-                end tell
-                return "missing"
-                """
-            guard await AppleScriptRunner.run(script, cached: false)?.stringValue == "ok" else {
-                return .failed("Onglet Terminal introuvable")
-            }
+            guard await selectTerminalTab(tty: tty) else { return .failed("Onglet Terminal introuvable") }
             try? await Task.sleep(for: .milliseconds(250))
             AX.press(key: escape, to: appPID)
             return .sent(app: appName)
@@ -174,6 +116,46 @@ enum ClaudeReply {
     }
 
     /// Commande shell qui ouvre Claude Code dans ce dossier avec ce premier message.
+    /// Script iTerm qui lance `commands` (avec `s`, la session) dans la session de ce terminal.
+    /// Il renvoie « ok » s'il l'a trouvée, « missing » sinon.
+    nonisolated static func iTermScript(tty: String, _ commands: String) -> String {
+        """
+        tell application id "\(iTermID)"
+            repeat with w in windows
+                repeat with t in tabs of w
+                    repeat with s in sessions of t
+                        if tty of s is "\(AppleScriptRunner.escape(tty))" then
+        \(commands)
+                            return "ok"
+                        end if
+                    end repeat
+                end repeat
+            end repeat
+        end tell
+        return "missing"
+        """
+    }
+
+    /// Affiche, au premier plan, l'onglet Terminal de ce terminal.
+    private static func selectTerminalTab(tty: String) async -> Bool {
+        let script = """
+            tell application id "\(terminalID)"
+                repeat with w in windows
+                    repeat with t in tabs of w
+                        if tty of t is "\(AppleScriptRunner.escape(tty))" then
+                            set selected of t to true
+                            set index of w to 1
+                            activate
+                            return "ok"
+                        end if
+                    end repeat
+                end repeat
+            end tell
+            return "missing"
+            """
+        return await AppleScriptRunner.run(script, cached: false)?.stringValue == "ok"
+    }
+
     nonisolated static func sessionCommand(prompt: String, in cwd: String, cli: URL?) -> String {
         func quoted(_ text: String) -> String { "'" + text.replacingOccurrences(of: "'", with: "'\\''") + "'" }
         let claude = cli.map { quoted($0.path) } ?? "claude"

@@ -18,6 +18,11 @@ enum ClaudePermissionRules {
     ]
     /// Jamais autorisées une fois pour toutes.
     private static let neverAlways: Set<String> = ["rm", "sudo", "su", "dd", "mkfs", "chmod", "chown", "kill", "killall"]
+    /// Lancent une autre commande : « env:* » ou « bash:* » autoriseraient tout, rm compris.
+    private static let launchers: Set<String> = [
+        "env", "bash", "sh", "zsh", "fish", "eval", "exec", "xargs", "nohup", "time", "timeout", "nice", "command",
+        "builtin", "osascript", "find", "doas",
+    ]
     /// Outils qu'on autorise en entier.
     private static let wholeTools: Set<String> = ["Edit", "Write", "MultiEdit", "NotebookEdit", "Read", "Glob", "Grep", "WebSearch"]
 
@@ -44,7 +49,10 @@ enum ClaudePermissionRules {
         let words = first.split(separator: " ").map(String.init).filter { !$0.isEmpty }
         // Variables d'environnement en tête (« FOO=1 npm test »).
         let command = words.drop { $0.contains("=") && !$0.hasPrefix("-") }
-        guard let head = command.first, !neverAlways.contains(head), !head.hasPrefix("-") else { return nil }
+        guard let head = command.first, !head.hasPrefix("-") else { return nil }
+        // « /bin/rm » ou « \rm » restent « rm ».
+        let name = (head.split(separator: "/").last.map(String.init) ?? head).trimmingCharacters(in: ["\\"])
+        guard !neverAlways.contains(name), !launchers.contains(name) else { return nil }
         if twoWordCommands.contains(head), let sub = command.dropFirst().first, !sub.hasPrefix("-") {
             return "\(head) \(sub)"
         }

@@ -101,25 +101,16 @@ final class FocusGuard {
         return custom > 0 ? custom : 30
     }
 
-    /// Site ou app interdits au premier plan, et depuis quand (le délai repart de zéro dès qu'on
-    /// en sort).
-    @ObservationIgnored private var pending: (key: String, since: Date, lastSeen: Date)?
-
     /// Absence tolérée (lecture ratée, coup d'œil ailleurs) avant de remettre le délai à zéro.
     static let leaveTolerance: TimeInterval = 5
-
-    /// Une fois chassée, la pince revient au bout de ce temps si tu es toujours sur le site :
-    /// de plus en plus vite à chaque fois (2 min, 1 min, puis 30 s).
-    static func snoozeDuration(anger: Int) -> TimeInterval {
-        [2 * 60, 60, 30][min(max(anger - 1, 0), 2)]
-    }
 
     /// Chassée autant de fois, elle ne se laisse plus faire.
     static let maxChases = 2
 
     @ObservationIgnored private let overlay = GuardianOverlay()
-    @ObservationIgnored private var snoozedUntil: [String: Date] = [:]
-    @ObservationIgnored private var angerByKey: [String: Int] = [:]
+    /// Délai, répit et colère : décide quand la pince sort.
+    @ObservationIgnored private var tracker = FocusGuardTracker(
+        gracePeriod: FocusGuard.gracePeriod, leaveTolerance: FocusGuard.leaveTolerance)
     @ObservationIgnored private var timer: Timer?
     @ObservationIgnored private var activationObserver: NSObjectProtocol?
     @ObservationIgnored private var checking = false
@@ -187,17 +178,21 @@ final class FocusGuard {
 
     /// Plus de surveillance (désactivé, fin du Pomodoro) : tout est oublié.
     private func reset() {
-        pending = nil
-        snoozedUntil.removeAll()
-        angerByKey.removeAll()
-        if watchingSince != nil { watchingSince = nil }
-        if anger != 0 { anger = 0 }
+        tracker.reset()
+        publishTracker()
         overlay.leave()
+    }
+
+    /// Recopie l'état du suivi dans les propriétés observées (sans réécrire une valeur égale,
+    /// qui redessinerait l'encoche pour rien).
+    private func publishTracker() {
+        if watchingSince != tracker.watchingSince { watchingSince = tracker.watchingSince }
+        if anger != tracker.anger { anger = tracker.anger }
     }
 
     private func check() {
         guard isActive else {
-            if pending != nil || !overlay.isIdle || !angerByKey.isEmpty { reset() }
+            if tracker.hasState || !overlay.isIdle { reset() }
             return
         }
         guard overlay.isIdle, !checking else { return }
@@ -205,46 +200,13 @@ final class FocusGuard {
         Task {
             defer { checking = false }
             guard isActive, overlay.isIdle else { return }
-            let now = Date()
-            guard let target = await currentTarget() else {
-                // Une lecture ratée (page qui charge, vidéo en plein écran…) ne remet pas le
-                // compteur à zéro : seulement si on a vraiment quitté le site quelques secondes.
-                if let pending, now.timeIntervalSince(pending.lastSeen) > Self.leaveTolerance {
-                    self.pending = nil
-                    snoozedUntil.removeAll()
-                    angerByKey.removeAll()
-                    watchingSince = nil
-                    anger = 0
-                } else if pending == nil, snoozedUntil.isEmpty {
-                    if watchingSince != nil { watchingSince = nil }
-                    if anger != 0 { anger = 0 }
-                }
-                return
-            }
-            // Un autre site : le répit et la colère de l'ancien sont oubliés.
-            snoozedUntil = snoozedUntil.filter { $0.key == target.key }
-            angerByKey = angerByKey.filter { $0.key == target.key }
-            let currentAnger = angerByKey[target.key] ?? 0
-            if anger != currentAnger { anger = currentAnger }
-            if let until = snoozedUntil[target.key] {
-                guard until <= now else { return }
-                // Chassée, elle revient d'elle-même à la fin du répit, sans nouveau délai.
-                snoozedUntil[target.key] = nil
-                pending = nil
+            let target = await currentTarget()
+            tracker.gracePeriod = Self.gracePeriod
+            let decision = tracker.observe(target?.key, at: Date())
+            publishTracker()
+            if decision == .intercept, let target {
                 await intercept(target)
-                return
             }
-            guard let pending, pending.key == target.key else {
-                self.pending = (target.key, now, now)
-                watchingSince = now
-                return
-            }
-            self.pending?.lastSeen = now
-            if watchingSince != pending.since { watchingSince = pending.since }
-            guard now.timeIntervalSince(pending.since) >= Self.gracePeriod else { return }
-            self.pending = nil
-            watchingSince = nil
-            await intercept(target)
         }
     }
 
@@ -293,7 +255,7 @@ final class FocusGuard {
         // Le visage reste resserré jusqu'au retour de la pince (sinon il se redéploierait
         // pendant qu'il disparaît).
         isClawOut = true
-        let anger = angerByKey[target.key] ?? 0
+        let anger = tracker.anger(for: target.key)
         overlay.intercept(
             tab: tab,
             grabPoint: grabPoint,
@@ -303,16 +265,12 @@ final class FocusGuard {
             stillThere: { [weak self] in await self?.currentTarget() == target },
             close: { [weak self] in
                 Self.close(target)
-                // Onglet attrapé : sa colère retombe.
-                self?.angerByKey[target.key] = nil
-                self?.anger = 0
+                self?.tracker.grabbed(target.key)
+                self?.publishTracker()
             },
             chased: { [weak self] in
-                guard let self else { return }
-                let anger = (angerByKey[target.key] ?? 0) + 1
-                angerByKey[target.key] = anger
-                self.anger = anger
-                snoozedUntil[target.key] = Date().addingTimeInterval(Self.snoozeDuration(anger: anger))
+                self?.tracker.chased(target.key, at: Date())
+                self?.publishTracker()
             }
         )
     }
@@ -320,7 +278,9 @@ final class FocusGuard {
     private static func close(_ target: Target) {
         switch target {
         case .app(let bundleID, _, _):
-            NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).forEach { $0.terminate() }
+            for app in NSRunningApplication.runningApplications(withBundleIdentifier: bundleID) {
+                app.terminate()
+            }
         case .site(_, _, let pid):
             // ⌘W : ferme l'onglet affiché, dans tous les navigateurs. La touche « W » dépend
             // du clavier : en AZERTY, la touche 13 est le « Z » (⌘Z rouvrait un onglet).
