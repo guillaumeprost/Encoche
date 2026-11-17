@@ -24,6 +24,8 @@ final class GuardianOverlay {
         /// Position du bas de l'encoche par rapport au haut du moyeu (`y` vers le haut), tant
         /// qu'elle est assez proche pour que le verre de la pince s'y soude (mitose).
         var root: CGPoint?
+        /// Posée devant l'encoche (onglet juste en dessous) : un liseré la détache du noir.
+        var overNotch = false
         var onTap: () -> Void = {}
     }
 
@@ -60,6 +62,8 @@ final class GuardianOverlay {
     private var notchX: CGFloat = 0
     /// Vrai pendant la sortie de l'encoche et le retour : elle peut s'y souder (mitose).
     private var merging = false
+    /// Demi-largeur de la zone noire de l'encoche (avec ses activités de part et d'autre).
+    private var notchHalfWidth: CGFloat = 150
 
     private var stillThere: () async -> Bool = { false }
     private var close: () -> Void = {}
@@ -94,6 +98,10 @@ final class GuardianOverlay {
         let menuBar = screen.safeAreaInsets.top > 0 ? screen.safeAreaInsets.top : top - screen.visibleFrame.maxY
         railY = top - max(menuBar, 24)
         notchX = screen.frame.midX
+        if let left = screen.auxiliaryTopLeftArea, let right = screen.auxiliaryTopRightArea {
+            // Encoche du Mac, élargie par les activités affichées de chaque côté.
+            notchHalfWidth = (screen.frame.width - left.width - right.width) / 2 + 80
+        }
         // Cachée derrière l'encoche au départ.
         hook = NSPoint(x: notchX, y: top + 10)
 
@@ -102,6 +110,8 @@ final class GuardianOverlay {
         model.message = nil
         model.carried = nil
         model.wiggle = false
+        model.overNotch = false
+        clawPanel?.level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 2)
         showPanels()
 
         // Griffes refermées pile sur l'onglet (le moyeu peut passer sur la barre de menus).
@@ -236,6 +246,12 @@ final class GuardianOverlay {
         let rise = railY - hook.y
         let root = merging && rise < Self.splitDepth ? CGPoint(x: notchX - hook.x, y: rise) : nil
         if root != model.root { model.root = root }
+        // Onglet sous l'encoche : la pince passe devant elle au lieu de s'y cacher.
+        let overNotch = !merging && abs(hook.x - notchX) < notchHalfWidth + 30 && hook.y > railY - 30
+        if overNotch != model.overNotch {
+            model.overNotch = overNotch
+            clawPanel?.level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + (overNotch ? 4 : 2))
+        }
         let length = max(railY - hook.y + 4, 0)
         cablePanel?.setFrame(NSRect(x: hook.x - 1.5, y: hook.y - 2, width: 3, height: length + 2), display: true)
         cablePanel?.alphaValue = length > 0 ? 1 : 0
@@ -399,10 +415,11 @@ private struct ClawView: View {
             topLeadingRadius: 3, bottomLeadingRadius: 11, bottomTrailingRadius: 11, topTrailingRadius: 3)
         return
             shape
-            .fill(.black)
-            .overlay(shape.strokeBorder(.white.opacity(0.2), lineWidth: 0.75))
+            .fill(model.overNotch ? Color(white: 0.13) : .black)
+            .overlay(shape.strokeBorder(.white.opacity(model.overNotch ? 0.55 : 0.2), lineWidth: model.overNotch ? 1 : 0.75))
             .frame(width: Self.hubSize.width, height: Self.hubSize.height)
-            .shadow(color: .black.opacity(0.35), radius: 3, y: 2)
+            .shadow(color: model.overNotch ? .white.opacity(0.25) : .black.opacity(0.35), radius: 3, y: model.overNotch ? 0 : 2)
+            .animation(.easeInOut(duration: 0.25), value: model.overNotch)
     }
 
     private var eyes: some View {
