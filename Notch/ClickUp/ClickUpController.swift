@@ -174,7 +174,7 @@ final class ClickUpController {
         // réponse : lu hors du fil principal, pour ne pas bloquer toute l'app en attendant.
         state = .loading
         Task { [weak self] in
-            let saved = await Task.detached { Keychain.read() }.value
+            let saved = await ClickUpKeychain.read()
             self?.tokenLoaded(saved)
         }
         isAppRunning = !NSRunningApplication.runningApplications(withBundleIdentifier: Self.bundleID).isEmpty
@@ -224,7 +224,9 @@ final class ClickUpController {
     func setToken(_ value: String) {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        Keychain.save(trimmed)
+        Task {
+            if !(await ClickUpKeychain.save(trimmed)) { NSLog("[Encoche] ClickUp token save failed") }
+        }
         token = trimmed
         resetAccount()
         state = .loading
@@ -232,7 +234,7 @@ final class ClickUpController {
     }
 
     func removeToken() {
-        Keychain.delete()
+        Task { await ClickUpKeychain.delete() }
         token = nil
         resetAccount()
         tasks = []
@@ -756,39 +758,5 @@ extension Color {
             green: Double((value >> 8) & 0xFF) / 255,
             blue: Double(value & 0xFF) / 255
         )
-    }
-}
-
-/// Le jeton ClickUp, dans le Trousseau de session.
-private enum Keychain {
-    private static var query: [String: Any] {
-        [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: "com.guillaumeprost.notch.clickup",
-            kSecAttrAccount as String: "api-token",
-        ]
-    }
-
-    static func read() -> String? {
-        var query = query
-        query[kSecReturnData as String] = true
-        query[kSecMatchLimit as String] = kSecMatchLimitOne
-        var result: CFTypeRef?
-        guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess, let data = result as? Data else {
-            return nil
-        }
-        return String(data: data, encoding: .utf8)
-    }
-
-    static func save(_ token: String) {
-        delete()
-        var item = query
-        item[kSecValueData as String] = Data(token.utf8)
-        let status = SecItemAdd(item as CFDictionary, nil)
-        if status != errSecSuccess { NSLog("[Encoche] ClickUp token save failed: \(status)") }
-    }
-
-    static func delete() {
-        SecItemDelete(query as CFDictionary)
     }
 }

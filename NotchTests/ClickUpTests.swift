@@ -194,3 +194,22 @@ struct ClickUpTests {
         #expect(statuses.map(\.id) == ["📥 todo", "🛠️ at work"])
     }
 }
+
+/// Le jeton ClickUp passe à l'outil `security` par son entrée standard.
+struct ClickUpKeychainTests {
+    @Test func buildsTheAddCommand() {
+        #expect(
+            ClickUpKeychain.addCommand("pk_123_ABC")
+                == "add-generic-password -U -s \"com.guillaumeprost.notch.clickup-token\" -a \"api-token\" -w \"pk_123_ABC\"\n")
+    }
+
+    @Test func escapesQuotesAndBackslashes() {
+        let command = ClickUpKeychain.addCommand(#"a"b\c"#)
+        #expect(command?.hasSuffix(#"-w "a\"b\\c""# + "\n") == true)
+    }
+
+    @Test func refusesEmptyOrMultilineTokens() {
+        #expect(ClickUpKeychain.addCommand("") == nil)
+        #expect(ClickUpKeychain.addCommand("pk_1\nrm") == nil)
+    }
+}

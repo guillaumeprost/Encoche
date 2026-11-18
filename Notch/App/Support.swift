@@ -35,7 +35,9 @@ enum ProcessRunner {
     }
 
     /// Renvoie sa sortie standard et son code de retour, ou `nil` s'il n'a pas pu être lancé.
-    nonisolated static func run(_ path: String, _ arguments: [String]) async -> Output? {
+    /// `input` est écrit sur son entrée standard (un secret n'apparaît pas dans ses arguments,
+    /// visibles par les autres processus).
+    nonisolated static func run(_ path: String, _ arguments: [String], input: Data? = nil) async -> Output? {
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
                 let process = Process()
@@ -44,11 +46,17 @@ enum ProcessRunner {
                 let output = Pipe()
                 process.standardOutput = output
                 process.standardError = FileHandle.nullDevice
+                let stdin = input.map { _ in Pipe() }
+                if let stdin { process.standardInput = stdin }
                 do {
                     try process.run()
                 } catch {
                     continuation.resume(returning: nil)
                     return
+                }
+                if let stdin, let input {
+                    stdin.fileHandleForWriting.write(input)
+                    try? stdin.fileHandleForWriting.close()
                 }
                 let data = output.fileHandleForReading.readDataToEndOfFile()
                 process.waitUntilExit()
