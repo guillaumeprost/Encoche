@@ -18,6 +18,7 @@ final class NotchWindowController {
     private let downloads: DownloadMonitor
     private let timer: TimerController
     private let focus: FocusMonitor
+    private let focusGuard: FocusGuard
     private let calls: CallMonitor
     private let settings: AppSettings
     private let alerts: AlertCenter
@@ -42,6 +43,7 @@ final class NotchWindowController {
         downloads = services.downloads
         timer = services.timer
         focus = services.focus
+        focusGuard = services.focusGuard
         calls = services.calls
         settings = services.settings
         alerts = services.alerts
@@ -172,7 +174,10 @@ final class NotchWindowController {
         // Même place que dans NotchRootView : décalée de 6 points à droite de la forme, 4 sous le haut.
         guard activities.count > 1 else { return nil }
         let size = viewModel.activityHeight - 8
-        let bubble = NSRect(x: hot.maxX + viewModel.topRadius + 6, y: hot.maxY - 2 - 4 - size, width: size, height: size)
+        // Les yeux du gardien, quand ils sont là, la poussent d'une case.
+        let eyes = focusGuard.isActive && !focusGuard.isClawOut ? GuardianPeek.slot : 0
+        let bubble = NSRect(
+            x: hot.maxX + viewModel.topRadius + 6 + eyes, y: hot.maxY - 2 - 4 - size, width: size, height: size)
         return bubble.insetBy(dx: -8, dy: -6).contains(mouse) ? activities[1] : nil
     }
 

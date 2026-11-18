@@ -150,8 +150,9 @@ struct NotchRootView: View {
                 // Un peu plus petite que l'encoche, et décollée du haut de l'écran.
                 let size = vm.activityHeight - 8
                 // Elle se divise depuis le bord de l'encoche (sous l'évasement du haut).
-                MitosisBubble(activity: second, size: size, gap: 6 + vm.topRadius)
-                    .offset(x: size + 6, y: 4)
+                // À côté des yeux du gardien quand ils sont là.
+                MitosisBubble(activity: second, size: size, gap: 6 + vm.topRadius + guardianSlot)
+                    .offset(x: size + 6 + guardianSlot, y: 4)
                     .id(second)
                     .transition(
                         .asymmetric(
@@ -160,17 +161,18 @@ struct NotchRootView: View {
                         ))
             }
         }
-        // Le gardien surveille : son visage prolonge l'encoche repliée par en dessous. Dessiné
-        // derrière elle, il ne recouvre rien de ce qu'elle affiche (activités, Claude…).
+        // Le gardien surveille : ses yeux, de part et d'autre de l'encoche repliée. Dessinés
+        // derrière elle, ils ne recouvrent rien de ce qu'elle affiche (activités, Claude…).
         .background(alignment: .top) {
             if showsGuardianPeek {
-                GuardianPeek(width: size.width - 2 * vm.topRadius)
-                    .offset(y: size.height - GuardianPeek.overlap)
-                    // Il descend de derrière l'encoche (de haut en bas), et y remonte.
-                    .transition(.offset(y: -GuardianPeek.travel))
+                GuardianPeek(
+                    notchWidth: size.width, height: size.height, topRadius: vm.topRadius, bottomRadius: vm.bottomRadius
+                )
+                .transition(.asymmetric(insertion: .identity, removal: .opacity.animation(.linear(duration: 0.08))))
             }
         }
         .animation(spring, value: showsGuardianPeek)
+        .animation(spring, value: guardianSlot)
         .animation(spring, value: activities)
         .contextMenu {
             @Bindable var focusGuard = focusGuard
@@ -233,7 +235,10 @@ struct NotchRootView: View {
     /// t'attend, caméra ou micro, téléchargement, Claude Code au travail, puis la musique.
     private var showsActivity: Bool { !activities.isEmpty }
 
-    /// Yeux du gardien sous l'encoche repliée, sauf quand la pince est sortie.
+    /// Place prise par un œil du gardien de chaque côté de l'encoche.
+    private var guardianSlot: CGFloat { showsGuardianPeek ? GuardianPeek.slot : 0 }
+
+    /// Yeux du gardien autour de l'encoche repliée, sauf quand la pince est sortie.
     private var showsGuardianPeek: Bool {
         focusGuard.isActive && !focusGuard.isClawOut && !vm.isOpen && !vm.showsAlert && !vm.showsHUD
     }

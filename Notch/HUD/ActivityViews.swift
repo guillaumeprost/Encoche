@@ -494,60 +494,75 @@ struct CollapsedTimerView: View {
 }
 
 /// Mode Concentration actif : son symbole à gauche de l'encoche.
-/// Le visage de la pince, sous l'encoche repliée et sur toute sa largeur. Ses yeux suivent le
-/// curseur et clignent ; sur un site interdit, ils se plissent (orange, puis rouges une fois
-/// chassée) et une barre se vide jusqu'à ce que la pince sorte ; contents après une prise.
+/// Les yeux de la pince, de part et d'autre de l'encoche repliée : elle s'élargit d'une case
+/// noire de chaque côté, un œil dans chacune. Ils suivent le curseur et clignent ; sur un site
+/// interdit, ils se plissent (orange, puis rouges une fois chassée) au-dessus d'une barre qui se
+/// vide ; contents après une prise. Ils sortent de derrière l'encoche et y rentrent quand la
+/// pince part.
 struct GuardianPeek: View {
     @Environment(FocusGuard.self) private var guardian
     @State private var face = GuardianFace()
-    /// Largeur du corps de l'encoche (sans ses évasements du haut).
-    let width: CGFloat
+    @State private var appeared = false
+    /// Largeur de l'encoche repliée (évasements du haut compris) et sa forme.
+    let notchWidth: CGFloat
+    let height: CGFloat
+    let topRadius: CGFloat
+    let bottomRadius: CGFloat
 
-    private static let height: CGFloat = 30
-    /// Hauteur cachée sous l'encoche : elle comble ses coins arrondis du bas, pour que le
-    /// visage la prolonge sans couture.
-    static let overlap: CGFloat = 14
-    /// Distance dont il remonte pour se cacher derrière l'encoche.
-    static let travel: CGFloat = height + 4
+    /// Case de chaque œil, ajoutée de chaque côté de l'encoche.
+    static let slot: CGFloat = 32
+    private static let eyeScale: CGFloat = 1.4
+    /// Bande ajoutée sous l'encoche pendant le décompte.
+    private static let countdownHeight: CGFloat = 9
+
+    /// Décompte en cours (yeux sortis, sur un site interdit).
+    private var counting: Bool { guardian.watchingSince != nil && appeared && !guardian.isClawLaunching }
 
     var body: some View {
-        let launching = guardian.isClawLaunching
-        ZStack(alignment: .bottom) {
-            UnevenRoundedRectangle(bottomLeadingRadius: 13, bottomTrailingRadius: 13, style: .continuous)
+        let open = appeared && !guardian.isClawLaunching
+        let body = notchWidth - 2 * topRadius
+        // Écart entre les deux yeux : chacun au milieu de sa case (largeur d'un œil déduite).
+        let spacing = open ? body + Self.slot - 6 * Self.eyeScale : 0
+        ZStack {
+            NotchShape(topRadius: topRadius, bottomRadius: bottomRadius)
                 .fill(.black)
             GuardianEyes(
-                style: launching ? .focused : style,
+                style: guardian.isClawLaunching ? .focused : style,
                 color: GuardianEyes.color(anger: guardian.anger),
-                scale: 1.5,
-                spacing: launching ? 18 : width * 0.26,
-                blinking: face.blinking && !launching
+                scale: Self.eyeScale,
+                spacing: spacing,
+                blinking: face.blinking && open
             )
-            // Au départ de la pince, les yeux se rejoignent au milieu…
-            .offset(x: launching ? 0 : face.look.width * width * 0.07, y: face.look.height * 3)
+            // Centrés dans la hauteur de l'encoche, même quand la bande du décompte l'allonge.
+            .offset(x: face.look.width * 4, y: face.look.height * 3 - (counting ? Self.countdownHeight / 2 : 0))
             .animation(.easeOut(duration: 0.25), value: face.look)
-            .padding(.bottom, guardian.watchingSince == nil ? 9 : 11)
-            if let since = guardian.watchingSince {
-                // Seule la barre se redessine en continu, et seulement pendant le décompte.
+            if let since = guardian.watchingSince, open {
+                // Le décompte, sur toute la largeur, dans la bande ajoutée sous l'encoche
+                // (seul à se redessiner en continu).
+                let full = body + 2 * Self.slot - 2 * bottomRadius
                 TimelineView(.periodic(from: .now, by: 0.25)) { context in
                     let left = max(FocusGuard.gracePeriod - context.date.timeIntervalSince(since), 0)
                     Capsule()
                         .fill(GuardianEyes.color(anger: max(guardian.anger, 1)))
-                        .frame(width: width * 0.4 * left / FocusGuard.gracePeriod, height: 2)
-                        .frame(width: width * 0.4)
+                        .frame(width: full * left / FocusGuard.gracePeriod, height: 3)
+                        .frame(width: full)
                         .animation(.linear(duration: 0.25), value: left)
                 }
+                .frame(maxHeight: .infinity, alignment: .bottom)
                 .padding(.bottom, 4)
             }
         }
-        .frame(width: width, height: Self.height + Self.overlap)
-        // …et le visage remonte derrière l'encoche, d'où la pince va tomber.
-        .offset(y: launching ? -Self.travel : 0)
+        // Les cases s'ouvrent de chaque côté ; l'encoche, devant, cache ce qui dépasse pas.
+        .frame(width: notchWidth + (open ? 2 * Self.slot : 0), height: height + (counting ? Self.countdownHeight : 0))
+        .animation(.spring(response: 0.45, dampingFraction: 0.75), value: open)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: guardian.watchingSince == nil)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: guardian.anger)
         .animation(.spring(response: 0.3, dampingFraction: 0.6), value: guardian.isHappy)
-        .animation(.easeIn(duration: 0.35), value: launching)
         .allowsHitTesting(false)
-        .onAppear { face.start() }
+        .onAppear {
+            face.start()
+            appeared = true
+        }
         .onDisappear { face.stop() }
     }
 
